@@ -72,7 +72,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // TODO: Save the post to database
         // For now, we'll create a mock post and redirect back
-        
+
         // Processing the image if one was uploaded
         $imagePath = null;
         if (request()->hasFile('image') && request()->file('image')->isValid()) {

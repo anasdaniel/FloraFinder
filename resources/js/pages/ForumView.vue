@@ -1,17 +1,42 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { ref, onMounted } from 'vue';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Heading from '@/components/Heading.vue';
 import Icon from '@/components/Icon.vue';
+import { useToast } from '@/composables/useToast';
 import type { BreadcrumbItem, User } from '@/types';
+
+const { toast } = useToast();
+const page = usePage();
+
+// Define flash message types
+interface FlashMessages {
+  success?: string;
+  error?: string;
+}
+
+// Access flash messages from page props
+const flash = page.props.flash as FlashMessages;
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Forum', href: '/forum' },
 ];
+
+// Check for flash messages on component mount
+onMounted(() => {
+  // Show success message if it exists in the flash session
+  if (flash?.success) {
+    toast({
+      title: 'Success',
+      description: flash.success,
+      variant: 'success'
+    });
+  }
+});
 
 // Example forum threads data
 const threads = ref([
@@ -105,7 +130,7 @@ const selectedCategory = ref('general');
             <div class="flex-1 min-w-0">
               <CardTitle class="text-lg font-semibold truncate">
                 <Link :href="`/forum/${thread.id}`" class="transition-colors hover:text-primary">{{ thread.title }}</Link>
-              </CardTitle>
+              </CardTitle> 
               <div class="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                 <span>By {{ thread.author.name }}</span>
                 <span class="mx-1">•</span>

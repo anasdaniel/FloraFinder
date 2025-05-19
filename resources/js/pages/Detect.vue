@@ -174,21 +174,21 @@ const gettingLocation = ref<boolean>(false);
 const useUploadLocation = (): void => {
   if (navigator.geolocation) {
     gettingLocation.value = true;
-    
+
     // Update button UI to show loading state
     toast({
       title: "Getting Your Location",
       description: "Please wait while we access your location...",
       variant: "default",
     });
-    
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         // Format coordinates to 6 decimal places for precision
         form.latitude = parseFloat(position.coords.latitude.toFixed(6));
         form.longitude = parseFloat(position.coords.longitude.toFixed(6));
         form.includeLocation = true;
-        
+
         // Try to get location name based on coordinates using reverse geocoding
         reverseGeocode(position.coords.latitude, position.coords.longitude);
 
@@ -203,7 +203,7 @@ const useUploadLocation = (): void => {
       (error) => {
         // Show error toast with more specific message
         let errorMessage = "Unable to get your current location.";
-        
+
         switch (error.code) {
           case error.PERMISSION_DENIED:
             errorMessage = "Location permission denied. Please enable location services in your browser settings.";
@@ -215,7 +215,7 @@ const useUploadLocation = (): void => {
             errorMessage = "Location request timed out. Please try again.";
             break;
         }
-        
+
         toast({
           title: "Location Error",
           description: errorMessage,
@@ -224,10 +224,10 @@ const useUploadLocation = (): void => {
         form.includeLocation = false;
         gettingLocation.value = false;
       },
-      { 
-        enableHighAccuracy: true, 
+      {
+        enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0 
+        maximumAge: 0
       }
     );
   } else {
@@ -246,29 +246,29 @@ const reverseGeocode = async (latitude: number, longitude: number): Promise<void
     // This is a simple example using Nominatim OpenStreetMap service
     // In a production app, you might want to use a paid service like Google Maps API
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`);
-    
+
     if (response.ok) {
       const data = await response.json();
       if (data && data.display_name) {
         // Extract a simplified location name
         let locationName = data.name || "";
-        
+
         // Set region based on available admin levels
         let region = "";
         if (data.address) {
           region = data.address.state || data.address.province || data.address.city || "Peninsular Malaysia";
-          
+
           // If we don't have a location name but have address components, create a name
           if (!locationName) {
             locationName = data.address.city || data.address.town || data.address.village || data.address.suburb || "";
           }
         }
-        
+
         // Set the form values if we found something useful
         if (locationName) {
           form.locationName = locationName;
         }
-        
+
         // Try to find the best match in malaysianRegions
         if (region && Array.isArray(malaysianRegions)) {
           for (const r of malaysianRegions) {
@@ -278,7 +278,7 @@ const reverseGeocode = async (latitude: number, longitude: number): Promise<void
             }
           }
         }
-        
+
         // Show success toast for location name if found
         if (locationName) {
           toast({
@@ -882,8 +882,8 @@ const submitSightingReport = () => {
                         placeholder="e.g. 4.2105"
                         class="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-moss-400 dark:bg-moss-900/40 dark:text-white border-moss-300 dark:border-moss-700"
                       />
-                      <div 
-                        v-if="gettingLocation" 
+                      <div
+                        v-if="gettingLocation"
                         class="absolute inset-y-0 right-0 flex items-center pr-3"
                       >
                         <Icon name="loader-2" class="w-4 h-4 text-moss-400 animate-spin" />
@@ -903,8 +903,8 @@ const submitSightingReport = () => {
                         placeholder="e.g. 101.9758"
                         class="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-moss-400 dark:bg-moss-900/40 dark:text-white border-moss-300 dark:border-moss-700"
                       />
-                      <div 
-                        v-if="gettingLocation" 
+                      <div
+                        v-if="gettingLocation"
                         class="absolute inset-y-0 right-0 flex items-center pr-3"
                       >
                         <Icon name="loader-2" class="w-4 h-4 text-moss-400 animate-spin" />
@@ -918,7 +918,7 @@ const submitSightingReport = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    class="w-full px-4 py-2 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900/30 transition-colors shadow-sm"
+                    class="w-full px-4 py-2 text-blue-700 transition-colors border-blue-200 shadow-sm bg-blue-50 hover:bg-blue-100 hover:border-blue-300 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900/30"
                     @click="useUploadLocation"
                     :disabled="gettingLocation"
                   >
@@ -932,7 +932,7 @@ const submitSightingReport = () => {
                     </template>
                   </Button>
                 </div>
-                
+
                 <div class="flex items-center mt-3">
                   <input
                     id="includeLocation"
@@ -977,13 +977,13 @@ const submitSightingReport = () => {
             <div class="flex justify-end mb-2">
               <Button
                 variant="outline"
-                class="px-4 py-2 text-gray-700 bg-white border-gray-300 rounded-full shadow-sm hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-700 transition-colors"
+                class="px-4 py-2 text-gray-700 transition-colors bg-white border-gray-300 rounded-full shadow-sm hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-700"
                 @click="resetForm"
               >
                 <Icon name="refresh-cw" class="w-4 h-4 mr-2" /> Clear Results & Start Over
               </Button>
             </div>
-            <div class="w-full h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent dark:via-gray-700 mb-4"></div>
+            <div class="w-full h-px mb-4 bg-gradient-to-r from-transparent via-gray-200 to-transparent dark:via-gray-700"></div>
           </div>
 
           <!-- Loading State -->
