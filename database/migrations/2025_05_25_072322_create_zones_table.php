@@ -20,8 +20,8 @@ return new class extends Migration
 
         Schema::create('plant_zone', function (Blueprint $table) {
             $table->id();
-            $table->foreignIdFor(\App\Models\Plant::class)->constrained()->cascadeOnDelete()
-            $table->foreignIdFor(\App\Models\Zone::class)->constrained()->cascadeOnDelete()
+            $table->foreignIdFor(\App\Models\Plant::class)->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(\App\Models\Zone::class)->constrained()->cascadeOnDelete();
             $table->timestamps();
         });
     }
