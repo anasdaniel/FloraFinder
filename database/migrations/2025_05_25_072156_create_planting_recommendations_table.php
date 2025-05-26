@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('temperature_range', 100);
             $table->string('fertilizer_type', 100);
             $table->string('humidity_level', 100);
+            $table->timestamps();
         });
     }
 

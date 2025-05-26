@@ -17,7 +17,8 @@ class PlantCategoryFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'category_name' => $this->faker->word(),
+            'description' => $this->faker->sentence(),
         ];
     }
 }

@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('family', 100);
             $table->string('habitat', 100);
             $table->string('lifespan',50);
-
+            $table->timestamps();
         });
     }
 

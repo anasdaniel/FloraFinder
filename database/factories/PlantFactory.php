@@ -17,7 +17,14 @@ class PlantFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'plant_category_id' => \App\Models\PlantCategory::factory(),
+            'conservation_status_id' => \App\Models\ConservationStatus::factory(),
+            'planting_recommendation_id' => \App\Models\PlantingRecommendation::factory(),
+            'common_name' => $this->faker->word(),
+            'scientific_name' => $this->faker->word(),
+            'family' => $this->faker->word(),
+            'habitat' => $this->faker->word(),
+            'lifespan' => $this->faker->numberBetween(1, 100),
         ];
     }
 }

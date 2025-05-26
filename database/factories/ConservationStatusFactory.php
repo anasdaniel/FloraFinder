@@ -17,7 +17,8 @@ class ConservationStatusFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'status_name' => $this->faker->randomElement(['Endangered', 'Vulnerable', 'Least Concern', 'Extinct']),
+            'description' => $this->faker->sentence(),
         ];
     }
 }
