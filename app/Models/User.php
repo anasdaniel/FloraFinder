@@ -45,4 +45,17 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function forumPosts()
+    {
+        return $this->hasMany(ForumPost::class);
+    }
+    public function forumThreads()
+    {
+        return $this->hasMany(ForumThread::class);
+    }
+    public function sightings()
+    {
+        return $this->hasMany(Plant::class);
+    }
 }
