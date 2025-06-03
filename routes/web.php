@@ -128,6 +128,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
 
+    // Plant search route
+    Route::get('plant-search', function () {
+        return Inertia::render('PlantSearch');
+    })->name('plant-search');
+
+    // Plant Map route
+    Route::get('plant-map', function () {
+        return Inertia::render('PlantMap');
+    })->name('plant-map');
+
+
     //detect route
     // Route::get('detect', function () {
     //     return Inertia::render('Detect');
