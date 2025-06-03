@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppLayout from "@/layouts/AppLayout.vue";
-import { ref, reactive, onMounted, computed } from "vue";
+import { ref, reactive, onMounted, computed, nextTick } from "vue";
 import { router } from "@inertiajs/vue3";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -206,7 +206,8 @@ const useUploadLocation = (): void => {
 
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage = "Location permission denied. Please enable location services in your browser settings.";
+            errorMessage =
+              "Location permission denied. Please enable location services in your browser settings.";
             break;
           case error.POSITION_UNAVAILABLE:
             errorMessage = "Location information is unavailable. Please try again.";
@@ -227,7 +228,7 @@ const useUploadLocation = (): void => {
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0
+        maximumAge: 0,
       }
     );
   } else {
@@ -245,7 +246,9 @@ const reverseGeocode = async (latitude: number, longitude: number): Promise<void
   try {
     // This is a simple example using Nominatim OpenStreetMap service
     // In a production app, you might want to use a paid service like Google Maps API
-    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`);
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+    );
 
     if (response.ok) {
       const data = await response.json();
@@ -256,11 +259,20 @@ const reverseGeocode = async (latitude: number, longitude: number): Promise<void
         // Set region based on available admin levels
         let region = "";
         if (data.address) {
-          region = data.address.state || data.address.province || data.address.city || "Peninsular Malaysia";
+          region =
+            data.address.state ||
+            data.address.province ||
+            data.address.city ||
+            "Peninsular Malaysia";
 
           // If we don't have a location name but have address components, create a name
           if (!locationName) {
-            locationName = data.address.city || data.address.town || data.address.village || data.address.suburb || "";
+            locationName =
+              data.address.city ||
+              data.address.town ||
+              data.address.village ||
+              data.address.suburb ||
+              "";
           }
         }
 
@@ -272,7 +284,7 @@ const reverseGeocode = async (latitude: number, longitude: number): Promise<void
         // Try to find the best match in malaysianRegions
         if (region && Array.isArray(malaysianRegions)) {
           for (const r of malaysianRegions) {
-            if (typeof r === 'string' && region.toLowerCase().includes(r.toLowerCase())) {
+            if (typeof r === "string" && region.toLowerCase().includes(r.toLowerCase())) {
               form.region = r;
               break;
             }
@@ -296,9 +308,12 @@ const reverseGeocode = async (latitude: number, longitude: number): Promise<void
 };
 
 const openFileUpload = (): void => {
-  if (fileUploadRef.value) {
-    fileUploadRef.value.click();
-  }
+  // Use nextTick to ensure the DOM element is available
+  nextTick(() => {
+    if (fileUploadRef.value) {
+      fileUploadRef.value.click();
+    }
+  });
 };
 
 const handleDragOver = (e: DragEvent): void => {
@@ -563,9 +578,9 @@ const malaysianRegions = [
 // Function to open the sighting modal with pre-filled data if available
 const openSightingModal = () => {
   // Pre-fill with current plant location data if available
-  if (selectedResult?.species?.scientificNameWithoutAuthor) {
+  if (selectedResult.value?.species?.scientificNameWithoutAuthor) {
     const locationInfo = getPlantLocationInfo(
-      selectedResult.species.scientificNameWithoutAuthor
+      selectedResult.value.species.scientificNameWithoutAuthor
     );
     sightingReport.locationName = locationInfo.name;
     sightingReport.region = locationInfo.region;
@@ -886,7 +901,10 @@ const submitSightingReport = () => {
                         v-if="gettingLocation"
                         class="absolute inset-y-0 right-0 flex items-center pr-3"
                       >
-                        <Icon name="loader-2" class="w-4 h-4 text-moss-400 animate-spin" />
+                        <Icon
+                          name="loader-2"
+                          class="w-4 h-4 text-moss-400 animate-spin"
+                        />
                       </div>
                     </div>
                   </div>
@@ -907,7 +925,10 @@ const submitSightingReport = () => {
                         v-if="gettingLocation"
                         class="absolute inset-y-0 right-0 flex items-center pr-3"
                       >
-                        <Icon name="loader-2" class="w-4 h-4 text-moss-400 animate-spin" />
+                        <Icon
+                          name="loader-2"
+                          class="w-4 h-4 text-moss-400 animate-spin"
+                        />
                       </div>
                     </div>
                   </div>
@@ -972,20 +993,6 @@ const submitSightingReport = () => {
 
         <!-- Right Column: Results -->
         <div class="space-y-6 md:col-span-7 lg:col-span-8">
-          <!-- Clear Results Button -->
-          <div v-if="results && (results.success || !results.success)" class="flex flex-col">
-            <div class="flex justify-end mb-2">
-              <Button
-                variant="outline"
-                class="px-4 py-2 text-gray-700 transition-colors bg-white border-gray-300 rounded-full shadow-sm hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-700"
-                @click="resetForm"
-              >
-                <Icon name="refresh-cw" class="w-4 h-4 mr-2" /> Clear Results & Start Over
-              </Button>
-            </div>
-            <div class="w-full h-px mb-4 bg-gradient-to-r from-transparent via-gray-200 to-transparent dark:via-gray-700"></div>
-          </div>
-
           <!-- Loading State -->
           <Card
             v-if="processing"
