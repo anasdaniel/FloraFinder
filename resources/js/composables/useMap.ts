@@ -72,19 +72,23 @@ export function useMap() {
     if (!markersLayer.value) {
       markersLayer.value = L.markerClusterGroup();
       console.log('useMap: MarkerClusterGroup initialized.');
-      map.value.addLayer(markersLayer.value);
+      map.value.addLayer(markersLayer.value as unknown as L.Layer); // Changed type assertion
       console.log('useMap: MarkerClusterGroup added to map.');
     } else {
       console.log('useMap: markersLayer already exists. Ensuring it is added to the map.');
-      if (!map.value.hasLayer(markersLayer.value)) {
-        map.value.addLayer(markersLayer.value);
+      if (markersLayer.value && !map.value.hasLayer(markersLayer.value as unknown as L.Layer)) { // Changed type assertion
+        map.value.addLayer(markersLayer.value as unknown as L.Layer); // Changed type assertion
       }
     }
-    
+
     nextTick(() => {
       if (map.value) {
         console.log('useMap: Invalidating map size.');
-        map.value.invalidateSize();
+        map.value.invalidateSize(true);
+
+        // Also trigger a pan to ensure tiles load
+        const center = map.value.getCenter();
+        map.value.panTo(center);
       }
     });
 
@@ -116,7 +120,7 @@ export function useMap() {
       if (!isNaN(lat) && !isNaN(lng)) {
         const latLng: LatLngExpression = [lat, lng];
         const customIcon = createCustomIcon(sighting.plant?.conservation_status);
-        
+
         let popupContent = `<b>${sighting.plant?.common_name || 'Unknown Plant'}</b><br>`;
         popupContent += `Scientific Name: ${sighting.plant?.scientific_name || 'N/A'}<br>`;
         popupContent += `Sighted on: ${new Date(sighting.sighting_date).toLocaleDateString()}<br>`;
@@ -127,7 +131,7 @@ export function useMap() {
 
         const marker = L.marker(latLng, { icon: customIcon })
           .bindPopup(popupContent);
-        
+
         // addLayer is available on both MarkerClusterGroup and LayerGroup
         (markersLayer.value as L.MarkerClusterGroup | L.LayerGroup).addLayer(marker);
         bounds.extend(latLng);
@@ -157,13 +161,13 @@ export function useMap() {
         console.log('useMap: Clustering state is already as requested.');
         return;
     }
-    
+
     const currentMarkers = (markersLayer.value as L.MarkerClusterGroup | L.LayerGroup).getLayers() as L.Marker[];
     console.log(`useMap: Stored ${currentMarkers.length} current markers.`);
 
-    if (map.value.hasLayer(markersLayer.value)) {
+    if (markersLayer.value && map.value.hasLayer(markersLayer.value as unknown as L.Layer)) { // Changed type assertion
         console.log('useMap: Removing current markersLayer from map.');
-        map.value.removeLayer(markersLayer.value);
+        map.value.removeLayer(markersLayer.value as unknown as L.Layer); // Changed type assertion
     }
 
     if (enableClustering) {
@@ -172,22 +176,24 @@ export function useMap() {
         console.log('useMap: New MarkerClusterGroup created for markersLayer.');
     } else {
         console.log('useMap: Disabling clustering.');
-        markersLayer.value = L.layerGroup(); 
+        markersLayer.value = L.layerGroup();
         console.log('useMap: New LayerGroup created for markersLayer (clustering disabled).');
     }
-    
+
     if (currentMarkers.length > 0) {
         console.log(`useMap: Adding ${currentMarkers.length} markers to the new markersLayer.`);
         currentMarkers.forEach(marker => (markersLayer.value as L.MarkerClusterGroup | L.LayerGroup).addLayer(marker));
     }
 
-    map.value.addLayer(markersLayer.value);
-    console.log('useMap: New/reconfigured markersLayer added back to map.');
+    if (markersLayer.value) {
+        map.value.addLayer(markersLayer.value as unknown as L.Layer); // Changed type assertion
+        console.log('useMap: New/reconfigured markersLayer added back to map.');
+    }
 
     isClusteringEnabled.value = enableClustering;
     console.log(`useMap: Clustering is now ${isClusteringEnabled.value ? 'enabled' : 'disabled'}.`);
   };
-  
+
   const cleanup = () => {
     console.log('useMap: Cleaning up map resources...');
     if (map.value) {
@@ -198,7 +204,7 @@ export function useMap() {
     if (markersLayer.value) {
       console.log('useMap: Clearing layers from markersLayer and nullifying.');
       markersLayer.value.clearLayers();
-      markersLayer.value = null; 
+      markersLayer.value = null;
     }
     console.log('useMap: Cleanup complete.');
   };

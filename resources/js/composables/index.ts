@@ -7,7 +7,7 @@ export { useInitials } from './useInitials';
 export { useMap } from './useMap';
 
 // Types for sighting data
-interface Sighting {
+export interface Sighting {
   id: number;
   commonName: string;
   scientificName: string;
@@ -108,4 +108,3 @@ export function useSightings(filters: any) {
     }
   };
 }
-

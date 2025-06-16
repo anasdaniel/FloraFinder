@@ -12,7 +12,8 @@ const plantOfTheDay = {
     'Native to tropical Malaysia, the mangosteen produces sweet-tart fruit with thick purple rind. Its distinctive appearance and delicious flavor have earned it the nickname "Queen of Fruits".',
   conservationStatus: "Least Concern",
   image:
-    "https://images.pexels.com/photos/2127433/pexels-photo-2127433.jpeg?auto=compress&cs=tinysrgb&w=1260",
+    // "https://images.pexels.com/photos/2127433/pexels-photo-2127433.jpeg?auto=compress&cs=tinysrgb&w=1260",
+    "https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=400&h=300&fit=crop",
 };
 
 const features = [
@@ -69,7 +70,7 @@ const popularPlants = [
         class="absolute inset-0 bg-gradient-to-br from-sage-100/90 to-moss-100/90 dark:from-sage-900/90 dark:to-moss-950/90"
       ></div>
       <div
-        class="relative z-10 mx-auto max-w-7xl px-6 py-24 sm:py-32 md:flex md:items-center md:justify-between md:gap-x-8 lg:px-8"
+        class="relative z-10 px-6 py-24 mx-auto max-w-7xl sm:py-32 md:flex md:items-center md:justify-between md:gap-x-8 lg:px-8"
       >
         <div class="max-w-xl md:flex-1 md:py-12">
           <h1
@@ -82,7 +83,7 @@ const popularPlants = [
             Explore the rich biodiversity of Malaysian flora using our advanced plant
             identification technology.
           </p>
-          <div class="mt-10 flex flex-col gap-4 sm:flex-row">
+          <div class="flex flex-col gap-4 mt-10 sm:flex-row">
             <Link href="/plant-identifier" class="group">
               <Button
                 class="w-full text-white transition-all duration-200 shadow-lg bg-gradient-to-r from-moss-600 to-sage-600 hover:from-moss-700 hover:to-sage-700 dark:from-moss-800 dark:to-sage-800 dark:hover:from-moss-700 dark:hover:to-sage-700 dark:text-white rounded-xl"
@@ -108,15 +109,15 @@ const popularPlants = [
         </div>
 
         <!-- Plant Image Card -->
-        <div class="mt-12 md:mt-0 flex-1">
+        <div class="flex-1 mt-12 md:mt-0">
           <Card
             class="overflow-hidden border-0 shadow-xl rounded-3xl backdrop-blur-md bg-white/70 dark:bg-moss-900/60 ring-1 ring-gray-200 dark:ring-gray-800"
           >
             <CardHeader class="p-0">
               <img
-                src="https://images.pexels.com/photos/2183727/pexels-photo-2183727.jpeg?auto=compress&cs=tinysrgb&w=1260"
+                src="https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?"
                 alt="Malaysian plants"
-                class="w-full h-64 object-cover object-center"
+                class="object-cover object-center w-full h-64"
               />
             </CardHeader>
             <CardContent class="p-4 text-center">
@@ -134,7 +135,7 @@ const popularPlants = [
 
     <!-- Plant of the Day -->
     <div class="px-4 py-16 bg-white dark:bg-gray-950 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-5xl">
+      <div class="max-w-5xl mx-auto">
         <div class="mb-12 text-center">
           <h2
             class="text-2xl font-bold tracking-tight text-moss-900 dark:text-moss-100 sm:text-3xl"
@@ -150,11 +151,11 @@ const popularPlants = [
           class="overflow-hidden border-0 shadow-xl rounded-3xl backdrop-blur-md bg-white/80 dark:bg-sage-900/60 ring-1 ring-gray-200 dark:ring-gray-800"
         >
           <div class="grid grid-cols-1 md:grid-cols-12">
-            <div class="md:col-span-5 relative">
+            <div class="relative md:col-span-5">
               <img
                 :src="plantOfTheDay.image"
                 :alt="plantOfTheDay.commonName"
-                class="h-64 md:h-full w-full object-cover md:rounded-l-3xl"
+                class="object-cover w-full h-64 md:h-full md:rounded-l-3xl"
               />
               <div class="absolute top-4 right-4">
                 <span
@@ -164,14 +165,14 @@ const popularPlants = [
                 </span>
               </div>
             </div>
-            <div class="md:col-span-7 p-6 md:p-8 flex flex-col justify-center">
+            <div class="flex flex-col justify-center p-6 md:col-span-7 md:p-8">
               <h3 class="text-2xl font-bold text-sage-900 dark:text-white">
                 {{ plantOfTheDay.commonName }}
               </h3>
-              <p class="text-sm italic text-sage-500 dark:text-sage-400 mt-1 mb-4">
+              <p class="mt-1 mb-4 text-sm italic text-sage-500 dark:text-sage-400">
                 {{ plantOfTheDay.name }}
               </p>
-              <p class="text-sage-700 dark:text-sage-300 text-base">
+              <p class="text-base text-sage-700 dark:text-sage-300">
                 {{ plantOfTheDay.description }}
               </p>
               <div class="mt-6">
@@ -194,14 +195,14 @@ const popularPlants = [
     </div>
 
     <!-- Features Section -->
-    <div class="px-4 py-16 relative overflow-hidden sm:px-6 lg:px-8">
+    <div class="relative px-4 py-16 overflow-hidden sm:px-6 lg:px-8">
       <div
         class="absolute inset-0 bg-[url('https://images.pexels.com/photos/38136/pexels-photo-38136.jpeg?auto=compress&cs=tinysrgb&w=1260')] bg-cover bg-center bg-no-repeat opacity-20 dark:opacity-10"
       ></div>
       <div
         class="absolute inset-0 bg-gradient-to-b from-sage-50/90 to-white/90 dark:from-sage-950/90 dark:to-gray-950/90"
       ></div>
-      <div class="relative z-10 mx-auto max-w-5xl">
+      <div class="relative z-10 max-w-5xl mx-auto">
         <div class="mb-12 text-center">
           <h2
             class="text-2xl font-bold tracking-tight text-moss-900 dark:text-moss-100 sm:text-3xl"
@@ -217,18 +218,18 @@ const popularPlants = [
           <div
             v-for="feature in features"
             :key="feature.title"
-            class="overflow-hidden border-0 shadow-lg rounded-2xl backdrop-blur-md bg-white/70 dark:bg-sage-900/40 ring-1 ring-gray-200 dark:ring-gray-800 p-6 hover:shadow-xl transition-shadow"
+            class="p-6 overflow-hidden transition-shadow border-0 shadow-lg rounded-2xl backdrop-blur-md bg-white/70 dark:bg-sage-900/40 ring-1 ring-gray-200 dark:ring-gray-800 hover:shadow-xl"
           >
             <div class="flex flex-col items-center text-center">
               <div
-                class="mb-4 rounded-full bg-moss-100 dark:bg-moss-900/60 p-3 shadow-inner flex items-center justify-center"
+                class="flex items-center justify-center p-3 mb-4 rounded-full shadow-inner bg-moss-100 dark:bg-moss-900/60"
               >
                 <span class="text-2xl" v-if="feature.icon === 'camera'">📷</span>
                 <span class="text-2xl" v-else-if="feature.icon === 'book-open'">📚</span>
                 <span class="text-2xl" v-else-if="feature.icon === 'map'">🗺️</span>
                 <span class="text-2xl" v-else>🌿</span>
               </div>
-              <h3 class="text-lg font-semibold text-moss-900 dark:text-white mb-2">
+              <h3 class="mb-2 text-lg font-semibold text-moss-900 dark:text-white">
                 {{ feature.title }}
               </h3>
               <p class="text-sage-600 dark:text-sage-400">{{ feature.description }}</p>
@@ -240,7 +241,7 @@ const popularPlants = [
 
     <!-- Popular Plants Section -->
     <div class="px-4 py-16 bg-white dark:bg-gray-950 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-5xl">
+      <div class="max-w-5xl mx-auto">
         <div class="mb-12 text-center">
           <h2
             class="text-2xl font-bold tracking-tight text-moss-900 dark:text-moss-100 sm:text-3xl"
@@ -256,19 +257,19 @@ const popularPlants = [
           <div
             v-for="plant in popularPlants"
             :key="plant.name"
-            class="group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-xl border border-gray-200 dark:border-gray-800"
+            class="overflow-hidden transition-all border border-gray-200 shadow-lg group rounded-2xl hover:shadow-xl dark:border-gray-800"
           >
             <div class="relative h-48 overflow-hidden">
               <img
                 :src="plant.image"
                 :alt="plant.name"
-                class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                class="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
               />
               <div
-                class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
+                class="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-t from-black/60 to-transparent group-hover:opacity-100"
               ></div>
             </div>
-            <div class="bg-white p-4 dark:bg-gray-900">
+            <div class="p-4 bg-white dark:bg-gray-900">
               <h4 class="font-semibold text-moss-900 dark:text-white">
                 {{ plant.name }}
               </h4>
@@ -293,14 +294,14 @@ const popularPlants = [
     </div>
 
     <!-- CTA Section -->
-    <div class="px-4 py-16 relative overflow-hidden sm:px-6 lg:px-8">
+    <div class="relative px-4 py-16 overflow-hidden sm:px-6 lg:px-8">
       <div
         class="absolute inset-0 bg-[url('https://images.pexels.com/photos/1287075/pexels-photo-1287075.jpeg?auto=compress&cs=tinysrgb&w=1260')] bg-cover bg-center bg-no-repeat"
       ></div>
       <div
         class="absolute inset-0 bg-gradient-to-r from-moss-600/90 to-sage-600/90 dark:from-moss-900/90 dark:to-sage-900/90"
       ></div>
-      <div class="relative z-10 mx-auto max-w-5xl text-center">
+      <div class="relative z-10 max-w-5xl mx-auto text-center">
         <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">
           Ready to discover Malaysian plants?
         </h2>
@@ -310,7 +311,7 @@ const popularPlants = [
         <div class="mt-8">
           <Link href="/plant-identifier">
             <Button
-              class="bg-white text-moss-800 hover:bg-white/90 rounded-full shadow-lg"
+              class="bg-white rounded-full shadow-lg text-moss-800 hover:bg-white/90"
             >
               <div class="flex items-center gap-2">
                 <Icon name="camera" class="w-4 h-4" />

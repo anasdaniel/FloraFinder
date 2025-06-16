@@ -135,7 +135,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Plant Map route
     Route::get('plant-map', function () {
-        return Inertia::render('PlantMap');
+        return Inertia::render(component: 'PlantMap');
     })->name('plant-map');
 
 
