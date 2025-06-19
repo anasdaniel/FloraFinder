@@ -11,7 +11,7 @@ class Sighting extends Model
     use HasFactory;
 
     protected $fillable = [
-        'image_url'
+        'image_url',
         'description',
         'created_at'
     ];

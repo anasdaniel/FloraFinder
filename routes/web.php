@@ -19,6 +19,9 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
+// Map Test Route
+
+
 
 Route::get('/login', function () {
     return Inertia::render('Auth/Login');
@@ -39,6 +42,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
+
+    Route::get('/map-test', function () {
+        return Inertia::render('MapTest');
+    })->name('map-test');
 
 
     Route::get('booking', function () {
@@ -135,7 +142,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Plant Map route
     Route::get('plant-map', function () {
-        return Inertia::render(component: 'PlantMap');
+        return Inertia::render('PlantMap');
+    })->name('plant-map');
+
+    Route::get('sighting-map', function () {
+        return Inertia::render(component: 'SightingMap');
     })->name('plant-map');
 
 
