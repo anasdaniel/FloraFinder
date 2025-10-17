@@ -6,22 +6,38 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Icon from "@/components/Icon.vue";
 import { useToast } from "@/composables/useToast";
+import exifr from "exifr";
 
 // Define types
 interface FormData {
   image: File | null;
-  organ: string;
+  organ: string; // Single selection
   locationName: string;
   region: string;
   latitude: number | null;
   longitude: number | null;
   includeLocation: boolean;
+  saveToDatabase: boolean;
 }
 
 interface PlantResult {
   success: boolean;
   message?: string;
   error?: string;
+  savedToDatabase?: boolean;
+  savedImage?: {
+    path: string;
+    url: string;
+    filename: string;
+    mime_type: string;
+    size: number;
+    organ: string;
+    location_name?: string;
+    region?: string;
+    latitude?: number;
+    longitude?: number;
+    uploaded_at: string;
+  };
   data?: {
     query?: {
       project?: string;
@@ -101,12 +117,13 @@ const { toast } = useToast();
 // State
 const form = reactive<FormData>({
   image: null,
-  organ: "flower",
+  organ: "", // Initialize as empty string
   locationName: "",
   region: "Peninsular Malaysia",
   latitude: null,
   longitude: null,
   includeLocation: false,
+  saveToDatabase: false,
 });
 
 const imagePreview = ref<string | null>(null);
@@ -116,6 +133,13 @@ const errors = reactive<Errors>({});
 const activeImageIndex = ref<number>(0);
 const selectedResultIndex = ref<number>(0);
 const fileUploadRef = ref<HTMLInputElement | null>(null);
+const extractingExif = ref<boolean>(false);
+const savingToDatabase = ref<boolean>(false);
+const bookmarkedResults = reactive<Record<string, boolean>>({});
+
+// Add new state for care details
+const careDetails = ref<any>(null);
+const fetchingCareDetails = ref<boolean>(false);
 
 // Initialize results from props if available
 onMounted(() => {
@@ -141,8 +165,15 @@ const selectedResult = computed(() => {
   return results.value!.data!.results[selectedResultIndex.value];
 });
 
+const isCurrentResultBookmarked = computed(() => {
+  if (!selectedResult.value) return false;
+  const scientificName = selectedResult.value.species?.scientificName;
+  if (!scientificName) return false;
+  return Boolean(bookmarkedResults[scientificName]);
+});
+
 // Methods
-const onImageChange = (e: Event): void => {
+const onImageChange = async (e: Event): Promise<void> => {
   const target = e.target as HTMLInputElement;
   if (!target.files || !target.files.length) return;
 
@@ -150,11 +181,84 @@ const onImageChange = (e: Event): void => {
   form.image = file;
   imagePreview.value = URL.createObjectURL(file);
   errors.image = undefined;
+
+  // Extract EXIF data automatically
+  await extractExifData(file);
+};
+
+// Extract EXIF geolocation data from image
+const extractExifData = async (file: File): Promise<void> => {
+  try {
+    extractingExif.value = true;
+
+    toast({
+      title: "Reading Image Data",
+      description: "Checking for location information in the photo...",
+      variant: "default",
+    });
+
+    // Parse EXIF data from the image
+    const exifData = await exifr.parse(file, {
+      gps: true,
+      tiff: true,
+      exif: true,
+    });
+
+    if (exifData && exifData.latitude && exifData.longitude) {
+      // EXIF data found with GPS coordinates
+      form.latitude = parseFloat(exifData.latitude.toFixed(6));
+      form.longitude = parseFloat(exifData.longitude.toFixed(6));
+      form.includeLocation = true;
+
+      // Try to get location name using reverse geocoding
+      await reverseGeocode(exifData.latitude, exifData.longitude);
+
+      // Show success toast with additional info
+      let additionalInfo = "";
+      if (exifData.DateTimeOriginal) {
+        const photoDate = new Date(exifData.DateTimeOriginal);
+        additionalInfo = ` (Photo taken: ${photoDate.toLocaleDateString()})`;
+      }
+
+      toast({
+        title: "Location Found in Photo!",
+        description: `GPS Coordinates: ${form.latitude}, ${form.longitude}${additionalInfo}`,
+        variant: "success",
+      });
+
+      // Log additional EXIF data for debugging
+      if (exifData.Make && exifData.Model) {
+        console.log(`Camera: ${exifData.Make} ${exifData.Model}`);
+      }
+      if (exifData.DateTimeOriginal) {
+        console.log(`Photo taken: ${exifData.DateTimeOriginal}`);
+      }
+    } else {
+      // No GPS data in EXIF
+      toast({
+        title: "No Location Data",
+        description:
+          "This photo doesn't contain GPS information. You can add location manually or use current location.",
+        variant: "default",
+      });
+    }
+  } catch (error) {
+    console.error("Error extracting EXIF data:", error);
+    // Silent fail - not all images have EXIF data
+    toast({
+      title: "No Location Data",
+      description: "Unable to read location from the photo. You can add it manually.",
+      variant: "default",
+    });
+  } finally {
+    extractingExif.value = false;
+  }
 };
 
 const resetForm = (): void => {
   form.image = null;
   imagePreview.value = null;
+  form.organ = ""; // Reset to empty string
   form.locationName = "";
   form.latitude = null;
   form.longitude = null;
@@ -241,6 +345,14 @@ const useUploadLocation = (): void => {
   }
 };
 
+const toggleBookmark = (): void => {
+  if (!selectedResult.value) return;
+  const scientificName = selectedResult.value.species?.scientificName;
+  if (!scientificName) return;
+
+  bookmarkedResults[scientificName] = !bookmarkedResults[scientificName];
+};
+
 // Attempt to get location name based on coordinates using reverse geocoding
 const reverseGeocode = async (latitude: number, longitude: number): Promise<void> => {
   try {
@@ -284,7 +396,7 @@ const reverseGeocode = async (latitude: number, longitude: number): Promise<void
         // Try to find the best match in malaysianRegions
         if (region && Array.isArray(malaysianRegions)) {
           for (const r of malaysianRegions) {
-            if (typeof r === "string" && region.toLowerCase().includes(r.toLowerCase())) {
+            if (region.toLowerCase().includes(r.toLowerCase())) {
               form.region = r;
               break;
             }
@@ -328,7 +440,7 @@ const handleDragLeave = (e: DragEvent): void => {
   }
 };
 
-const handleDrop = (e: DragEvent): void => {
+const handleDrop = async (e: DragEvent): Promise<void> => {
   if (e.target instanceof HTMLElement) {
     e.target.classList.remove("ring-2", "ring-green-400");
   }
@@ -339,6 +451,9 @@ const handleDrop = (e: DragEvent): void => {
       form.image = files[0];
       imagePreview.value = URL.createObjectURL(files[0]);
       errors.image = undefined;
+
+      // Extract EXIF data from dropped file
+      await extractExifData(files[0]);
     }
   }
 };
@@ -363,21 +478,6 @@ const identifyPlant = async (): Promise<void> => {
   formData.append("image", form.image);
   formData.append("organ", form.organ);
 
-  // Location data is kept local for the prototype
-  // We don't send it to the API yet
-
-  // Show a toast indicating location data is saved locally if included
-  if (form.includeLocation && (form.locationName || form.latitude !== null)) {
-    setTimeout(() => {
-      toast({
-        title: "Location Data Saved",
-        description:
-          "Location information has been saved with this identification (prototype feature).",
-        variant: "success",
-      });
-    }, 1000);
-  }
-
   // Send request
   try {
     router.post(route("plant-identifier.identify"), formData, {
@@ -390,11 +490,27 @@ const identifyPlant = async (): Promise<void> => {
           if (results.value.success && results.value.data) {
             selectedResultIndex.value = 0;
             activeImageIndex.value = 0;
-            toast({
-              title: "Plant Identified",
-              description: "We've found potential matches for your plant.",
-              variant: "success",
-            });
+
+            // If identification was successful, fetch care details
+            if (results.value.data.results.length > 0) {
+              const topResult = results.value.data.results[0];
+              fetchCareDetails(topResult.species.scientificName);
+            }
+
+            // Check if data was saved to database
+            if (results.value.savedToDatabase) {
+              toast({
+                title: "Success!",
+                description: "Plant identified and saved to database successfully.",
+                variant: "success",
+              });
+            } else {
+              toast({
+                title: "Plant Identified",
+                description: "We've found potential matches for your plant.",
+                variant: "success",
+              });
+            }
           }
         } else {
           // Handle the case where no plant data was returned
@@ -439,6 +555,45 @@ const setActiveImage = (index: number): void => {
 const selectResult = (index: number): void => {
   selectedResultIndex.value = index;
   activeImageIndex.value = 0;
+};
+
+// New function to fetch care details from Trefle API
+const fetchCareDetails = async (scientificName: string): Promise<void> => {
+  fetchingCareDetails.value = true;
+  try {
+    const url = new URL(route("plant-identifier.care-details"));
+    url.searchParams.append("scientificName", scientificName);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    console.log("Raw response:", responseText);
+    console.log("Response status:", response.status);
+
+    if (!response.ok) {
+      console.error("API request failed:", response.status, responseText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = JSON.parse(responseText);
+
+    if (data.success) {
+      careDetails.value = data.data;
+    } else {
+      console.log("API returned success=false:", data.message);
+      careDetails.value = null;
+    }
+  } catch (error) {
+    console.error("Error fetching care details:", error);
+    careDetails.value = null;
+  } finally {
+    fetchingCareDetails.value = false;
+  }
 };
 
 const organs = [
@@ -654,6 +809,124 @@ const submitSightingReport = () => {
   sightingReport.notes = "";
   sightingReport.useCurrentLocation = false;
 };
+
+// Function to save the selected plant to database
+const savePlantToDatabase = async () => {
+  if (!form.image || !selectedResult.value) {
+    toast({
+      title: "Cannot Save",
+      description: "No plant data available to save.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  savingToDatabase.value = true;
+
+  try {
+    // Create form data with the selected plant information
+    const formData = new FormData();
+    formData.append("image", form.image);
+    formData.append("organ", form.organ);
+    formData.append("saveToDatabase", "1");
+
+    // Add plant identification data
+    formData.append("scientificName", selectedResult.value.species.scientificName);
+    formData.append(
+      "scientificNameWithoutAuthor",
+      selectedResult.value.species.scientificNameWithoutAuthor
+    );
+    formData.append("commonName", selectedResult.value.species.commonNames?.[0] || "");
+    formData.append("family", selectedResult.value.species.family.scientificName);
+    formData.append("genus", selectedResult.value.species.genus.scientificName);
+    formData.append("confidence", selectedResult.value.score.toString());
+
+    // Add GBIF and POWO IDs if available
+    if (selectedResult.value.gbif?.id) {
+      formData.append("gbifId", selectedResult.value.gbif.id);
+    }
+    if (selectedResult.value.powo?.id) {
+      formData.append("powoId", selectedResult.value.powo.id);
+    }
+    if (selectedResult.value.iucn?.category) {
+      formData.append("iucnCategory", selectedResult.value.iucn.category);
+    }
+
+    // Include location data if available
+    if (form.includeLocation) {
+      if (form.locationName) {
+        formData.append("locationName", form.locationName);
+      }
+      if (form.region) {
+        formData.append("region", form.region);
+      }
+      if (form.latitude !== null) {
+        formData.append("latitude", form.latitude.toString());
+      }
+      if (form.longitude !== null) {
+        formData.append("longitude", form.longitude.toString());
+      }
+    }
+
+    // Send to backend
+    router.post(route("plant-identifier.save"), formData, {
+      onSuccess: () => {
+        if (results.value) {
+          results.value.savedToDatabase = true;
+        }
+
+        // Show success toast
+        toast({
+          title: "Plant Saved Successfully! 🌿",
+          description: "The plant identification has been saved to the database.",
+          variant: "success",
+        });
+
+        // Reset the form after successful save
+        form.image = null;
+        imagePreview.value = null;
+        form.organ = ""; // Reset to empty string
+        form.locationName = "";
+        form.region = "Peninsular Malaysia";
+        form.latitude = null;
+        form.longitude = null;
+        form.includeLocation = false;
+        form.saveToDatabase = false;
+
+        // Clear the results to show a clean slate
+        results.value = null;
+        selectedResultIndex.value = 0;
+        activeImageIndex.value = 0;
+
+        // Clear any errors
+        Object.keys(errors).forEach((key) => delete errors[key]);
+
+        savingToDatabase.value = false;
+      },
+      onError: (errors) => {
+        console.error("Save error:", errors);
+        toast({
+          title: "Save Failed",
+          description: "Unable to save plant to database. Please try again.",
+          variant: "destructive",
+        });
+        savingToDatabase.value = false;
+      },
+      onFinish: () => {
+        savingToDatabase.value = false;
+      },
+      preserveScroll: true,
+    });
+  } catch (error: any) {
+    console.error("Save error:", error);
+    toast({
+      title: "Save Failed",
+      description: error.message || "An unexpected error occurred.",
+      variant: "destructive",
+    });
+    savingToDatabase.value = false;
+  }
+};
 </script>
 
 <template>
@@ -671,7 +944,9 @@ const submitSightingReport = () => {
             >
               <div class="flex items-center justify-center">
                 <Icon name="camera" class="w-5 h-5 mr-2 text-moss-400" />
-                <h2 class="text-lg font-semibold tracking-tight">Upload Plant Image</h2>
+                <h2 class="text-lg font-semibold tracking-tight">
+                  {{ imagePreview ? "Identify Plant" : "Upload Plant Image" }}
+                </h2>
               </div>
             </CardHeader>
             <CardContent class="px-8 py-8 space-y-8 bg-transparent">
@@ -701,7 +976,7 @@ const submitSightingReport = () => {
                       class="flex items-center gap-2 mt-4 text-xs text-moss-400 dark:text-moss-400"
                     >
                       <Icon name="info" class="w-3 h-3" />
-                      <span>Clear, well-lit photos yield the best results</span>
+                      <span>We'll automatically detect location from photo metadata</span>
                     </div>
                   </div>
                   <div
@@ -713,6 +988,23 @@ const submitSightingReport = () => {
                       alt="Plant preview"
                       class="object-cover w-full h-full transition-transform duration-200 group-hover:scale-105"
                     />
+                    <!-- EXIF extraction indicator -->
+                    <div
+                      v-if="extractingExif"
+                      class="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                    >
+                      <div
+                        class="flex flex-col items-center gap-2 p-4 rounded-lg bg-white/90 dark:bg-black/90"
+                      >
+                        <Icon
+                          name="loader-2"
+                          class="w-6 h-6 text-moss-600 animate-spin"
+                        />
+                        <span class="text-sm font-medium text-moss-700 dark:text-moss-300"
+                          >Reading location data...</span
+                        >
+                      </div>
+                    </div>
                     <div
                       class="absolute inset-0 flex flex-col items-center justify-center gap-2 transition-opacity opacity-0 bg-black/30 group-hover:opacity-100 backdrop-blur-sm"
                     >
@@ -750,6 +1042,19 @@ const submitSightingReport = () => {
                 >
                   {{ errors.image }}
                 </p>
+                <!-- EXIF info badge -->
+                <div
+                  v-if="imagePreview && form.latitude && form.longitude"
+                  class="flex items-center gap-2 p-2 mt-3 rounded-lg bg-green-50 dark:bg-green-900/20"
+                >
+                  <Icon
+                    name="map-pin"
+                    class="w-4 h-4 text-green-600 dark:text-green-400"
+                  />
+                  <span class="text-xs font-medium text-green-700 dark:text-green-300">
+                    Location detected from photo EXIF data
+                  </span>
+                </div>
                 <div v-if="imagePreview" class="flex justify-center mt-3 md:hidden">
                   <Button
                     variant="outline"
@@ -817,11 +1122,6 @@ const submitSightingReport = () => {
                       >
                         {{ organ.label }}
                       </span>
-                      <span
-                        v-if="form.organ === organ.value"
-                        class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-moss-500 shadow-md border-2 border-white dark:border-moss-900"
-                        aria-label="Selected"
-                      ></span>
                     </div>
                   </div>
                 </div>
@@ -1364,27 +1664,80 @@ const submitSightingReport = () => {
                         <h4
                           class="mb-2 font-semibold tracking-tight text-green-700 dark:text-green-300"
                         >
-                          Conservation Guide
+                          Care Guide
                         </h4>
-                        <p class="text-sm text-sage-800 dark:text-sage-200">
-                          {{
-                            getConservationAdvice(
-                              selectedResult?.species.scientificNameWithoutAuthor || ""
-                            )
-                          }}
-                        </p>
+                        <template v-if="fetchingCareDetails">
+                          <p class="text-sm text-sage-800 dark:text-sage-200">
+                            Loading care details...
+                          </p>
+                        </template>
+                        <template v-else-if="careDetails">
+                          <ul class="text-sm text-sage-800 dark:text-sage-200 space-y-1">
+                            <li><strong>Watering:</strong> {{ careDetails.watering }}</li>
+                            <li><strong>Sunlight:</strong> {{ careDetails.sunlight }}</li>
+                            <li><strong>Soil:</strong> {{ careDetails.soil }}</li>
+                            <li>
+                              <strong>Temperature:</strong> {{ careDetails.temperature }}
+                            </li>
+                          </ul>
+                        </template>
+                        <template v-else>
+                          <p class="text-sm text-sage-800 dark:text-sage-200">
+                            {{
+                              getConservationAdvice(
+                                selectedResult?.species.scientificNameWithoutAuthor || ""
+                              )
+                            }}
+                          </p>
+                        </template>
                         <p class="mt-2 text-xs text-sage-500 dark:text-sage-400">
                           This is a general guide. For critical conservation, consult
                           local experts.
                         </p>
                       </div>
                       <!-- Action Buttons -->
-                      <div class="flex gap-3 mt-4">
+                      <div class="flex flex-wrap gap-3 mt-4">
                         <Button
                           variant="outline"
                           class="flex items-center gap-1 transition-all rounded-full shadow-sm hover:bg-green-50 dark:hover:bg-green-900/30"
+                          @click="savePlantToDatabase"
+                          :disabled="savingToDatabase || results?.savedToDatabase"
                         >
-                          <Icon name="bookmark" class="w-4 h-4" /> Bookmark
+                          <template v-if="savingToDatabase">
+                            <Icon name="loader-2" class="w-4 h-4 animate-spin" />
+                            Saving...
+                          </template>
+                          <template v-else-if="results?.savedToDatabase">
+                            <Icon name="check" class="w-4 h-4" />
+                            Saved to Database
+                          </template>
+                          <template v-else>
+                            <Icon name="database" class="w-4 h-4" />
+                            Save to Database
+                          </template>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          :class="[
+                            'flex items-center gap-1 transition-all rounded-full shadow-sm',
+                            isCurrentResultBookmarked
+                              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-200 dark:hover:bg-yellow-800/60'
+                              : 'hover:bg-green-50 dark:hover:bg-green-900/30',
+                          ]"
+                          @click="toggleBookmark"
+                        >
+                          <Icon
+                            name="bookmark"
+                            class="w-4 h-4"
+                            :class="
+                              isCurrentResultBookmarked
+                                ? 'text-yellow-600 dark:text-yellow-200'
+                                : ''
+                            "
+                          />
+                          <span>{{
+                            isCurrentResultBookmarked ? "Bookmarked" : "Bookmark"
+                          }}</span>
                         </Button>
                         <Button
                           variant="outline"
@@ -1392,12 +1745,6 @@ const submitSightingReport = () => {
                           @click="openSightingModal"
                         >
                           <Icon name="map-pin" class="w-4 h-4" /> Report Sighting
-                        </Button>
-                        <Button
-                          variant="outline"
-                          class="flex items-center gap-1 transition-all rounded-full shadow-sm hover:bg-green-50 dark:hover:bg-green-900/30"
-                        >
-                          <Icon name="info" class="w-4 h-4" /> More Info
                         </Button>
                       </div>
                       <!-- Similar Plants Section -->
@@ -1585,7 +1932,7 @@ const submitSightingReport = () => {
               </p>
               <Button class="mt-8 shadow-lg rounded-xl" size="lg" @click="openFileUpload">
                 <Icon name="upload" class="w-4 h-4 mr-2" />
-                Upload Plant Image
+                {{ imagePreview ? "Identify Plant" : "Upload Plant Image" }}
               </Button>
             </CardContent>
           </Card>

@@ -30,6 +30,7 @@ const mainNavItems: NavItem[] = [
         href: '/plant-search',
         icon: Database,
     },
+
     {
         title: 'Plant Map',
         href: '/plant-map',
@@ -39,6 +40,11 @@ const mainNavItems: NavItem[] = [
         title: 'Forum',
         href: '/forum',
         icon: UsersRoundIcon,
+    },
+    {
+        title: 'Trefle Test',
+        href: '/trefle-test',
+        icon: Database,
     },
 ];
 
