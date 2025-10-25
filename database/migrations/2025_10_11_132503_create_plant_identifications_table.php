@@ -19,16 +19,16 @@ return new class extends Migration {
             $table->string('organ');
             $table->string('scientific_name');
             $table->string('scientific_name_without_author');
-            $table->string('common_name');
+            $table->string('common_name')->nullable();
             $table->string('family');
             $table->string('genus');
             $table->string('confidence');
-            $table->string('gbif_id');
-            $table->string('powo_id');
-            $table->string('iucn_category');
-            $table->string('region');
-            $table->string('latitude');
-            $table->string('longitude');
+            $table->string('gbif_id')->nullable();
+            $table->string('powo_id')->nullable();
+            $table->string('iucn_category')->nullable();
+            $table->string('region')->nullable();
+            $table->string('latitude')->nullable();
+            $table->string('longitude')->nullable();
             $table->timestamps();
         });
     }

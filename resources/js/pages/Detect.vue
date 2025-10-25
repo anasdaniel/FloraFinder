@@ -117,7 +117,7 @@ const { toast } = useToast();
 // State
 const form = reactive<FormData>({
   image: null,
-  organ: "", // Initialize as empty string
+  organ: "leaf", // Set default organ to "leaf"
   locationName: "",
   region: "Peninsular Malaysia",
   latitude: null,
@@ -258,7 +258,7 @@ const extractExifData = async (file: File): Promise<void> => {
 const resetForm = (): void => {
   form.image = null;
   imagePreview.value = null;
-  form.organ = ""; // Reset to empty string
+  form.organ = "leaf"; // Reset to default organ
   form.locationName = "";
   form.latitude = null;
   form.longitude = null;
@@ -852,23 +852,23 @@ const savePlantToDatabase = async () => {
       formData.append("iucnCategory", selectedResult.value.iucn.category);
     }
 
-    // Include location data if available
-    if (form.includeLocation) {
+      // Always include location data, even if it's empty
+      formData.append("includeLocation", form.includeLocation ? "1" : "0");
       if (form.locationName) {
-        formData.append("locationName", form.locationName);
+          formData.append("locationName", form.locationName);
       }
       if (form.region) {
-        formData.append("region", form.region);
+          formData.append("region", form.region);
       }
       if (form.latitude !== null) {
-        formData.append("latitude", form.latitude.toString());
+          formData.append("latitude", form.latitude.toString());
       }
       if (form.longitude !== null) {
-        formData.append("longitude", form.longitude.toString());
+          formData.append("longitude", form.longitude.toString());
       }
-    }
 
-    // Send to backend
+
+      // Send to backend
     router.post(route("plant-identifier.save"), formData, {
       onSuccess: () => {
         if (results.value) {
@@ -885,7 +885,7 @@ const savePlantToDatabase = async () => {
         // Reset the form after successful save
         form.image = null;
         imagePreview.value = null;
-        form.organ = ""; // Reset to empty string
+        form.organ = "leaf"; // Reset to default organ
         form.locationName = "";
         form.region = "Peninsular Malaysia";
         form.latitude = null;

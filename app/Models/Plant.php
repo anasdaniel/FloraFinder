@@ -28,7 +28,7 @@ class Plant extends Model
     }
     public function sightings()
     {
-        return $this-hasMany(Sighting::class);
+        return $this->belongsTo(Sighting::class);
     }
     public function zones()
     {

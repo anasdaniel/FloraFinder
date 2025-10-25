@@ -13,8 +13,9 @@ return new class extends Migration
     {
         Schema::create('plants', function (Blueprint $table) {
             $table->id();
-            $table->foreignIdFor(\App\Models\PlantCategory::class)->constrained()->cascadeOnDelete();
-            $table->foreignIdFor(\App\Models\ConservationStatus::class)->constrained()->cascadeOnDelete();
+//            $table->foreignIdFor(\App\Models\PlantCategory::class)->constrained()->cascadeOnDelete();
+//            $table->foreignIdFor(\App\Models\ConservationStatus::class)->constrained()->cascadeOnDelete();
+
             $table->foreignIdFor(\App\Models\PlantingRecommendation::class)->constrained()->cascadeOnDelete();
             $table->string('common_name', 100);
             $table->string('scientific_name', 150)->unique();
