@@ -4,10 +4,6 @@ use App\Http\Controllers\PlantIdentifierController;
 use App\Http\Controllers\ForumController;
 use App\Http\Integrations\CheckStatusRequest;
 use App\Http\Integrations\IdentifyPlantRequest;
-use App\Http\Integrations\PerenualCareGuideRequest;
-use App\Http\Integrations\PerenualConnector;
-use App\Http\Integrations\PerenualPlantDetails;
-use App\Http\Integrations\PerenualPlantRequest;
 use App\Http\Integrations\PlantNetConnector;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -325,7 +321,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('sighting-map', function () {
         return Inertia::render(component: 'SightingMap');
-    })->name('plant-map');
+    })->name('sighting-map');
 
 
     //detect route
@@ -333,39 +329,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //     return Inertia::render('Detect');
     // })->name('detect');
 
+    //test dd env variable
+    Route::get('test-env', function () {
+        dd(env('PLANTNET_API_KEY'));
+    })->name('test-env');
 
-    Route::get(
-        '/plant-identifier',
-        [PlantIdentifierController::class, 'index']
-    )->name('plant-identifier');
-    Route::post(
-        '/plant-identifier/identify',
-        [PlantIdentifierController::class, 'identify']
-    )->name('plant-identifier.identify');
-    Route::post(
-        '/plant-identifier/save',
-        [PlantIdentifierController::class, 'save']
-    )->name('plant-identifier.save');
+
+
 });
 
+Route::get(
+    '/plant-identifier',
+    [PlantIdentifierController::class, 'index']
+)->name('plant-identifier');
+Route::post(
+    '/plant-identifier/identify',
+    [PlantIdentifierController::class, 'identify']
+)->name('plant-identifier.identify');
+Route::post(
+    '/plant-identifier/save',
+    [PlantIdentifierController::class, 'save']
+)->name('plant-identifier.save');
 
-//test route for plant care details
-Route::get('/plant-care-test', function () {
-
-    $scientificName = 'Lantana Camara'  ; // Example scientific name
-
-    $connector = new TrefleConnector();
-    $searchRequest = new SearchPlantRequest($scientificName);
-    $searchResponse = $connector->send($searchRequest);
-
-   //dd details of the first plant in the search results
-    $searchData = $searchResponse->json();
-
-    dd($searchData);
-
-
-    return Inertia::render('PlantCareTest');
-})->name('plant-care-test');
 
 Route::get(
     '/plant-identifier/care-details',

@@ -50,6 +50,11 @@ class PlantIdentifierController extends Controller
 
     public function save(Request $request)
     {
+
+
+
+
+
         $request->validate([
             'image' => 'required|image|max:10240',
             'organ' => 'required|string|in:flower,leaf,fruit,bark,habit,other',
@@ -68,9 +73,16 @@ class PlantIdentifierController extends Controller
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             //grab current user id if logged in
+
         ]);
 
+
+
         try {
+
+
+//            dd($request->input('latitude'), $request->input('longitude'), $request->input('family'));
+
             // Save to database with all plant information
             $savedData = $this->saveToDatabase(
                 $request->file('image'),
@@ -98,6 +110,8 @@ class PlantIdentifierController extends Controller
 
             //return to the detect page with success message and reset form
 
+//            dd($savedData);
+
             return redirect()->route('plant-identifier')->with('success', 'Plant identification saved successfully!');
         } catch (\Exception $e) {
             Log::error('Plant save error: ' . $e->getMessage());
@@ -122,8 +136,6 @@ class PlantIdentifierController extends Controller
             $connector = new TrefleConnector();
             $searchRequest = new SearchPlantRequest($scientificName);
             $searchResponse = $connector->send($searchRequest);
-
-            dd($searchResponse->json());
 
             Log::info('Search response status: ' . $searchResponse->status());
             Log::info('Search response body: ' . $searchResponse->body());
@@ -238,6 +250,8 @@ class PlantIdentifierController extends Controller
     private function sendIdentificationRequest($imagePath, $organ)
     {
         $apiKey = env('PLANTNET_API_KEY');
+
+
         $connector = new IntegrationsPlantNetConnector();
 
         $plantNetRequest = new IntegrationsIdentifyPlantRequest(
