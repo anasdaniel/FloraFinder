@@ -160,7 +160,15 @@ const filters = ref({
 
 // Filtered plants
 const filteredPlants = computed(() => {
-  return plants.value.filter((plant) => {
+  let plants = [...(props.plants || dummyPlants)];
+
+  // Set default conservation status to "DD" if null or undefined
+  plants = plants.map((plant) => ({
+    ...plant,
+    iucn_category: plant.iucn_category || "DD",
+  }));
+
+  return plants.filter((plant) => {
     const matchesFamily =
       filters.value.family === "all" || plant.family === filters.value.family;
     const matchesStatus =
@@ -569,7 +577,7 @@ const malaysianStates = ref([
             <DialogTitle class="flex items-center gap-2">
               <span>{{ selectedPlant?.common_name }}</span>
               <div
-                :class="getConservationStatusColor(selectedPlant?.iuc_category || '')"
+                :class="getConservationStatusColor(selectedPlant?.iucn_category || '')"
                 class="w-3 h-3 rounded-full"
               ></div>
             </DialogTitle>

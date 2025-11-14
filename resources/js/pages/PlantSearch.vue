@@ -153,6 +153,12 @@ const hasActiveFilters = computed(() => {
 const filteredPlants = computed(() => {
   let plants = [...(props.plants || [])];
 
+  // Set default conservation status to "DD" if null or undefined
+  plants = plants.map(plant => ({
+    ...plant,
+    iucn_category: plant.iucn_category || "DD"
+  }));
+
   // Apply search filter
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
@@ -275,6 +281,38 @@ const clearFilters = () => {
   currentPage.value = 1;
 };
 
+// Dummy plant details
+const getDummyPlantDetails = (plant) => {
+  return {
+    description: "This is a fascinating plant species native to tropical regions. It features distinctive characteristics that make it easily identifiable in its natural habitat. The plant has adapted well to various environmental conditions and plays an important role in its ecosystem.",
+    identification: {
+      height: "1-3 meters",
+      leaves: "Oval-shaped, dark green with serrated edges",
+      flowers: "Small, white to pale yellow, clustered",
+      fruit: "Berry-like, red when mature",
+      bark: "Smooth, grayish-brown",
+    },
+    care: {
+      light: "Partial shade to full sun",
+      water: "Moderate watering, well-drained soil",
+      temperature: "18-28°C (64-82°F)",
+      soil: "Rich, loamy soil with good drainage",
+      fertilizer: "Monthly during growing season",
+      pruning: "Prune in early spring to maintain shape",
+    },
+    ecology: {
+      nativeRange: "Southeast Asian tropical forests",
+      habitat: "Lowland and montane forests, forest edges",
+      pollinators: "Bees, butterflies, and small birds",
+      threats: "Habitat loss, over-collection, climate change",
+      uses: "Traditional medicine, ornamental purposes, wildlife food source",
+    },
+    growthRate: "Moderate",
+    lifespan: "15-25 years",
+    toxicity: "Non-toxic to humans and pets",
+  };
+};
+
 const getConservationStatusColor = (status) => {
   const colors = {
     NE: "bg-blue-100 text-blue-800",
@@ -302,7 +340,7 @@ const getConservationStatusLabel = (status) => {
     EW: "Extinct in the Wild",
     EX: "Extinct",
   };
-  return labels[status] || status;
+  return labels[status] || "Data Deficient";
 };
 </script>
 
@@ -560,7 +598,7 @@ const getConservationStatusLabel = (status) => {
                         class="px-3 py-1 text-xs font-medium rounded-full"
                         :class="getConservationStatusColor(plant.iucn_category)"
                       >
-                        {{ getConservationStatusLabel(plant.iucn_category) }}
+                        {{ getConservationStatusLabel(plant.iucn_category)  }}
                       </span>
                     </div>
 
@@ -639,15 +677,16 @@ const getConservationStatusLabel = (status) => {
         <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"></div>
 
         <div
-          class="inline-block overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full"
+          class="inline-block w-full max-w-5xl overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle"
           @click.stop
         >
           <div class="bg-white">
+            <!-- Header Image -->
             <div class="relative">
               <img
                 :src="selectedPlant.path"
                 :alt="selectedPlant.common_name || selectedPlant.scientific_name"
-                class="object-cover w-full h-64"
+                class="object-cover w-full h-80"
               />
               <button
                 @click="selectedPlant = null"
@@ -657,63 +696,128 @@ const getConservationStatusLabel = (status) => {
               </button>
             </div>
 
-            <div class="p-6">
-              <div class="flex items-start justify-between mb-4">
+            <div class="p-8">
+              <!-- Title Section -->
+              <div class="flex items-start justify-between pb-6 mb-6 border-b border-gray-200">
                 <div>
-                  <h2 class="mb-2 text-2xl font-bold text-gray-900">
+                  <h2 class="mb-2 text-3xl font-bold text-gray-900">
                     {{ selectedPlant.common_name || selectedPlant.scientific_name }}
                   </h2>
-                  <p class="text-lg italic text-gray-600">
+                  <p class="mb-1 text-xl italic text-gray-600">
                     {{ selectedPlant.scientific_name }}
                   </p>
-                  <p class="text-gray-500">{{ selectedPlant.family }}</p>
+                  <p class="text-lg text-gray-500">Family: {{ selectedPlant.family }}</p>
                 </div>
                 <span
-                  class="px-3 py-1 text-sm font-medium rounded-full"
+                  class="px-4 py-2 text-sm font-medium rounded-full"
                   :class="getConservationStatusColor(selectedPlant.iucn_category)"
                 >
                   {{ getConservationStatusLabel(selectedPlant.iucn_category) }}
                 </span>
               </div>
 
-              <div class="grid grid-cols-1 gap-6 mb-6 md:grid-cols-2">
+              <!-- Description -->
+              <div class="mb-8">
+                <h3 class="mb-3 text-xl font-semibold text-gray-900">Description</h3>
+                <p class="leading-relaxed text-gray-700">
+                  {{ getDummyPlantDetails(selectedPlant).description }}
+                </p>
+              </div>
+
+              <!-- Two Column Layout -->
+              <div class="grid grid-cols-1 gap-8 mb-8 lg:grid-cols-2">
+                <!-- Identification Features -->
                 <div>
-                  <h3 class="mb-3 text-lg font-semibold text-gray-900">
-                    Plant Information
+                  <h3 class="mb-4 text-xl font-semibold text-gray-900">
+                    Identification Features
                   </h3>
-                  <div class="space-y-2">
-                    <div class="flex items-center">
-                      <MapPin class="w-5 h-5 mr-3 text-gray-400" />
-                      <span class="text-gray-700">{{ selectedPlant.region }}</span>
-                    </div>
-                    <div class="flex items-center">
-                      <span class="text-gray-700"
-                        >Confidence: {{ selectedPlant.confidence }}</span
-                      >
+                  <div class="p-4 space-y-3 bg-gray-50 rounded-lg">
+                    <div v-for="(value, key) in getDummyPlantDetails(selectedPlant).identification" :key="key">
+                      <p class="text-sm font-medium text-gray-500 capitalize">{{ key }}:</p>
+                      <p class="text-gray-900">{{ value }}</p>
                     </div>
                   </div>
                 </div>
 
+                <!-- Care Requirements -->
                 <div>
-                  <h3 class="mb-3 text-lg font-semibold text-gray-900">
-                    Additional Details
+                  <h3 class="mb-4 text-xl font-semibold text-gray-900">
+                    Care Requirements
                   </h3>
-                  <p class="leading-relaxed text-gray-700">
-                    Genus: {{ selectedPlant.genus }}<br />
-                    Organ: {{ selectedPlant.organ }}
-                  </p>
+                  <div class="p-4 space-y-3 bg-green-50 rounded-lg">
+                    <div v-for="(value, key) in getDummyPlantDetails(selectedPlant).care" :key="key">
+                      <p class="text-sm font-medium text-green-700 capitalize">{{ key }}:</p>
+                      <p class="text-gray-900">{{ value }}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
+              <!-- Ecology & Conservation -->
+              <div class="mb-8">
+                <h3 class="mb-4 text-xl font-semibold text-gray-900">
+                  Ecology & Conservation
+                </h3>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div v-for="(value, key) in getDummyPlantDetails(selectedPlant).ecology" :key="key"
+                    class="p-4 border border-gray-200 rounded-lg">
+                    <p class="mb-1 text-sm font-medium text-gray-500 capitalize">{{ key }}:</p>
+                    <p class="text-gray-900">{{ value }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Additional Information -->
+              <div class="p-4 mb-6 border-l-4 border-black bg-gray-50">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div>
+                    <p class="text-sm font-medium text-gray-500">Growth Rate</p>
+                    <p class="text-lg font-semibold text-gray-900">
+                      {{ getDummyPlantDetails(selectedPlant).growthRate }}
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-500">Lifespan</p>
+                    <p class="text-lg font-semibold text-gray-900">
+                      {{ getDummyPlantDetails(selectedPlant).lifespan }}
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-500">Toxicity</p>
+                    <p class="text-lg font-semibold text-gray-900">
+                      {{ getDummyPlantDetails(selectedPlant).toxicity }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Location Information -->
+              <div class="p-4 mb-6 rounded-lg bg-blue-50">
+                <h4 class="mb-2 text-lg font-semibold text-gray-900">Location Information</h4>
+                <div class="flex items-center space-x-4 text-gray-700">
+                  <div class="flex items-center">
+                    <MapPin class="w-5 h-5 mr-2 text-blue-600" />
+                    <span>Region: {{ selectedPlant.region }}</span>
+                  </div>
+                  <div class="flex items-center">
+                    <span>Genus: {{ selectedPlant.genus }}</span>
+                  </div>
+                  <div class="flex items-center">
+                    <span>Detection Confidence: {{ (selectedPlant.confidence * 100).toFixed(1) }}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
               <div class="flex justify-end space-x-3">
                 <button
                   @click="selectedPlant = null"
-                  class="px-4 py-2 text-gray-700 transition-colors duration-200 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  class="px-6 py-2 text-gray-700 transition-colors duration-200 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Close
                 </button>
                 <button
-                  class="px-4 py-2 text-white transition-colors duration-200 bg-black rounded-lg hover:bg-gray-800"
+                  class="px-6 py-2 text-white transition-colors duration-200 bg-black rounded-lg hover:bg-gray-800"
                 >
                   View Full Details
                 </button>

@@ -5,6 +5,7 @@ use App\Http\Controllers\ForumController;
 use App\Http\Integrations\CheckStatusRequest;
 use App\Http\Integrations\IdentifyPlantRequest;
 use App\Http\Integrations\PlantNetConnector;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Cache;
@@ -17,12 +18,10 @@ use App\Models\PlantIdentification;
 Route::get('/', function () {
 
 
-
     return Inertia::render('Welcome');
 })->name('home');
 
 // Map Test Route
-
 
 
 Route::get('/login', function () {
@@ -33,7 +32,6 @@ Route::get('/login', function () {
 Route::get('/register', function () {
     return Inertia::render('Auth/Register');
 })->name('register');
-
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -51,7 +49,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('booking', function () {
         return Inertia::render('Booking');
     })->name('booking');
-
 
 
     Route::get('trefle-test', function () {
@@ -94,7 +91,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('trefle-malaysia', function () {
-        $page = (int) request('page', 1);
+        $page = (int)request('page', 1);
         $targetCount = 20; // Desired number of unique plants per page
         $allPlants = [];
         $seenIds = [];
@@ -232,7 +229,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('forum.post');
 
 
-
     // Plant search route
     Route::get('plant-search', function () {
 
@@ -335,21 +331,43 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('test-env');
 
 
+    Route::get(
+        '/plant-identifier',
+        [PlantIdentifierController::class, 'index']
+    )->name('plant-identifier');
+    // Route::post(
+    //     '/plant-identifier/identify',
+    //     [PlantIdentifierController::class, 'identify']
+    // )->name('plant-identifier.identify');
+    Route::post(
+        '/plant-identifier/save',
+        [PlantIdentifierController::class, 'save']
+    )->name('plant-identifier.save');
+
 
 });
 
-Route::get(
-    '/plant-identifier',
-    [PlantIdentifierController::class, 'index']
-)->name('plant-identifier');
-Route::post(
-    '/plant-identifier/identify',
-    [PlantIdentifierController::class, 'identify']
-)->name('plant-identifier.identify');
-Route::post(
-    '/plant-identifier/save',
-    [PlantIdentifierController::class, 'save']
-)->name('plant-identifier.save');
+Route::post('plant-identifier/identify', [PlantIdentifierController::class, 'identify'])->name('plant-identifier.identify');
+
+//search plant care details via scientific name
+Route::get('/details', static function () {
+
+
+    $scientificName = 'Sorbus aucuparia';
+
+    // First, search for the plant
+    $connector = new TrefleConnector();
+    $searchRequest = new SearchPlantRequest($scientificName);
+    $searchResponse = $connector->send($searchRequest);
+
+    //get the data
+
+    $species = $searchResponse->json();
+
+    dd($species['data']['growth']['ph_maximum']);
+
+
+});
 
 
 Route::get(

@@ -13,14 +13,16 @@
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "predis/predis": "^3.2",
         "saloonphp/saloon": "^3.0",
+        "spatie/laravel-ray": "^1.41",
         "symfony/css-selector": "^7.0",
         "symfony/dom-crawler": "^7.0",
         "tightenco/ziggy": "^2.4"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
-        "laravel/pail": "^1.2.2",
+        "laravel/pail": "^1.2",
         "laravel/pint": "^1.18",
         "laravel/sail": "^1.41",
         "mockery/mockery": "^1.6",

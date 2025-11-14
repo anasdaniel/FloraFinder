@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/button";
 import Icon from "@/components/Icon.vue";
 
 const plantOfTheDay = {
-  name: "Garcinia mangostana",
-  commonName: "Mangosteen",
+  name: "Bougainvillea glabra",
+  commonName: "Paperflower",
   description:
-    'Native to tropical Malaysia, the mangosteen produces sweet-tart fruit with thick purple rind. Its distinctive appearance and delicious flavor have earned it the nickname "Queen of Fruits".',
+    'Bougainvillea glabra, commonly known as Paperflower, is a vibrant and hardy flowering plant native to South America but widely cultivated in tropical regions,' +
+      ' including Malaysia. It is renowned for its colorful bracts that surround its small white flowers, creating a stunning display of colors ranging from pink and ' +
+      'purple to red and orange.',
   conservationStatus: "Least Concern",
   image:
-    // "https://images.pexels.com/photos/2127433/pexels-photo-2127433.jpeg?auto=compress&cs=tinysrgb&w=1260",
-    "https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=400&h=300&fit=crop",
+    // "https://images.pexels.com/photos/2568457/pexels-photo-2568457.jpeg?w=400&h=300&fit=crop",
+    "https://images.pexels.com/photos/13406833/pexels-photo-13406833.jpeg?w=400&h=300&fit=crop"
 };
 
 const features = [
@@ -42,27 +44,35 @@ const popularPlants = [
     name: "Rafflesia",
     scientificName: "Rafflesia arnoldii",
     image:
-      "https://images.pexels.com/photos/12625630/pexels-photo-12625630.jpeg?auto=compress&cs=tinysrgb&w=1260",
+      "https://images.pexels.com/photos/15695205/pexels-photo-15695205.jpeg?auto=compress&cs=tinysrgb&w=1260"
   },
   {
     name: "Torch Ginger",
     scientificName: "Etlingera elatior",
     image:
-      "https://images.pexels.com/photos/13284551/pexels-photo-13284551.jpeg?auto=compress&cs=tinysrgb&w=1260",
+      "https://images.pexels.com/photos/4141814/pexels-photo-4141814.jpeg?auto=compress&cs=tinysrgb&w=1260"
   },
   {
     name: "Highland Pitcher Plant",
     scientificName: "Nepenthes rajah",
     image:
-      "https://images.pexels.com/photos/756880/pexels-photo-756880.jpeg?auto=compress&cs=tinysrgb&w=1260",
+      "https://images.pexels.com/photos/12875326/pexels-photo-12875326.jpeg?auto=compress&cs=tinysrgb&w=1260"
   },
 ];
+
+// Performance UX: smooth image loading skeletons
+import { ref } from "vue";
+const heroCardLoaded = ref(false);
+const potdImageLoaded = ref(false);
 </script>
 
 <template>
   <AppLayout title="FloraFinder">
     <!-- Hero Section -->
-    <div class="relative overflow-hidden">
+    <section
+      aria-labelledby="hero-heading"
+      class="relative overflow-hidden"
+    >
       <div
         class="absolute inset-0 bg-[url('https://images.pexels.com/photos/957024/forest-trees-perspective-bright-957024.jpeg?auto=compress&cs=tinysrgb&w=1260')] bg-cover bg-center bg-no-repeat opacity-30 dark:opacity-20"
       ></div>
@@ -74,17 +84,18 @@ const popularPlants = [
       >
         <div class="max-w-xl md:flex-1 md:py-12">
           <h1
+            id="hero-heading"
             class="text-4xl font-extrabold tracking-tight text-moss-900 dark:text-white sm:text-5xl"
           >
             <span class="block">Discover &amp; Identify</span>
             <span class="block text-sage-600 dark:text-sage-400">Malaysian Plants</span>
           </h1>
-          <p class="mt-6 text-lg leading-8 text-sage-700 dark:text-sage-300">
+          <p class="font-semibold mt-6 text-lg leading-8 text-sage-700 dark:text-sage-300">
             Explore the rich biodiversity of Malaysian flora using our advanced plant
             identification technology.
           </p>
           <div class="flex flex-col gap-4 mt-10 sm:flex-row">
-            <Link href="/plant-identifier" class="group">
+            <Link href="/plant-identifier" class="group" aria-label="Identify plants with your camera">
               <Button
                 class="w-full text-white transition-all duration-200 shadow-lg bg-gradient-to-r from-moss-600 to-sage-600 hover:from-moss-700 hover:to-sage-700 dark:from-moss-800 dark:to-sage-800 dark:hover:from-moss-700 dark:hover:to-sage-700 dark:text-white rounded-xl"
               >
@@ -94,7 +105,7 @@ const popularPlants = [
                 </div>
               </Button>
             </Link>
-            <Link href="/explore">
+            <Link href="/plant-search" class="group" aria-label="Browse the plant database">
               <Button
                 variant="outline"
                 class="w-full rounded-xl border-moss-300 dark:border-moss-700 hover:bg-moss-50 dark:hover:bg-moss-900/30"
@@ -113,11 +124,21 @@ const popularPlants = [
           <Card
             class="overflow-hidden border-0 shadow-xl rounded-3xl backdrop-blur-md bg-white/70 dark:bg-moss-900/60 ring-1 ring-gray-200 dark:ring-gray-800"
           >
-            <CardHeader class="p-0">
+            <CardHeader class="relative p-0">
               <img
-                src="https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?"
+                src="https://images.pexels.com/photos/244796/pexels-photo-244796.jpeg?auto=compress&cs=tinysrgb&w=1260"
                 alt="Malaysian plants"
-                class="object-cover object-center w-full h-64"
+                class="object-cover object-center w-full h-64 transition-opacity duration-500"
+                loading="eager"
+                decoding="async"
+                fetchpriority="high"
+                @load="heroCardLoaded = true"
+                :class="heroCardLoaded ? 'opacity-100' : 'opacity-0'"
+              />
+              <div
+                v-if="!heroCardLoaded"
+                class="absolute inset-0 animate-pulse bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900"
+                aria-hidden="true"
               />
             </CardHeader>
             <CardContent class="p-4 text-center">
@@ -125,19 +146,20 @@ const popularPlants = [
                 class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
               >
                 <Icon name="leaf" class="w-3 h-3 mr-1" />
-                15,000+ Plant Species
+                1000+ Plant Species
               </span>
             </CardContent>
           </Card>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- Plant of the Day -->
-    <div class="px-4 py-16 bg-white dark:bg-gray-950 sm:px-6 lg:px-8">
+    <section aria-labelledby="potd-heading" class="px-4 py-16 bg-white dark:bg-gray-950 sm:px-6 lg:px-8">
       <div class="max-w-5xl mx-auto">
         <div class="mb-12 text-center">
           <h2
+            id="potd-heading"
             class="text-2xl font-bold tracking-tight text-moss-900 dark:text-moss-100 sm:text-3xl"
           >
             Plant of the Day
@@ -155,12 +177,23 @@ const popularPlants = [
               <img
                 :src="plantOfTheDay.image"
                 :alt="plantOfTheDay.commonName"
-                class="object-cover w-full h-64 md:h-full md:rounded-l-3xl"
+                class="object-cover w-full h-64 md:h-full md:rounded-l-3xl transition-opacity duration-500"
+                loading="lazy"
+                decoding="async"
+                sizes="(min-width: 768px) 40vw, 100vw"
+                @load="potdImageLoaded = true"
+                :class="potdImageLoaded ? 'opacity-100' : 'opacity-0'"
+              />
+              <div
+                v-if="!potdImageLoaded"
+                class="absolute inset-0 animate-pulse bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 md:rounded-l-3xl"
+                aria-hidden="true"
               />
               <div class="absolute top-4 right-4">
                 <span
                   class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 shadow-sm"
                 >
+                  <span class="sr-only">Conservation status:</span>
                   {{ plantOfTheDay.conservationStatus }}
                 </span>
               </div>
@@ -192,10 +225,10 @@ const popularPlants = [
           </div>
         </Card>
       </div>
-    </div>
+    </section>
 
     <!-- Features Section -->
-    <div class="relative px-4 py-16 overflow-hidden sm:px-6 lg:px-8">
+    <section aria-labelledby="features-heading" class="relative px-4 py-16 overflow-hidden sm:px-6 lg:px-8">
       <div
         class="absolute inset-0 bg-[url('https://images.pexels.com/photos/38136/pexels-photo-38136.jpeg?auto=compress&cs=tinysrgb&w=1260')] bg-cover bg-center bg-no-repeat opacity-20 dark:opacity-10"
       ></div>
@@ -205,6 +238,7 @@ const popularPlants = [
       <div class="relative z-10 max-w-5xl mx-auto">
         <div class="mb-12 text-center">
           <h2
+            id="features-heading"
             class="text-2xl font-bold tracking-tight text-moss-900 dark:text-moss-100 sm:text-3xl"
           >
             Key Features
@@ -237,13 +271,14 @@ const popularPlants = [
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- Popular Plants Section -->
-    <div class="px-4 py-16 bg-white dark:bg-gray-950 sm:px-6 lg:px-8">
+    <section aria-labelledby="popular-heading" class="px-4 py-16 bg-white dark:bg-gray-950 sm:px-6 lg:px-8">
       <div class="max-w-5xl mx-auto">
         <div class="mb-12 text-center">
           <h2
+            id="popular-heading"
             class="text-2xl font-bold tracking-tight text-moss-900 dark:text-moss-100 sm:text-3xl"
           >
             Popular Malaysian Plants
@@ -255,7 +290,7 @@ const popularPlants = [
 
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <div
-            v-for="plant in popularPlants"
+            v-for="(plant, idx) in popularPlants"
             :key="plant.name"
             class="overflow-hidden transition-all border border-gray-200 shadow-lg group rounded-2xl hover:shadow-xl dark:border-gray-800"
           >
@@ -264,6 +299,9 @@ const popularPlants = [
                 :src="plant.image"
                 :alt="plant.name"
                 class="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+                decoding="async"
+                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
               />
               <div
                 class="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-t from-black/60 to-transparent group-hover:opacity-100"
@@ -281,7 +319,7 @@ const popularPlants = [
         </div>
 
         <div class="mt-10 text-center">
-          <Link href="/explore">
+          <Link href="/explore" aria-label="Explore all plants">
             <Button class="rounded-full shadow-sm">
               <div class="flex items-center gap-2">
                 <span>Explore All Plants</span>
@@ -291,10 +329,10 @@ const popularPlants = [
           </Link>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- CTA Section -->
-    <div class="relative px-4 py-16 overflow-hidden sm:px-6 lg:px-8">
+    <section aria-labelledby="cta-heading" class="relative px-4 py-16 overflow-hidden sm:px-6 lg:px-8">
       <div
         class="absolute inset-0 bg-[url('https://images.pexels.com/photos/1287075/pexels-photo-1287075.jpeg?auto=compress&cs=tinysrgb&w=1260')] bg-cover bg-center bg-no-repeat"
       ></div>
@@ -302,14 +340,14 @@ const popularPlants = [
         class="absolute inset-0 bg-gradient-to-r from-moss-600/90 to-sage-600/90 dark:from-moss-900/90 dark:to-sage-900/90"
       ></div>
       <div class="relative z-10 max-w-5xl mx-auto text-center">
-        <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+        <h2 id="cta-heading" class="text-2xl font-bold tracking-tight text-white sm:text-3xl">
           Ready to discover Malaysian plants?
         </h2>
         <p class="mt-3 text-lg text-white/80">
           Start identifying plants in your surroundings today.
         </p>
         <div class="mt-8">
-          <Link href="/plant-identifier">
+          <Link href="/plant-identifier" aria-label="Start identifying plants now">
             <Button
               class="bg-white rounded-full shadow-lg text-moss-800 hover:bg-white/90"
             >
@@ -321,6 +359,6 @@ const popularPlants = [
           </Link>
         </div>
       </div>
-    </div>
+    </section>
   </AppLayout>
 </template>

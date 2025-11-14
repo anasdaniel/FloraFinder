@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Integrations\IdentifyPlantRequest as IntegrationsIdentifyPlantRequest;
 use App\Models\PlantIdentification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use App\Http\Integrations\PlantNetConnector as IntegrationsPlantNetConnector;
 use Illuminate\Support\Facades\Log;
@@ -29,10 +30,24 @@ class PlantIdentifierController extends Controller
         ]);
 
         try {
+
+            $cacheKey = 'plant_' . md5($request->file('image')->get());
+
+            // Check cache first
+            $cachedResult = Cache::store('redis')->get($cacheKey);
+            if ($cachedResult) {
+                return Inertia::render('Detect', [
+                    'plantData' => $cachedResult
+                ]);
+            }
+
             $result = $this->processPlantIdentification(
                 $request->file('image'),
                 $request->input('organ')
             );
+
+            Cache::store('redis')->put($cacheKey, $result, 3600);
+
 
             return Inertia::render('Detect', [
                 'plantData' => $result
@@ -50,9 +65,6 @@ class PlantIdentifierController extends Controller
 
     public function save(Request $request)
     {
-
-
-
 
 
         $request->validate([
@@ -75,7 +87,6 @@ class PlantIdentifierController extends Controller
             //grab current user id if logged in
 
         ]);
-
 
 
         try {
@@ -129,81 +140,60 @@ class PlantIdentifierController extends Controller
         ]);
 
         try {
-            $scientificName = $request->input('scientificName');
-            Log::info('Fetching care details for: ' . $scientificName);
 
-            // First, search for the plant
+            $scientificName = 'Sorbus aucuparia';
+
             $connector = new TrefleConnector();
-            $searchRequest = new SearchPlantRequest($scientificName);
-            $searchResponse = $connector->send($searchRequest);
+            $detailsRequest = new SearchPlantRequest($scientificName);
+            $detailsResponse = $connector->send($detailsRequest);
 
-            Log::info('Search response status: ' . $searchResponse->status());
-            Log::info('Search response body: ' . $searchResponse->body());
-
-            if ($searchResponse->successful()) {
-                $searchData = $searchResponse->json();
-                Log::info('Search data: ', $searchData);
-
-                if (isset($searchData['data']) && count($searchData['data']) > 0) {
-                    $plantSlug = $searchData['data'][0]['slug'];
-                    Log::info('Found plant slug: ' . $plantSlug);
-
-                    // Fetch detailed plant information
-                    $detailsRequest = new TrefleRequest("plants/{$plantSlug}");
-                    $detailsResponse = $connector->send($detailsRequest);
-
-                    Log::info('Details response status: ' . $detailsResponse->status());
-                    Log::info('Details response body: ' . $detailsResponse->body());
-
-                    if ($detailsResponse->successful()) {
-                        $detailsData = $detailsResponse->json();
-                        Log::info('Details data: ', $detailsData);
-
-                        // Extract care details - try different possible structures
-                        $mainSpecies = $detailsData['data']['main_species'] ?? $detailsData['data'] ?? null;
-                        if ($mainSpecies && isset($mainSpecies['growth'])) {
-                            $growth = $mainSpecies['growth'];
-                            $careDetails = [
-                                'watering' => $growth['watering'] ?? $growth['water'] ?? 'Unknown',
-                                'sunlight' => $growth['light'] ?? $growth['sunlight'] ?? 'Unknown',
-                                'soil' => $growth['soil'] ?? 'Unknown',
-                                'temperature' => $growth['temperature'] ?? $growth['temp'] ?? 'Unknown',
-                            ];
-                        } else {
-                            // Try alternative structure
-                            $careDetails = [
-                                'watering' => $detailsData['data']['watering'] ?? $detailsData['watering'] ?? 'Unknown',
-                                'sunlight' => $detailsData['data']['sunlight'] ?? $detailsData['sunlight'] ?? 'Unknown',
-                                'soil' => $detailsData['data']['soil'] ?? $detailsData['soil'] ?? 'Unknown',
-                                'temperature' => $detailsData['data']['temperature'] ?? $detailsData['temperature'] ?? 'Unknown',
-                            ];
-                        }
-
-                        return response()->json([
-                            'success' => true,
-                            'data' => $careDetails
-                        ]);
-                    } else {
-                        Log::error('Details request failed: ' . $detailsResponse->body());
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Failed to fetch plant details from Trefle API'
-                        ], 500);
-                    }
-                } else {
-                    Log::info('No plants found in search results');
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Plant not found in Trefle database'
-                    ]);
-                }
-            } else {
-                Log::error('Search request failed: ' . $searchResponse->body());
+            if (!$detailsResponse->successful()) {
+                Log::error('Details request failed: ' . $detailsResponse->body());
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to search Trefle database'
+                    'message' => 'Failed to fetch plant details from Trefle API'
                 ], 500);
             }
+
+            $detailsData = $detailsResponse->json();
+            $growth = $detailsData['data']['growth'] ?? null;
+
+            if (!$growth) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No plant data available'
+                ], 404);
+            }
+
+            $careDetails = [
+                'description' => $growth['description'] ?? 'No description available',
+                'sowing' => $growth['sowing'] ?? 'No sowing information available',
+                'days_to_harvest' => $growth['days_to_harvest'] ?? 'Unknown',
+                'row_spacing_cm' => $growth['row_spacing']['cm'] ?? 'Unknown',
+                'spread_cm' => $growth['spread']['cm'] ?? 'Unknown',
+                'ph_maximum' => $growth['ph_maximum'] ?? 'Unknown',
+                'ph_minimum' => $growth['ph_minimum'] ?? 'Unknown',
+                'light' => $growth['light'] ?? 'Unknown',
+                'atmospheric_humidity' => $growth['atmospheric_humidity'] ?? 'Unknown',
+                'growth_months' => $growth['growth_months'] ?? 'Unknown',
+                'bloom_months' => $growth['bloom_months'] ?? 'Unknown',
+                'fruit_months' => $growth['fruit_months'] ?? 'Unknown',
+                'minimum_precipitation' => $growth['minimum_precipitation']['mm'] ?? 'Unknown',
+                'maximum_precipitation' => $growth['maximum_precipitation']['mm'] ?? 'Unknown',
+                'minimum_temperature_celcius' => $growth['minimum_temperature']['deg_c'] ?? 'Unknown',
+                'maximum_temperature_celcius' => $growth['maximum_temperature']['deg_c'] ?? 'Unknown',
+                'soil_nutriments' => $growth['soil_nutriments'] ?? 'Unknown',
+                'soil_salinity' => $growth['soil_salinity'] ?? 'Unknown',
+                'soil_texture' => $growth['soil_texture'] ?? 'Unknown',
+                'soil_humidity' => $growth['soil_humidity'] ?? 'Unknown',
+            ];
+
+
+            return response()->json([
+                'success' => true,
+                'data' => $careDetails
+            ]);
+
         } catch (\Exception $e) {
             Log::error('Trefle API error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
