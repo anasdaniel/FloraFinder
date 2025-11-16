@@ -545,10 +545,7 @@ const fetchCareDetails = async (scientificName: string): Promise<void> => {
     fetchingCareDetails.value = true;
     try {
         const url = new URL(route('plant-identifier.care-details'));
-
-        const test = 'Sorbus aucuparia';
-
-        url.searchParams.append('scientificName', test);
+        url.searchParams.append('scientificName', scientificName);
 
         const response = await fetch(url.toString(), {
             method: 'GET',
@@ -558,8 +555,6 @@ const fetchCareDetails = async (scientificName: string): Promise<void> => {
         });
 
         const responseText = await response.text();
-        console.log('Raw response:', responseText);
-        console.log('Response status:', response.status);
 
         if (!response.ok) {
             console.error('API request failed:', response.status, responseText);
@@ -570,6 +565,7 @@ const fetchCareDetails = async (scientificName: string): Promise<void> => {
 
         if (data.success) {
             careDetails.value = data.data;
+            console.log('Fetched care details:', careDetails.value);
         } else {
             console.log('API returned success=false:', data.message);
             careDetails.value = null;
@@ -1496,11 +1492,6 @@ const savePlantToDatabase = async () => {
                                                 </template>
                                                 <template v-else-if="careDetails">
                                                     <ul class="text-sage-800 dark:text-sage-200 space-y-1 text-sm">
-                                                        <!--                                                        <li><strong>Watering:</strong> {{ careDetails.watering }}</li>-->
-                                                        <!--                                                        <li><strong>Sunlight:</strong> {{ careDetails.sunlight }}</li>-->
-                                                        <!--                                                        <li><strong>Soil:</strong> {{ careDetails.soil }}</li>-->
-                                                        <!--                                                        <li><strong>Temperature:</strong> {{ careDetails.temperature }}</li>-->
-
                                                         <li><strong>Description:</strong> {{ careDetails.description }}</li>
                                                         <li><strong>Sowing:</strong> {{ careDetails.sowing }}</li>
                                                         <li><strong>Days to Harvest:</strong> {{ careDetails.days_to_harvest }}</li>
@@ -1513,8 +1504,8 @@ const savePlantToDatabase = async () => {
                                                         <li><strong>Growth Months:</strong> {{ careDetails.growth_months }}</li>
                                                         <li><strong>Bloom Months:</strong> {{ careDetails.bloom_months }}</li>
                                                         <li><strong>Fruit Months:</strong> {{ careDetails.fruit_months }}</li>
-                                                        <li><strong>Minimum Precipitation:</strong> {{ careDetails.minimum_precipitation }}</li>
-                                                        <li><strong>Maximum Precipitation:</strong> {{ careDetails.maximum_precipitation }}</li>
+                                                        <li><strong>Minimum Precipitation (mm):</strong> {{ careDetails.minimum_precipitation }}</li>
+                                                        <li><strong>Maximum Precipitation (mm):</strong> {{ careDetails.maximum_precipitation }}</li>
                                                         <li>
                                                             <strong>Minimum Temperature (°C):</strong> {{ careDetails.minimum_temperature_celcius }}
                                                         </li>
@@ -1532,7 +1523,7 @@ const savePlantToDatabase = async () => {
                                                         {{ getConservationAdvice(selectedResult?.species.scientificNameWithoutAuthor || '') }}
                                                     </p>
                                                 </template>
-                                                <p class="text-sage-500 dark:text-sage-400 mt-2 text-xs">
+                                                <p class="text-sage-500 dark:text-sage-400 mt-4 text-xs">
                                                     This is a general guide. For critical conservation, consult local experts.
                                                 </p>
                                             </div>

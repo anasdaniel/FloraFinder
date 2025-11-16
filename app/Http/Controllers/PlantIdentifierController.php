@@ -188,6 +188,14 @@ class PlantIdentifierController extends Controller
                 'soil_humidity' => $growth['soil_humidity'] ?? 'Unknown',
             ];
 
+            //save to redis cache for 24 hours
+            $cacheKey = 'care_details_' . md5($scientificName);
+            Cache::store('redis')->put($cacheKey, $careDetails, 86400
+            );
+
+
+            Log::info("Logged care details", $careDetails);
+
 
             return response()->json([
                 'success' => true,
