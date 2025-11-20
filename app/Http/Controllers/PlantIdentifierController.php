@@ -19,37 +19,59 @@ class PlantIdentifierController extends Controller
     public function index()
     {
 
-        return Inertia::render('Detect');
+        return Inertia::render('DetectRevamp');
     }
 
     public function identify(Request $request)
     {
+        $organsInput = $request->input('organs');
+        if (is_string($organsInput)) {
+            $decodedOrgans = json_decode($organsInput, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $request->merge(['organs' => $decodedOrgans]);
+            }
+        }
+
         $request->validate([
-            'image' => 'required|image|max:10240', // Max 10MB
-            'organ' => 'required|string|in:flower,leaf,fruit,bark,habit,other',
+            'images' => 'required|array|min:1|max:5',
+            'images.*' => 'file|image|max:10240',
+            'organs' => 'required|array',
+            'organs.*' => 'required|string|in:flower,leaf,fruit,bark,habit,other',
         ]);
+
+        if (count($request->input('organs', [])) !== count($request->file('images', []))) {
+            return back()->withErrors([
+                'organs' => 'Please select an organ for each uploaded image.',
+            ]);
+        }
+
 
         try {
 
-            $cacheKey = 'plant_' . md5($request->file('image')->get());
+            $images = $request->file('images');
+            $organs = $request->input('organs');
+            $primaryImage = $images[0];
+            $primaryOrgan = $organs[0] ?? 'flower';
+
+            $cacheKey = 'plant_' . hash_file('sha256', $primaryImage->getRealPath());
 
             // Check cache first
             $cachedResult = Cache::store('redis')->get($cacheKey);
             if ($cachedResult) {
-                return Inertia::render('Detect', [
+                return Inertia::render('DetectRevamp', [
                     'plantData' => $cachedResult
                 ]);
             }
 
             $result = $this->processPlantIdentification(
-                $request->file('image'),
-                $request->input('organ')
+                $primaryImage,
+                $primaryOrgan
             );
 
             Cache::store('redis')->put($cacheKey, $result, 3600);
 
 
-            return Inertia::render('Detect', [
+            return Inertia::render('DetectRevamp', [
                 'plantData' => $result
             ]);
         } catch (\Exception $e) {
