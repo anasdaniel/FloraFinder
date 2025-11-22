@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('forum_tags', function (Blueprint $table) {
             $table->id();
             $table->string('tag_name', 100)->unique();
+            $table->string('tag_category', 100)->unique();
         });
 
         Schema::create('thread_tag', function (Blueprint $table) {

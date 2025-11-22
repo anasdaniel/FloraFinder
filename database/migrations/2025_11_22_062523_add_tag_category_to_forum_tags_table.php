@@ -4,7 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-
 return new class extends Migration
 {
     /**
@@ -12,11 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('conservation_statuses', function (Blueprint $table) {
-            $table->id();
-            $table->string('status_name', 100)->unique();
-            $table->text('description')->nullable();
-            $table->timestamps();
+        Schema::table('forum_tags', function (Blueprint $table) {
+            $table->string('tag_category', 100)->after('tag_name');
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('conservation_statuses');
+        Schema::table('forum_tags', function (Blueprint $table) {
+            $table->dropColumn('tag_category');
+        });
     }
 };

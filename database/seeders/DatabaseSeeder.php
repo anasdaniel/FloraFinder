@@ -27,5 +27,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         Plant::factory(100)->create();
+
+        $this->call([
+            ConservationStatusSeeder::class,
+            ForumTagSeeder::class,
+        ]);
     }
 }

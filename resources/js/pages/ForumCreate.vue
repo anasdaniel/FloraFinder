@@ -1,4 +1,3 @@
-// filepath: /Users/anas/code/FloraFinder/resources/js/pages/ForumCreate.vue
 <script setup lang="ts">
 import { ref } from "vue";
 import { Head, Link, useForm } from "@inertiajs/vue3";
@@ -19,12 +18,26 @@ import { AlertCircle } from "lucide-vue-next";
 import Icon from "@/components/Icon.vue";
 import { useToast } from "@/composables/useToast";
 import type { BreadcrumbItem } from "@/types";
+import { onMounted } from "vue";
 
 const { toast } = useToast();
 
+const tags = ref([]);
+
+// Fetch tags on mount
+onMounted(async () => {
+    const res = await fetch("/forum/tags", {
+        headers: { "Accept": "application/json" },
+        credentials: "same-origin" // important for auth cookies
+    });
+    const json = await res.json();
+    tags.value = json.tags || [];
+});
+
+
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Forum", href: "/forum" },
-  { title: "New Post", href: "/forum/new" },
+  { title: "New Thread", href: "/forum/create" },
 ];
 
 // Categories for the forum
@@ -35,6 +48,12 @@ const categories = ref([
   { key: "offtopic", name: "Off Topic" },
 ]);
 
+// Make this component usable embedded (modal) or as a standalone page
+const props = defineProps({
+  embedded: { type: Boolean, default: false },
+});
+const emit = defineEmits(["close", "created"]);
+
 // Preview of uploaded image
 const imagePreview = ref<string | null>(null);
 
@@ -44,6 +63,7 @@ const form = useForm({
   content: "",
   category: "general",
   image: null as File | null,
+    tag_ids: [] as number[],
 });
 
 // Form error and success handling
@@ -99,13 +119,19 @@ const submitForm = () => {
   });
 
   // Use the Inertia form helper
-  form.post("/forum/new", {
+  form.post("/forum", {
     preserveScroll: true,
     forceFormData: true, // Force FormData for file uploads
     onSuccess: () => {
       // Reset form after successful submission
       form.reset();
       imagePreview.value = null;
+
+      // If embedded, notify parent to close / refresh
+      if (props.embedded) {
+        emit("created");
+        emit("close");
+      }
 
       // Show success toast (though the redirect will happen before user sees this)
       toast({
@@ -134,159 +160,201 @@ const submitForm = () => {
 </script>
 
 <template>
-  <Head title="Create New Post" />
-  <AppLayout :breadcrumbs="breadcrumbs">
-    <div class="w-full max-w-2xl px-4 py-8 mx-auto">
-      <Button as-child variant="outline" size="sm" class="gap-2 mb-4">
-        <Link href="/forum">
-          <Icon name="arrow-left" class="w-4 h-4" />
-          Back to Forum
-        </Link>
-      </Button>
+  <!-- If not embedded, render page head + layout. If embedded, only render the form container. -->
+  <div>
+    <Head v-if="!props.embedded" title="Create New Post" />
 
-      <Card class="mb-8">
-        <CardHeader>
-          <CardTitle class="text-xl font-semibold">Create New Post</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form @submit.prevent="submitForm" class="space-y-6">
-            <!-- General form error -->
-            <div
-              v-if="formError"
-              class="p-4 mb-4 text-sm border rounded-md bg-red-50 text-red-600 border-red-200"
-            >
-              <div class="flex items-start">
-                <Icon name="alert-circle" class="w-5 h-5 mr-2" />
-                <div>{{ formError }}</div>
-              </div>
-            </div>
+    <component :is="props.embedded ? 'div' : AppLayout" v-bind="!props.embedded ? { breadcrumbs } : {}">
+      <div class="w-full max-w-2xl px-4 py-8 mx-auto">
+        <Button as-child variant="outline" size="sm" class="gap-2 mb-4" v-if="!props.embedded">
+          <Link href="/forum">
+            <Icon name="arrow-left" class="w-4 h-4" />
+            Back to Forum
+          </Link>
+        </Button>
 
-            <div class="space-y-2">
-              <Label for="title">Title</Label>
-              <Input
-                id="title"
-                v-model="form.title"
-                placeholder="Enter a descriptive title"
-                required
-                :disabled="form.processing"
-              />
-              <p
-                v-if="form.errors.title"
-                class="text-sm text-red-600 flex items-center gap-1 mt-1"
+        <Card class="mb-8">
+          <CardHeader>
+            <CardTitle class="text-xl font-semibold">Create New Post</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form @submit.prevent="submitForm" class="space-y-6">
+              <!-- General form error -->
+              <div
+                v-if="formError"
+                class="p-4 mb-4 text-sm border rounded-md bg-red-50 text-red-600 border-red-200"
               >
-                <AlertCircle class="w-4 h-4" /> {{ form.errors.title }}
-              </p>
-            </div>
+                <div class="flex items-start">
+                  <Icon name="alert-circle" class="w-5 h-5 mr-2" />
+                  <div>{{ formError }}</div>
+                </div>
+              </div>
 
-            <div class="space-y-2">
-              <Label for="category">Category</Label>
-              <Select v-model="form.category" :disabled="form.processing">
-                <SelectTrigger class="w-full">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="category in categories"
-                    :key="category.key"
-                    :value="category.key"
+              <div class="space-y-2">
+                <Label for="title">Title</Label>
+                <Input
+                  id="title"
+                  v-model="form.title"
+                  placeholder="Enter a descriptive title"
+                  required
+                  :disabled="form.processing"
+                />
+                <p
+                  v-if="form.errors.title"
+                  class="text-sm text-red-600 flex items-center gap-1 mt-1"
+                >
+                  <AlertCircle class="w-4 h-4" /> {{ form.errors.title }}
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <Label for="category">Category</Label>
+                <Select v-model="form.category" :disabled="form.processing">
+                  <SelectTrigger class="w-full">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="category in categories"
+                      :key="category.key"
+                      :value="category.key"
+                    >
+                      {{ category.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p
+                  v-if="form.errors.category"
+                  class="text-sm text-red-600 flex items-center gap-1 mt-1"
+                >
+                  <AlertCircle class="w-4 h-4" /> {{ form.errors.category }}
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <Label for="content">Content</Label>
+                <Textarea
+                  id="content"
+                  v-model="form.content"
+                  placeholder="Share your thoughts, questions, or knowledge..."
+                  rows="8"
+                  required
+                  :disabled="form.processing"
+                />
+                <p
+                  v-if="form.errors.content"
+                  class="text-sm text-red-600 flex items-center gap-1 mt-1"
+                >
+                  <AlertCircle class="w-4 h-4" /> {{ form.errors.content }}
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <Label for="image-upload">Image (Optional)</Label>
+                <div class="flex items-center gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    @click="triggerFileInput"
+                    :disabled="form.processing"
                   >
-                    {{ category.name }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p
-                v-if="form.errors.category"
-                class="text-sm text-red-600 flex items-center gap-1 mt-1"
-              >
-                <AlertCircle class="w-4 h-4" /> {{ form.errors.category }}
-              </p>
-            </div>
+                    <Icon name="image-plus" class="w-4 h-4 mr-2" />
+                    {{ imagePreview ? "Change Image" : "Add Image" }}
+                  </Button>
+                  <input
+                    type="file"
+                    ref="fileInputRef"
+                    class="hidden"
+                    accept="image/*"
+                    @change="handleImageUpload"
+                  />
+                  <Button
+                    v-if="imagePreview"
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    @click="removeImage"
+                    :disabled="form.processing"
+                  >
+                    <Icon name="trash-2" class="w-4 h-4 mr-2" />
+                    Remove
+                  </Button>
+                </div>
+                <div v-if="imagePreview" class="mt-4 relative">
+                  <img
+                    :src="imagePreview"
+                    class="max-h-64 rounded-md border border-border object-cover"
+                    alt="Preview"
+                  />
+                </div>
+                <p
+                  v-if="form.errors.image"
+                  class="text-sm text-red-600 flex items-center gap-1 mt-1"
+                >
+                  <AlertCircle class="w-4 h-4" /> {{ form.errors.image }}
+                </p>
+              </div>
 
-            <div class="space-y-2">
-              <Label for="content">Content</Label>
-              <Textarea
-                id="content"
-                v-model="form.content"
-                placeholder="Share your thoughts, questions, or knowledge..."
-                rows="8"
-                required
-                :disabled="form.processing"
-              />
-              <p
-                v-if="form.errors.content"
-                class="text-sm text-red-600 flex items-center gap-1 mt-1"
-              >
-                <AlertCircle class="w-4 h-4" /> {{ form.errors.content }}
-              </p>
-            </div>
+                <div class="space-y-2">
+                    <Label for="tags">Tags (optional)</Label>
+                    <Select v-model="form.tag_ids" multiple>
+                        <SelectTrigger class="w-full">
+                            <SelectValue placeholder="Select tags" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="tag in tags"
+                                :key="tag.id"
+                                :value="tag.id"
+                            >
+                                {{ tag.tag_name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <p v-if="form.errors.tag_ids" class="text-sm text-red-600 mt-1">
+                        <AlertCircle class="w-4 h-4 inline mr-1" /> {{ form.errors.tag_ids }}
+                    </p>
+                </div>
 
-            <div class="space-y-2">
-              <Label for="image-upload">Image (Optional)</Label>
-              <div class="flex items-center gap-4">
+
+                <div class="flex items-center justify-end gap-4 pt-4">
+                <!-- Update cancel/back buttons to close modal when embedded -->
                 <Button
+                  v-if="props.embedded"
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  @click="triggerFileInput"
+                  variant="ghost"
+                  :disabled="form.processing"
+                  @click="$emit('close')"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  v-else
+                  as-child
+                  type="button"
+                  variant="ghost"
                   :disabled="form.processing"
                 >
-                  <Icon name="image-plus" class="w-4 h-4 mr-2" />
-                  {{ imagePreview ? "Change Image" : "Add Image" }}
+                  <Link href="/forum">Cancel</Link>
                 </Button>
-                <input
-                  type="file"
-                  ref="fileInputRef"
-                  class="hidden"
-                  accept="image/*"
-                  @change="handleImageUpload"
-                />
                 <Button
-                  v-if="imagePreview"
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  @click="removeImage"
+                  type="submit"
                   :disabled="form.processing"
+                  :class="{ 'opacity-75 cursor-wait': form.processing }"
                 >
-                  <Icon name="trash-2" class="w-4 h-4 mr-2" />
-                  Remove
+                  <Icon
+                    v-if="form.processing"
+                    name="loader-2"
+                    class="w-4 h-4 mr-2 animate-spin"
+                  />
+                  <span>{{ form.processing ? "Creating..." : "Create Post" }}</span>
                 </Button>
               </div>
-              <div v-if="imagePreview" class="mt-4 relative">
-                <img
-                  :src="imagePreview"
-                  class="max-h-64 rounded-md border border-border object-cover"
-                  alt="Preview"
-                />
-              </div>
-              <p
-                v-if="form.errors.image"
-                class="text-sm text-red-600 flex items-center gap-1 mt-1"
-              >
-                <AlertCircle class="w-4 h-4" /> {{ form.errors.image }}
-              </p>
-            </div>
-
-            <div class="flex items-center justify-end gap-4 pt-4">
-              <Button as-child type="button" variant="ghost" :disabled="form.processing">
-                <Link href="/forum">Cancel</Link>
-              </Button>
-              <Button
-                type="submit"
-                :disabled="form.processing"
-                :class="{ 'opacity-75 cursor-wait': form.processing }"
-              >
-                <Icon
-                  v-if="form.processing"
-                  name="loader-2"
-                  class="w-4 h-4 mr-2 animate-spin"
-                />
-                <span>{{ form.processing ? "Creating..." : "Create Post" }}</span>
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  </AppLayout>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </component>
+  </div>
 </template>
