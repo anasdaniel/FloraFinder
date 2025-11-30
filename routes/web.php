@@ -17,10 +17,12 @@ use App\Models\PlantIdentification;
 Route::get('/', function () {
 
 
+
     return Inertia::render('Welcome');
 })->name('home');
 
 // Map Test Route
+
 
 
 Route::get('/login', function () {
@@ -31,6 +33,7 @@ Route::get('/login', function () {
 Route::get('/register', function () {
     return Inertia::render('Auth/Register');
 })->name('register');
+
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -48,6 +51,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('booking', function () {
         return Inertia::render('Booking');
     })->name('booking');
+
 
 
     Route::get('trefle-test', function () {
@@ -90,7 +94,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('trefle-malaysia', function () {
-        $page = (int)request('page', 1);
+        $page = (int) request('page', 1);
         $targetCount = 20; // Desired number of unique plants per page
         $allPlants = [];
         $seenIds = [];
@@ -228,6 +232,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('forum.post');
 
 
+
     // Plant search route
     Route::get('plant-search', function () {
 
@@ -316,7 +321,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('sighting-map', function () {
         return Inertia::render(component: 'SightingMap');
-    })->name('sighting-map');
+    })->name('plant-map');
 
 
     //detect route
@@ -334,12 +339,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         '/plant-identifier',
         [PlantIdentifierController::class, 'index']
     )->name('plant-identifier');
-
     // Route::post(
     //     '/plant-identifier/identify',
     //     [PlantIdentifierController::class, 'identify']
     // )->name('plant-identifier.identify');
-
     Route::post(
         '/plant-identifier/save',
         [PlantIdentifierController::class, 'save']

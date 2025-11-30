@@ -55,25 +55,20 @@ class PlantIdentifierController extends Controller
 
             $cacheKey = 'plant_' . hash_file('sha256', $primaryImage->getRealPath());
 
-            // Check cache first
+            $plantData = null;
             $cachedResult = Cache::store('redis')->get($cacheKey);
             if ($cachedResult) {
-                return Inertia::render('DetectRevamp', [
-                    'plantData' => $cachedResult
-                ]);
+                $plantData = $cachedResult;
+            } else {
+                $result = $this->processPlantIdentification($primaryImage, $primaryOrgan);
+                Cache::store('redis')->put($cacheKey, $result, 3600);
+                $plantData = $result;
             }
 
-            $result = $this->processPlantIdentification(
-                $primaryImage,
-                $primaryOrgan
-            );
-
-            Cache::store('redis')->put($cacheKey, $result, 3600);
-
-
             return Inertia::render('DetectRevamp', [
-                'plantData' => $result
+                'plantData' => $plantData
             ]);
+
         } catch (\Exception $e) {
             Log::error('Plant identification error: ' . $e->getMessage());
 
@@ -106,15 +101,11 @@ class PlantIdentifierController extends Controller
             'region' => 'nullable|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
-            //grab current user id if logged in
-
         ]);
 
 
         try {
 
-
-//            dd($request->input('latitude'), $request->input('longitude'), $request->input('family'));
 
             // Save to database with all plant information
             $savedData = $this->saveToDatabase(
@@ -141,9 +132,6 @@ class PlantIdentifierController extends Controller
 
             Log::info('Plant identification saved to database', ['data' => $savedData]);
 
-            //return to the detect page with success message and reset form
-
-//            dd($savedData);
 
             return redirect()->route('plant-identifier')->with('success', 'Plant identification saved successfully!');
         } catch (\Exception $e) {
