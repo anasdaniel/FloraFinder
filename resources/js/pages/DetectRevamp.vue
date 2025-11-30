@@ -6,7 +6,7 @@ import { useToast } from '@/composables/useToast';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router } from '@inertiajs/vue3';
 import exifr from 'exifr';
-import { computed, nextTick, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 
 // --- Types ---
 interface ImageUpload {
@@ -85,16 +85,61 @@ const savingToDatabase = ref<boolean>(false);
 const bookmarkedResults = reactive<Record<string, boolean>>({});
 const careDetails = ref<any>(null);
 const fetchingCareDetails = ref<boolean>(false);
+const plantDescription = ref('');
+const descriptionLoading = ref(false);
 
+// --- Chat State ---
+const chatMessages = ref<{ role: 'user' | 'model'; text: string }[]>([]);
+const chatInput = ref('');
+const isChatLoading = ref(false);
+const chatEndRef = ref<HTMLElement | null>(null);
+
+// Constants
 const MAX_IMAGES = 5;
 const ORGANS = [
-    { label: 'Leaf', value: 'leaf' },
-    { label: 'Flower', value: 'flower' },
-    { label: 'Fruit', value: 'fruit' },
-    { label: 'Bark', value: 'bark' },
-    { label: 'Whole Plant', value: 'habit' },
+    { value: 'flower', label: 'Flower', icon: 'flower' },
+    { value: 'leaf', label: 'Leaf', icon: 'leaf' },
+    { value: 'fruit', label: 'Fruit', icon: 'apple' },
+    { value: 'bark', label: 'Bark', icon: 'tree' },
+    { value: 'habit', label: 'Whole', icon: 'sprout' },
 ];
-const MALAYSIAN_REGIONS = ['Peninsular Malaysia', 'Sabah', 'Sarawak', 'Labuan'];
+
+const MALAYSIAN_REGIONS = [
+    'Peninsular Malaysia',
+    'Sabah',
+    'Sarawak',
+    'Labuan',
+    'Johor',
+    'Kedah',
+    'Kelantan',
+    'Melaka',
+    'Negeri Sembilan',
+    'Pahang',
+    'Perak',
+    'Perlis',
+    'Pulau Pinang',
+    'Selangor',
+    'Terengganu',
+];
+
+// --- Computed ---
+const hasResults = computed(() => {
+    return results.value && results.value.success && results.value.data && results.value.data.results && results.value.data.results.length > 0;
+});
+
+const selectedResult = computed(() => {
+    if (!hasResults.value) return null;
+    return results.value!.data!.results[selectedResultIndex.value];
+});
+
+const isCurrentResultBookmarked = computed(() => {
+    if (!selectedResult.value) return false;
+    return Boolean(bookmarkedResults[selectedResult.value.species?.scientificName]);
+});
+
+const allImagesTagged = computed(() => {
+    return uploadedImages.value.length > 0 && uploadedImages.value.every((img) => img.organ !== null);
+});
 
 const isKnownValue = (value: unknown): boolean => {
     if (value === null || value === undefined) return false;
@@ -127,25 +172,6 @@ const hasCareData = computed(() => {
     ].some((key) => isKnownValue(details[key]));
 });
 
-// --- Computed ---
-const hasResults = computed(() => {
-    return results.value && results.value.success && results.value.data && results.value.data.results && results.value.data.results.length > 0;
-});
-
-const selectedResult = computed(() => {
-    if (!hasResults.value) return null;
-    return results.value!.data!.results[selectedResultIndex.value];
-});
-
-const isCurrentResultBookmarked = computed(() => {
-    if (!selectedResult.value) return false;
-    return Boolean(bookmarkedResults[selectedResult.value.species?.scientificName]);
-});
-
-const allImagesTagged = computed(() => {
-    return uploadedImages.value.length > 0 && uploadedImages.value.every((img) => img.organ !== null);
-});
-
 // --- Lifecycle ---
 onMounted(() => {
     if (props.plantData && props.plantData.success) {
@@ -153,7 +179,32 @@ onMounted(() => {
     }
 });
 
+// Watch chat messages to auto-scroll
+watch(
+    chatMessages,
+    async () => {
+        await nextTick();
+        if (chatEndRef.value) {
+            chatEndRef.value.scrollIntoView({ behavior: 'smooth' });
+        }
+    },
+    { deep: true },
+);
+watch(
+    selectedResult,
+    (result) => {
+        if (result?.species?.scientificName) {
+            fetchPlantDescription(result.species.scientificName);
+        } else {
+            plantDescription.value = '';
+        }
+    },
+    { immediate: true },
+);
+
 // --- Methods ---
+
+// ... (Previous methods: onImageChange, removeImage, setOrgan, extractExifData, reverseGeocode, useUploadLocation, resetForm)
 
 const onImageChange = async (e: Event): Promise<void> => {
     const target = e.target as HTMLInputElement;
@@ -172,24 +223,21 @@ const onImageChange = async (e: Event): Promise<void> => {
 
     const filesToProcess = newFiles.slice(0, remainingSlots);
 
-    // Process each file
     for (const file of filesToProcess) {
         const newImage: ImageUpload = {
             id: Math.random().toString(36).substring(2, 9),
             file,
             preview: URL.createObjectURL(file),
-            organ: null, // Default to null to force selection
+            organ: null,
         };
         uploadedImages.value.push(newImage);
 
-        // Extract EXIF only from the first image to set location
         if (uploadedImages.value.length === 1) {
             await extractExifData(file);
         }
     }
 
     errors.image = undefined;
-    // Reset input
     target.value = '';
 };
 
@@ -207,14 +255,11 @@ const setOrgan = (id: string, organValue: string) => {
     }
 };
 
-// Extract EXIF geolocation data from image
 const extractExifData = async (file: File): Promise<void> => {
     try {
         extractingExif.value = true;
         toast({ title: 'Reading Metadata', description: 'Checking for location in photo...', variant: 'default' });
-
         const exifData = await exifr.parse(file, { gps: true, tiff: true, exif: true });
-
         if (exifData && exifData.latitude && exifData.longitude) {
             form.latitude = parseFloat(exifData.latitude.toFixed(6));
             form.longitude = parseFloat(exifData.longitude.toFixed(6));
@@ -239,7 +284,6 @@ const reverseGeocode = async (latitude: number, longitude: number): Promise<void
             if (data && data.display_name) {
                 let locationName = data.name || data.address.city || data.address.town || '';
                 let region = data.address.state || data.address.province || 'Peninsular Malaysia';
-
                 if (locationName) form.locationName = locationName;
                 const matchedRegion = MALAYSIAN_REGIONS.find((r) => region.toLowerCase().includes(r.toLowerCase()));
                 if (matchedRegion) form.region = matchedRegion;
@@ -280,10 +324,11 @@ const resetForm = (): void => {
     careDetails.value = null;
     selectedResultIndex.value = 0;
     activeImageIndex.value = 0;
+    chatMessages.value = []; // Reset chat
+    plantDescription.value = '';
 };
 
 const identifyPlant = async (): Promise<void> => {
-    // Clear previous errors
     Object.keys(errors).forEach((key) => delete errors[key]);
 
     if (uploadedImages.value.length === 0) {
@@ -298,10 +343,9 @@ const identifyPlant = async (): Promise<void> => {
 
     processing.value = true;
     results.value = null;
+    chatMessages.value = []; // Clear chat on new identification
 
     const formData = new FormData();
-
-    // Append multiple images and organs
     uploadedImages.value.forEach((img, index) => {
         formData.append(`images[${index}]`, img.file);
         formData.append(`organs[${index}]`, img.organ || 'leaf');
@@ -346,6 +390,35 @@ const fetchCareDetails = async (scientificName: string) => {
     }
 };
 
+// Add these definitions
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_MODEL = 'gemini-2.5-flash'; // or 'gemini-pro'
+
+const fetchPlantDescription = async (scientificName: string) => {
+    if (!scientificName) {
+        plantDescription.value = '';
+        return;
+    }
+    descriptionLoading.value = true;
+    try {
+        const prompt = `In no more than three sentences, describe the plant ${scientificName}, summarizing its key traits, natural habitat, and notable uses. Write in plain text only.`;
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            }),
+        });
+        const data = await res.json();
+        plantDescription.value = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Description unavailable.';
+    } catch (error) {
+        console.error('Gemini description error:', error);
+        plantDescription.value = 'Description unavailable.';
+    } finally {
+        descriptionLoading.value = false;
+    }
+};
+
 const toggleBookmark = () => {
     if (!selectedResult.value) return;
     const name = selectedResult.value.species?.scientificName;
@@ -356,14 +429,11 @@ const savePlantToDatabase = async () => {
     if (uploadedImages.value.length === 0 || !selectedResult.value) return;
     savingToDatabase.value = true;
     const fd = new FormData();
-    // Use first image for main save, or adjust backend to handle multiple
     fd.append('image', uploadedImages.value[0].file);
     fd.append('organ', uploadedImages.value[0].organ || 'leaf');
     fd.append('saveToDatabase', '1');
-    // ... Add all other fields from original code ...
     fd.append('scientificName', selectedResult.value.species.scientificName);
 
-    // Mock success for UI transition
     setTimeout(() => {
         savingToDatabase.value = false;
         toast({ title: 'Saved', variant: 'success' });
@@ -373,6 +443,52 @@ const savePlantToDatabase = async () => {
 function getConservationAdvice(name: string) {
     return 'Protect habitat.';
 }
+
+// --- Chat Logic ---
+
+const callGeminiChat = async (plantName: string, history: any[], message: string) => {
+    const systemPrompt = `You are a helpful botanist assistant. The user has just identified a plant: "${plantName}".
+    Answer their questions specifically about this plant. Keep answers concise, friendly, and practical. Do not use markdown formatting.`;
+    const contents = [
+        { role: 'model', parts: [{ text: systemPrompt }] },
+        ...history.map((msg) => ({
+            role: msg.role,
+            parts: [{ text: msg.text }],
+        })),
+        { role: 'user', parts: [{ text: message }] },
+    ];
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents }),
+            },
+        );
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+    } catch (error) {
+        console.error('Chat API Error:', error);
+        return "I'm having trouble checking my botanical reference books right now.";
+    }
+};
+
+const handleChatSend = async () => {
+    if (!chatInput.value.trim() || !selectedResult.value) return;
+
+    const userText = chatInput.value;
+    const plantName = selectedResult.value.species.commonNames?.[0] || selectedResult.value.species.scientificName;
+
+    chatMessages.value.push({ text: userText, role: 'user' });
+    chatInput.value = '';
+    isChatLoading.value = true;
+
+    const responseText = await callGeminiChat(plantName, chatMessages.value, userText);
+
+    chatMessages.value.push({ text: responseText, role: 'model' });
+    isChatLoading.value = false;
+};
 
 // Sighting Modal State
 const showSightingModal = ref(false);
@@ -398,7 +514,7 @@ const setActiveImage = (index: number) => {
 const selectResult = (index: number) => {
     selectedResultIndex.value = index;
     activeImageIndex.value = 0;
-    // Fetch care details for new selection
+    chatMessages.value = []; // Clear chat when switching results
     if (results.value?.data?.results[index]) {
         fetchCareDetails(results.value.data.results[index].species.scientificName);
     }
@@ -412,7 +528,7 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
         <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <!-- Dynamic Grid Layout -->
             <div class="grid grid-cols-1 gap-8 transition-all duration-500 ease-in-out md:grid-cols-12">
-                <!-- Upload Panel: Centered initially, moves left when results exist -->
+                <!-- Upload Panel -->
                 <div
                     :class="[
                         'transition-all duration-500',
@@ -454,7 +570,6 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                     </div>
                                 </div>
                             </div>
-
                             <!-- Image List (Cards) -->
                             <div v-else class="space-y-3">
                                 <div class="flex items-center justify-between px-1 text-xs text-gray-500">
@@ -467,13 +582,11 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                         <Icon name="plus" class="h-3 w-3" /> Add more
                                     </button>
                                 </div>
-
                                 <div
                                     v-for="(img, idx) in uploadedImages"
                                     :key="img.id"
                                     class="group flex gap-3 rounded-xl border border-gray-100 bg-white p-2 shadow-sm dark:border-gray-700 dark:bg-gray-800"
                                 >
-                                    <!-- Thumbnail -->
                                     <div class="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
                                         <img :src="img.preview" class="h-full w-full object-cover" />
                                         <button
@@ -483,12 +596,10 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                             <Icon name="x" class="h-3 w-3" />
                                         </button>
                                     </div>
-
-                                    <!-- Organ Selection -->
                                     <div class="flex flex-1 flex-col justify-center">
-                                        <span class="mb-1 truncate text-sm font-medium text-gray-600 dark:text-gray-300">
-                                            {{ truncateFileName(img.file.name) }}
-                                        </span>
+                                        <span class="mb-1 truncate text-sm font-medium text-gray-600 dark:text-gray-300">{{
+                                            truncateFileName(img.file.name)
+                                        }}</span>
                                         <span class="mb-1.5 text-sm font-bold uppercase tracking-wide text-gray-400">Select visible part</span>
                                         <div class="flex flex-wrap gap-1.5">
                                             <button
@@ -508,16 +619,12 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Hidden Input (Multiple) -->
                             <input ref="fileUploadRef" type="file" multiple class="hidden" accept="image/*" @change="onImageChange" />
-
                             <!-- Location Section -->
                             <div
                                 v-if="uploadedImages.length > 0"
                                 class="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-4 transition-all dark:border-gray-700 dark:bg-gray-800/50"
                             >
-                                <!-- Header / Toggle -->
                                 <div class="mb-3 flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <div class="rounded-lg bg-green-100 p-1.5 text-green-600 dark:bg-blue-900/30 dark:text-blue-400">
@@ -535,14 +642,11 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                         ></div>
                                     </label>
                                 </div>
-
-                                <!-- Content (Collapsible) -->
                                 <Transition
                                     enter-active-class="duration-200 animate-in fade-in slide-in-from-top-2"
                                     leave-active-class="duration-200 animate-out fade-out slide-out-to-top-2"
                                 >
                                     <div v-if="form.includeLocation" class="space-y-3">
-                                        <!-- Auto-Locate Button -->
                                         <button
                                             @click="useUploadLocation"
                                             class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white py-2 text-xs font-medium text-gray-700 transition-all hover:border-blue-200 hover:bg-gray-50 hover:text-blue-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-blue-400"
@@ -551,38 +655,30 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                             <Icon name="crosshair" :class="['h-3.5 w-3.5', gettingLocation ? 'animate-spin' : '']" />
                                             {{ gettingLocation ? 'Triangulating GPS...' : 'Use Current GPS Location' }}
                                         </button>
-
                                         <div class="grid grid-cols-1 gap-3">
-                                            <!-- Location Name -->
                                             <div class="relative">
-                                                <Icon name="map-pin" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                                                <input
+                                                <Icon name="map-pin" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" /><input
                                                     v-model="form.locationName"
                                                     placeholder="Location Name (e.g. Taman Negara)"
                                                     class="w-full rounded-lg border-gray-200 bg-white py-2 pl-9 pr-3 text-xs focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
                                                 />
                                             </div>
-
-                                            <!-- Region Select -->
                                             <div class="relative">
-                                                <Icon name="globe" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                                                <select
+                                                <Icon name="globe" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" /><select
                                                     v-model="form.region"
                                                     class="w-full appearance-none rounded-lg border-gray-200 bg-white py-2 pl-9 pr-3 text-xs focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
                                                 >
-                                                    <option v-for="region in MALAYSIAN_REGIONS" :key="region" :value="region">{{ region }}</option>
-                                                </select>
-                                                <Icon name="chevron-down" class="pointer-events-none absolute right-3 top-3 h-3 w-3 text-gray-400" />
+                                                    <option v-for="region in MALAYSIAN_REGIONS" :key="region" :value="region">
+                                                        {{ region }}
+                                                    </option></select
+                                                ><Icon name="chevron-down" class="pointer-events-none absolute right-3 top-3 h-3 w-3 text-gray-400" />
                                             </div>
-
-                                            <!-- Coordinates Display -->
                                             <div class="grid grid-cols-2 gap-2">
                                                 <div class="group relative">
                                                     <span
                                                         class="absolute -top-2 left-2 bg-gray-50 px-1 text-[10px] font-medium text-gray-500 dark:bg-gray-800"
                                                         >Lat</span
-                                                    >
-                                                    <input
+                                                    ><input
                                                         v-model="form.latitude"
                                                         class="w-full rounded-lg border-transparent bg-gray-100 px-3 py-2 font-mono text-xs text-gray-600 transition-all focus:border-blue-500 focus:bg-white dark:bg-gray-900 dark:text-gray-300"
                                                         placeholder="0.000000"
@@ -592,8 +688,7 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                                     <span
                                                         class="absolute -top-2 left-2 bg-gray-50 px-1 text-[10px] font-medium text-gray-500 dark:bg-gray-800"
                                                         >Long</span
-                                                    >
-                                                    <input
+                                                    ><input
                                                         v-model="form.longitude"
                                                         class="w-full rounded-lg border-transparent bg-gray-100 px-3 py-2 font-mono text-xs text-gray-600 transition-all focus:border-blue-500 focus:bg-white dark:bg-gray-900 dark:text-gray-300"
                                                         placeholder="0.000000"
@@ -604,8 +699,6 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                     </div>
                                 </Transition>
                             </div>
-
-                            <!-- Identify Button -->
                             <div class="flex gap-3">
                                 <Button
                                     v-if="!hasResults"
@@ -615,14 +708,10 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                     @click="identifyPlant"
                                 >
                                     <div class="flex items-center justify-center">
-                                        <template v-if="processing">
-                                            <Icon name="loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                                            Identifying...
-                                        </template>
-                                        <template v-else>
-                                            <Icon name="search" class="mr-2 h-4 w-4" />
-                                            Identify Plant
-                                        </template>
+                                        <template v-if="processing"
+                                            ><Icon name="loader-2" class="mr-2 h-4 w-4 animate-spin" /> Identifying...</template
+                                        >
+                                        <template v-else><Icon name="search" class="mr-2 h-4 w-4" /> Identify Plant</template>
                                     </div>
                                 </Button>
                                 <Button
@@ -632,11 +721,9 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                     size="lg"
                                     :disabled="processing"
                                     @click="resetForm"
+                                    >New Identification</Button
                                 >
-                                    New Identification
-                                </Button>
                             </div>
-
                             <p v-if="uploadedImages.length > 0 && !allImagesTagged" class="text-center text-xs font-medium text-orange-500">
                                 Please select a plant part for all images
                             </p>
@@ -644,7 +731,7 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                     </Card>
                 </div>
 
-                <!-- Results Column: Appears only when results exist -->
+                <!-- Results Column -->
                 <div v-if="hasResults || processing" class="space-y-6 duration-500 animate-in slide-in-from-right-4 md:col-span-7 lg:col-span-8">
                     <!-- Processing State -->
                     <Card v-if="processing" class="overflow-hidden rounded-3xl border-0 bg-white/80 shadow-xl backdrop-blur-md dark:bg-black/60">
@@ -670,9 +757,7 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
 
                     <!-- Results Display -->
                     <template v-else-if="hasResults && selectedResult">
-                        <!-- Main Botanical Identity Card -->
                         <div class="overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
-                            <!-- Hero Section: Image Backdrop & Typography -->
                             <div class="relative h-48 overflow-hidden bg-gradient-to-r from-green-800 to-teal-900 md:h-64">
                                 <img
                                     v-if="selectedResult.images?.length"
@@ -680,22 +765,18 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                     class="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 mix-blend-overlay blur-sm"
                                 />
                                 <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
-
                                 <div class="absolute bottom-0 left-0 w-full p-6 text-white md:p-8">
                                     <div class="mb-2 flex items-center justify-between">
                                         <div class="flex items-center gap-2">
-                                            <span class="rounded-full bg-green-500/90 px-3 py-1 text-xs font-bold shadow-sm backdrop-blur-md">
-                                                {{ Math.round((selectedResult.score || 0) * 100) }}% Match
-                                            </span>
+                                            <span class="rounded-full bg-green-500/90 px-3 py-1 text-xs font-bold shadow-sm backdrop-blur-md"
+                                                >{{ Math.round((selectedResult.score || 0) * 100) }}% Match</span
+                                            >
                                             <span
                                                 v-if="selectedResult.iucn?.category"
                                                 class="rounded-full bg-amber-500/90 px-3 py-1 text-xs font-bold shadow-sm backdrop-blur-md"
+                                                >IUCN: {{ selectedResult.iucn.category }}</span
                                             >
-                                                IUCN: {{ selectedResult.iucn.category }}
-                                            </span>
                                         </div>
-
-                                        <!-- Bookmark Action -->
                                         <button
                                             @click="toggleBookmark"
                                             class="rounded-full bg-white/10 p-2 backdrop-blur-md transition-colors hover:bg-white/20"
@@ -706,7 +787,6 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                             />
                                         </button>
                                     </div>
-
                                     <h1 class="mb-1 text-3xl font-bold leading-tight tracking-tight text-white shadow-sm md:text-5xl">
                                         {{ selectedResult.species.commonNames?.[0] || 'Unknown Species' }}
                                     </h1>
@@ -715,10 +795,7 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                     </p>
                                 </div>
                             </div>
-
-                            <!-- Split Content Layout -->
                             <div class="grid grid-cols-1 gap-0 divide-y dark:divide-gray-800 md:grid-cols-12 md:divide-x md:divide-y-0">
-                                <!-- Left: Visual Gallery (4 cols) -->
                                 <div class="bg-gray-50 p-6 dark:bg-gray-800/30 md:col-span-5">
                                     <div
                                         class="group relative mb-4 aspect-[4/3] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 dark:bg-gray-900"
@@ -732,8 +809,6 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                             <Icon name="image-off" class="h-10 w-10" />
                                         </div>
                                     </div>
-
-                                    <!-- Thumbnails -->
                                     <div
                                         v-if="selectedResult.images && selectedResult.images.length > 1"
                                         class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
@@ -752,8 +827,19 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                             <img :src="img.url.s" class="h-full w-full object-cover" />
                                         </button>
                                     </div>
-
-                                    <!-- External Sources -->
+                                    <div
+                                        class="mt-6 rounded-2xl border border-gray-200 bg-white p-4 text-sm leading-relaxed dark:border-gray-700 dark:bg-gray-900"
+                                    >
+                                        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Plant Description</p>
+                                        <p v-if="descriptionLoading" class="text-gray-400">Fetching plant overview…</p>
+                                        <p v-else-if="plantDescription" class="text-justify text-gray-700 dark:text-gray-200">
+                                            {{ plantDescription }}
+                                        </p>
+                                        <p v-else class="text-gray-400">Description unavailable.</p>
+                                        <p v-if="!descriptionLoading && plantDescription" class="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+                                            AI-generated overview—may contain inaccuracies.
+                                        </p>
+                                    </div>
                                     <div class="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700">
                                         <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">External Databases</p>
                                         <div class="flex flex-wrap gap-2">
@@ -762,29 +848,24 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                                 :href="`https://www.gbif.org/species/${selectedResult.gbif.id}`"
                                                 target="_blank"
                                                 class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                                            >
-                                                GBIF <Icon name="external-link" class="ml-1.5 h-3 w-3 opacity-50" />
-                                            </a>
+                                                >GBIF <Icon name="external-link" class="ml-1.5 h-3 w-3 opacity-50"
+                                            /></a>
                                             <a
                                                 v-if="selectedResult.powo?.id"
                                                 :href="`http://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:${selectedResult.powo.id}`"
                                                 target="_blank"
                                                 class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                                            >
-                                                POWO <Icon name="external-link" class="ml-1.5 h-3 w-3 opacity-50" />
-                                            </a>
+                                                >POWO <Icon name="external-link" class="ml-1.5 h-3 w-3 opacity-50"
+                                            /></a>
                                         </div>
                                     </div>
                                 </div>
-
-                                <!-- Right: Details & Care (8 cols) -->
                                 <div class="space-y-8 p-6 md:col-span-7 md:p-8">
-                                    <!-- Taxonomy -->
                                     <div class="grid grid-cols-2 gap-4">
                                         <div class="rounded-xl border border-green-100 bg-green-50 p-4 dark:border-green-800/50 dark:bg-green-900/20">
                                             <div class="mb-1 flex items-center gap-2">
-                                                <Icon name="git-merge" class="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                <span class="text-xs font-bold uppercase tracking-wider text-green-700 dark:text-green-300"
+                                                <Icon name="git-merge" class="h-4 w-4 text-green-600 dark:text-green-400" /><span
+                                                    class="text-xs font-bold uppercase tracking-wider text-green-700 dark:text-green-300"
                                                     >Family</span
                                                 >
                                             </div>
@@ -794,8 +875,8 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                         </div>
                                         <div class="rounded-xl border border-green-100 bg-green-50 p-4 dark:border-green-800/50 dark:bg-green-900/20">
                                             <div class="mb-1 flex items-center gap-2">
-                                                <Icon name="git-branch" class="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                <span class="text-xs font-bold uppercase tracking-wider text-green-700 dark:text-green-300"
+                                                <Icon name="git-branch" class="h-4 w-4 text-green-600 dark:text-green-400" /><span
+                                                    class="text-xs font-bold uppercase tracking-wider text-green-700 dark:text-green-300"
                                                     >Genus</span
                                                 >
                                             </div>
@@ -804,8 +885,6 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                             </div>
                                         </div>
                                     </div>
-
-                                    <!-- Care Guide -->
                                     <div>
                                         <h3 class="mb-4 flex items-center text-lg font-bold text-gray-900 dark:text-white">
                                             <div class="mr-3 rounded-lg bg-green-100 p-1.5 text-green-700 dark:bg-green-900 dark:text-green-300">
@@ -813,13 +892,12 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                             </div>
                                             Care Essentials
                                         </h3>
-
-                                        <div class="overflow-hidden rounded-2xl border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
+                                        <div class="overflow-hidden rounded-2xl dark:border-gray-700 dark:bg-gray-800">
                                             <div v-if="fetchingCareDetails" class="flex flex-col items-center justify-center p-8 text-gray-400">
-                                                <Icon name="loader-2" class="mb-2 h-6 w-6 animate-spin" />
-                                                <span class="text-xs">Consulting botanist notes...</span>
+                                                <Icon name="loader-2" class="mb-2 h-6 w-6 animate-spin" /><span class="text-xs"
+                                                    >Consulting botanist notes...</span
+                                                >
                                             </div>
-
                                             <template v-else-if="careDetails">
                                                 <div v-if="hasCareData" class="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2">
                                                     <div
@@ -854,14 +932,12 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <!-- Sunlight Card -->
                                                     <div
                                                         class="relative h-full overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm dark:border-amber-900/40 dark:from-amber-950/40 dark:to-gray-900"
                                                     >
                                                         <div
                                                             class="absolute inset-y-0 right-0 w-24 bg-amber-100/40 blur-3xl dark:bg-amber-500/10"
                                                         ></div>
-                                                        <!-- Added items-start here -->
                                                         <div class="relative flex h-full items-start gap-3">
                                                             <div
                                                                 class="flex-shrink-0 rounded-2xl bg-white/80 p-3 text-amber-500 shadow-inner ring-1 ring-white/70 dark:bg-amber-900/30"
@@ -882,15 +958,12 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                                             </div>
                                                         </div>
                                                     </div>
-
-                                                    <!-- Soil Card -->
                                                     <div
                                                         class="relative h-full overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/30 dark:to-gray-900"
                                                     >
                                                         <div
                                                             class="absolute inset-y-0 right-0 w-24 bg-emerald-100/40 blur-3xl dark:bg-emerald-500/10"
                                                         ></div>
-                                                        <!-- Added items-start here -->
                                                         <div class="relative flex h-full items-start gap-3">
                                                             <div
                                                                 class="flex-shrink-0 rounded-2xl bg-white/80 p-3 text-emerald-600 shadow-inner ring-1 ring-white/70 dark:bg-emerald-900/30"
@@ -908,27 +981,21 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                                                 <div class="mt-2 flex flex-wrap gap-1.5">
                                                                     <span
                                                                         class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                                                                    >
-                                                                        Salinity: {{ formatCareValue(careDetails.soil_salinity, 'n/a') }}
-                                                                    </span>
-                                                                    <span
+                                                                        >Salinity: {{ formatCareValue(careDetails.soil_salinity, 'n/a') }}</span
+                                                                    ><span
                                                                         class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                                                                        >Nutriments: {{ formatCareValue(careDetails.soil_nutriments, 'n/a') }}</span
                                                                     >
-                                                                        Nutriments: {{ formatCareValue(careDetails.soil_nutriments, 'n/a') }}
-                                                                    </span>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
-
-                                                    <!-- Temp Card -->
                                                     <div
                                                         class="relative h-full overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 to-white p-4 shadow-sm dark:border-rose-900/40 dark:from-rose-950/40 dark:to-gray-900"
                                                     >
                                                         <div
                                                             class="absolute inset-y-0 right-0 w-24 bg-rose-100/40 blur-3xl dark:bg-rose-500/10"
                                                         ></div>
-                                                        <!-- Added items-start here -->
                                                         <div class="relative flex h-full items-start gap-3">
                                                             <div
                                                                 class="flex-shrink-0 rounded-2xl bg-white/80 p-3 text-rose-500 shadow-inner ring-1 ring-white/70 dark:bg-rose-900/30"
@@ -962,60 +1029,93 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                                             </template>
                                         </div>
                                     </div>
-
-                                    <!-- Primary Actions -->
                                     <div class="flex gap-3 pt-2">
                                         <Button
                                             @click="savePlantToDatabase"
                                             :disabled="savingToDatabase"
                                             class="h-12 flex-1 rounded-xl bg-gray-900 transition-all hover:bg-black dark:bg-white dark:text-black dark:hover:bg-gray-200"
+                                            ><Icon name="database" class="mr-2 h-4 w-4" />
+                                            {{ savingToDatabase ? 'Saving...' : 'Save Collection' }}</Button
                                         >
-                                            <Icon name="database" class="mr-2 h-4 w-4" />
-                                            {{ savingToDatabase ? 'Saving...' : 'Save Collection' }}
-                                        </Button>
                                         <Button
                                             @click="openSightingModal"
                                             variant="outline"
                                             class="h-12 flex-1 rounded-xl border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                                            ><Icon name="map-pin" class="mr-2 h-4 w-4" /> Report Sighting</Button
                                         >
-                                            <Icon name="map-pin" class="mr-2 h-4 w-4" /> Report Sighting
-                                        </Button>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- Alternative Matches (Simplified Grid) -->
-                        <div v-if="results.data?.results && results.data.results.length > 1" class="mt-8">
-                            <div class="mb-4 flex items-center justify-between px-2">
-                                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Other Possibilities</h3>
-                                <span class="text-sm text-gray-500">{{ results.data.results.length - 1 }} matches</span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                                <div
-                                    v-for="(alt, idx) in results.data.results.slice(1)"
-                                    :key="idx"
-                                    @click="selectResult(idx + 1)"
-                                    class="group cursor-pointer rounded-xl border border-transparent bg-white p-2 transition-all hover:border-gray-200 hover:shadow-md dark:bg-gray-800 dark:hover:border-gray-700"
-                                >
-                                    <div class="mb-2 aspect-square overflow-hidden rounded-lg bg-gray-100">
-                                        <img
-                                            v-if="alt.images?.length"
-                                            :src="alt.images[0].url.s"
-                                            class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                        />
+                                    <!-- BOTANIST CHAT UI -->
+                                    <div class="mt-8 border-t border-gray-100 pt-8 dark:border-gray-800">
+                                        <h3 class="mb-4 flex items-center text-lg font-bold text-gray-900 dark:text-white">
+                                            <div
+                                                class="mr-3 rounded-lg bg-indigo-100 p-1.5 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300"
+                                            >
+                                                <Icon name="message-circle" class="h-5 w-5" />
+                                            </div>
+                                            Ask the Botanist
+                                        </h3>
+                                        <div
+                                            class="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-inner dark:border-gray-700 dark:bg-gray-800/50"
+                                        >
+                                            <div class="h-72 space-y-4 overflow-y-auto p-4">
+                                                <div
+                                                    v-if="chatMessages.length === 0"
+                                                    class="flex h-full flex-col items-center justify-center text-center text-gray-400"
+                                                >
+                                                    <Icon name="sparkles" class="mb-2 h-8 w-8 text-indigo-300" />
+                                                    <p class="text-sm">
+                                                        Have questions about this {{ selectedResult.species.commonNames?.[0] || 'plant' }}?<br />Ask
+                                                        our AI botanist anything!
+                                                    </p>
+                                                </div>
+                                                <div
+                                                    v-for="(msg, idx) in chatMessages"
+                                                    :key="idx"
+                                                    :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']"
+                                                >
+                                                    <div
+                                                        :class="[
+                                                            'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm',
+                                                            msg.role === 'user'
+                                                                ? 'rounded-br-none bg-indigo-600 text-white'
+                                                                : 'rounded-bl-none bg-white text-gray-800 dark:bg-gray-700 dark:text-gray-100',
+                                                        ]"
+                                                    >
+                                                        {{ msg.text }}
+                                                    </div>
+                                                </div>
+                                                <div v-if="isChatLoading" class="flex justify-start">
+                                                    <div class="rounded-2xl rounded-bl-none bg-white px-4 py-3 shadow-sm dark:bg-gray-700">
+                                                        <div class="flex gap-1.5">
+                                                            <div class="h-2 w-2 animate-bounce rounded-full bg-gray-400 delay-0"></div>
+                                                            <div class="h-2 w-2 animate-bounce rounded-full bg-gray-400 delay-150"></div>
+                                                            <div class="h-2 w-2 animate-bounce rounded-full bg-gray-400 delay-300"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div ref="chatEndRef"></div>
+                                            </div>
+                                            <div class="border-t border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+                                                <div class="relative flex items-center gap-2">
+                                                    <input
+                                                        v-model="chatInput"
+                                                        @keydown.enter="handleChatSend"
+                                                        placeholder="Type your question..."
+                                                        class="flex-1 rounded-xl border-gray-200 bg-gray-50 py-2.5 pl-4 pr-12 text-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                                    />
+                                                    <button
+                                                        @click="handleChatSend"
+                                                        :disabled="!chatInput.trim() || isChatLoading"
+                                                        class="absolute right-2 rounded-lg bg-indigo-600 p-1.5 text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        <Icon name="send" class="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="px-1">
-                                        <div class="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                            {{ alt.species.commonNames?.[0] || 'Unknown' }}
-                                        </div>
-                                        <div class="truncate text-xs italic text-gray-500">
-                                            {{ alt.species.scientificName }}
-                                        </div>
-                                        <div class="mt-1.5 h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-700">
-                                            <div class="h-1.5 rounded-full bg-green-500" :style="{ width: `${alt.score * 100}%` }"></div>
-                                        </div>
-                                    </div>
+                                    <!-- END CHAT UI -->
                                 </div>
                             </div>
                         </div>
@@ -1023,10 +1123,7 @@ const truncateFileName = (name: string, max = 28) => (name.length > max ? `${nam
                 </div>
             </div>
         </div>
-
-        <!-- Sighting Modal (Kept same as before) -->
         <div v-if="showSightingModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <!-- Modal Content ... -->
             <Card class="m-4 w-full max-w-lg">
                 <CardHeader><h3 class="font-bold">Report Sighting</h3></CardHeader>
                 <CardContent>
