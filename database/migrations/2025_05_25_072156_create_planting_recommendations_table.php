@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('water_per_week', 100);
             $table->string('sunlight_per_week',100);
             $table->string('temperature_range', 100);
-            $table->string('fertilizer_type', 100);
+//            $table->string('fertilizer_type', 100);
             $table->string('humidity_level', 100);
             $table->timestamps();
         });

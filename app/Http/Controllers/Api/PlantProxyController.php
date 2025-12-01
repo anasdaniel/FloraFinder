@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Cache;
 
 class PlantProxyController extends Controller
 {
@@ -58,6 +56,14 @@ class PlantProxyController extends Controller
                 return response()->json(['error' => 'Plant name is required'], 400);
             }
 
+            $cacheKey = 'trefle_' . md5($name);
+            $cachedData = Cache::get($cacheKey);
+
+            if ($cachedData) {
+                Log::info("Returning cached Trefle data for {$name}");
+                return response()->json($cachedData);
+            }
+
             $apiKey = config('services.trefle.key');
 
             if (empty($apiKey)) {
@@ -81,6 +87,9 @@ class PlantProxyController extends Controller
 
             $responseData = $response->json();
             Log::info("Trefle API response received for {$name}");
+
+            // Cache for 1 hour
+            Cache::put($cacheKey, $responseData, 3600);
 
             return response()->json($responseData);
         } catch (\Exception $e) {

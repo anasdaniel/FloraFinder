@@ -14,7 +14,7 @@ return new class extends Migration
     {
         Schema::create('conservation_statuses', function (Blueprint $table) {
             $table->id();
-            $table->string('status_name', 100)->unique();
+            $table->string('status_name', 100);
             $table->text('description')->nullable();
             $table->timestamps();
         });

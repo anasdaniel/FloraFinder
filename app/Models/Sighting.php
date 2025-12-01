@@ -15,4 +15,10 @@ class Sighting extends Model
         'description',
         'created_at'
     ];
+
+    // Define relationship to User model
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

@@ -17,13 +17,15 @@ let markersLayer: L.LayerGroup | null = null;
 // Conservation status color mapping
 const getConservationStatusColor = (status: string): string => {
   const colors: Record<string, string> = {
-    CR: "#7f1d1d", // Critically Endangered - dark red
-    EN: "#dc2626", // Endangered - red
-    VU: "#ea580c", // Vulnerable - orange
-    NT: "#eab308", // Near Threatened - yellow
-    LC: "#16a34a", // Least Concern - green
+    CR: "#dc2626", // Critically Endangered - vibrant red
+    EN: "#ef4444", // Endangered - bright red
+    VU: "#f97316", // Vulnerable - bright orange
+    NT: "#eab308", // Near Threatened - bright yellow
+    LC: "#22c55e", // Least Concern - bright green
     DD: "#6b7280", // Data Deficient - gray
-    NE: "#374151", // Not Evaluated - dark gray
+    NE: "#3b82f6", // Not Evaluated - bright blue
+    EW: "#374151", // Extinct in the Wild - dark gray
+    EX: "#9ca3af", // Extinct - light gray
   };
   return colors[status] || "#3b82f6"; // Default blue
 };
@@ -37,7 +39,7 @@ const createMarker = (lat: number, lng: number, status: string): L.CircleMarker 
     color: "#ffffff",
     weight: 2,
     opacity: 1,
-    fillOpacity: 0.8,
+    fillOpacity: 1.0,
   });
 };
 
@@ -79,7 +81,7 @@ onMounted(async () => {
     }, 100);
 
     // Close popup when clicking outside the map
-    document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener("mousedown", handleDocumentClick);
   }
 });
 
@@ -147,10 +149,10 @@ const updateMarkers = (sightings: Sighting[]) => {
       // Simple popup with plant name and basic info
       marker.bindPopup(
         `<div class="text-sm">
-           <strong>${sighting.commonName || 'Unknown Plant'}</strong><br/>
-           <em>${sighting.scientificName || ''}</em><br/>
-           ${sighting.location ? `<div>${sighting.location}</div>` : ''}
-           ${sighting.date ? `<div>${sighting.date}</div>` : ''}
+           <strong>${sighting.commonName || "Unknown Plant"}</strong><br/>
+           <em>${sighting.scientificName || ""}</em><br/>
+           ${sighting.location ? `<div>${sighting.location}</div>` : ""}
+           ${sighting.date ? `<div>${sighting.date}</div>` : ""}
         </div>`
       );
 
@@ -179,7 +181,7 @@ onUnmounted(() => {
     markersLayer.clearLayers();
     markersLayer = null;
   }
-  document.removeEventListener('mousedown', handleDocumentClick);
+  document.removeEventListener("mousedown", handleDocumentClick);
 });
 
 // Close popup when clicking outside the map
@@ -256,15 +258,15 @@ const toggleLegend = () => {
         </div>
         <div v-if="legendExpanded" class="space-y-1 text-xs">
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: #7f1d1d"></div>
+            <div class="w-3 h-3 rounded-full" style="background-color: #dc2626"></div>
             <span class="text-gray-700 dark:text-gray-300">Critically Endangered</span>
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: #dc2626"></div>
+            <div class="w-3 h-3 rounded-full" style="background-color: #ef4444"></div>
             <span class="text-gray-700 dark:text-gray-300">Endangered</span>
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: #ea580c"></div>
+            <div class="w-3 h-3 rounded-full" style="background-color: #f97316"></div>
             <span class="text-gray-700 dark:text-gray-300">Vulnerable</span>
           </div>
           <div class="flex items-center gap-2">
@@ -272,8 +274,24 @@ const toggleLegend = () => {
             <span class="text-gray-700 dark:text-gray-300">Near Threatened</span>
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: #16a34a"></div>
+            <div class="w-3 h-3 rounded-full" style="background-color: #22c55e"></div>
             <span class="text-gray-700 dark:text-gray-300">Least Concern</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full" style="background-color: #6b7280"></div>
+            <span class="text-gray-700 dark:text-gray-300">Data Deficient</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full" style="background-color: #3b82f6"></div>
+            <span class="text-gray-700 dark:text-gray-300">Not Evaluated</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full" style="background-color: #374151"></div>
+            <span class="text-gray-700 dark:text-gray-300">Extinct in the Wild</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full" style="background-color: #9ca3af"></div>
+            <span class="text-gray-700 dark:text-gray-300">Extinct</span>
           </div>
         </div>
       </div>
@@ -285,7 +303,17 @@ const toggleLegend = () => {
       class="absolute bottom-6 right-4 z-[1000] flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow hover:bg-gray-100 dark:hover:bg-gray-700 transition text-xs font-semibold text-gray-700 dark:text-gray-200"
       title="Center Map"
     >
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      <svg
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <circle cx="12" cy="12" r="3" fill="currentColor" />
+      </svg>
       Center Map
     </button>
   </div>

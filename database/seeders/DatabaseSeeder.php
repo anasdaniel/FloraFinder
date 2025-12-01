@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\PlantCategory;
 use App\Models\User;
 use App\Models\Plant;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
