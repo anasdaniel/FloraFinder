@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Cache;
 use GuzzleHttp\Client;
 use App\Models\ForumThread;
 use App\Models\ForumTag;
+use App\Models\PlantIdentification;
+use App\Http\Integrations\TrefleConnector;
+use App\Http\Integrations\TrefleRequest;
+use App\Http\Integrations\SearchPlantRequest;
+
 
 
 
@@ -163,31 +168,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('forum');
 
     // Create new forum post
-//    Route::post('forum/new', function () {
-//        $validated = request()->validate([
-//            'title' => 'required|string|max:255',
-//            'content' => 'required|string',
-//            'category' => 'required|string',
-//            'image' => 'nullable|image|max:2048',
-//        ]);
-//
-//        // Handle image upload
-//        $imagePath = null;
-//        if (request()->hasFile('image') && request()->file('image')->isValid()) {
-//            $imagePath = request()->file('image')->store('forum', 'public');
-//        }
-//
-//        // Create thread with content + image
-//        $thread = \App\Models\ForumThread::create([
-//            'title' => $validated['title'],
-//            'category' => $validated['category'],
-//            'content' => $validated['content'],
-//            'image' => $imagePath,
-//            'user_id' => auth()->id(),
-//        ]);
-//
-//        return redirect()->route('forum')->with('success', 'Thread created successfully!');
-//    })->name('forum.store');
+    //    Route::post('forum/new', function () {
+    //        $validated = request()->validate([
+    //            'title' => 'required|string|max:255',
+    //            'content' => 'required|string',
+    //            'category' => 'required|string',
+    //            'image' => 'nullable|image|max:2048',
+    //        ]);
+    //
+    //        // Handle image upload
+    //        $imagePath = null;
+    //        if (request()->hasFile('image') && request()->file('image')->isValid()) {
+    //            $imagePath = request()->file('image')->store('forum', 'public');
+    //        }
+    //
+    //        // Create thread with content + image
+    //        $thread = \App\Models\ForumThread::create([
+    //            'title' => $validated['title'],
+    //            'category' => $validated['category'],
+    //            'content' => $validated['content'],
+    //            'image' => $imagePath,
+    //            'user_id' => auth()->id(),
+    //        ]);
+    //
+    //        return redirect()->route('forum')->with('success', 'Thread created successfully!');
+    //    })->name('forum.store');
 
 
 
