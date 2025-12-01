@@ -141,6 +141,27 @@ const hasResults = computed(() => {
   );
 });
 
+const hasError = computed(() => {
+  return Boolean(results.value && results.value.success === false);
+});
+
+const noMatches = computed(() => {
+  if (!results.value || !results.value.success) {
+    return false;
+  }
+  const matches = results.value.data?.results ?? [];
+  return matches.length === 0;
+});
+
+const errorMessage = computed(() => {
+  if (!results.value) return "";
+  return (
+    results.value.message ||
+    results.value.error ||
+    "We couldn't identify that plant. Please try another photo."
+  );
+});
+
 const selectedResult = computed(() => {
   if (!hasResults.value) return null;
   return results.value!.data!.results[selectedResultIndex.value];
@@ -401,18 +422,51 @@ const identifyPlant = async (): Promise<void> => {
   try {
     router.post(route("plant-identifier.identify"), formData, {
       onSuccess: (page) => {
-        if (page.props.plantData) {
-          results.value = page.props.plantData as PlantResult;
-          if (results.value.success && results.value.data?.results.length) {
-            const topResult = results.value.data.results[0];
-            fetchCareDetails(topResult.species.scientificName);
-            toast({
-              title: "Identification Complete",
-              description: "Potential matches found.",
-              variant: "success",
-            });
-          }
+        const plantData = page.props.plantData as PlantResult | undefined;
+
+        if (!plantData) {
+          results.value = null;
+          toast({
+            title: "No Data Returned",
+            description: "The server did not return any plant information.",
+            variant: "destructive",
+          });
+          return;
         }
+
+        results.value = plantData;
+
+        if (!results.value.success) {
+          toast({
+            title: "Identification Failed",
+            description: errorMessage.value,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const matches = results.value.data?.results ?? [];
+
+        if (matches.length === 0) {
+          toast({
+            title: "No Matches Found",
+            description: "Try a clearer image or choose a different plant part.",
+            variant: "default",
+          });
+          return;
+        }
+
+        selectedResultIndex.value = 0;
+        activeImageIndex.value = 0;
+
+        const topResult = matches[0];
+        fetchCareDetails(topResult.species.scientificName);
+
+        toast({
+          title: "Identification Complete",
+          description: "Potential matches found.",
+          variant: "success",
+        });
       },
       onError: (errs) => {
         Object.assign(errors, errs);
@@ -874,7 +928,7 @@ const truncateFileName = (name: string, max = 28) =>
 
         <!-- Results Column -->
         <div
-          v-if="hasResults || processing"
+          v-if="processing || hasResults || hasError || noMatches"
           class="space-y-6 duration-500 animate-in slide-in-from-right-4 md:col-span-7 lg:col-span-8"
         >
           <!-- Processing State -->
@@ -1392,6 +1446,68 @@ const truncateFileName = (name: string, max = 28) =>
               </div>
             </div>
           </template>
+
+          <Card
+            v-else-if="hasError"
+            class="overflow-hidden border-0 shadow-xl rounded-3xl bg-white/80 backdrop-blur-md dark:bg-black/60"
+          >
+            <CardContent class="flex flex-col items-center justify-center py-20 text-center">
+              <div class="p-4 mb-4 rounded-full shadow bg-red-900/20">
+                <Icon name="x-circle" class="w-10 h-10 text-red-500" />
+              </div>
+              <h3 class="text-lg font-semibold tracking-tight text-red-600 dark:text-red-400">
+                Identification Failed
+              </h3>
+              <p class="max-w-md mt-3 text-sm text-gray-600 dark:text-gray-300">
+                {{ errorMessage }}
+              </p>
+              <p
+                v-if="results?.error"
+                class="max-w-md mt-2 text-xs text-gray-500 break-all dark:text-gray-400"
+              >
+                {{ results.error }}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                class="mt-6 text-gray-700 border-gray-300 rounded-full hover:bg-gray-100 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-800"
+                @click="resetForm"
+              >
+                <Icon name="refresh-cw" class="w-4 h-4 mr-2" /> Try Again
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card
+            v-else-if="noMatches"
+            class="overflow-hidden border-0 shadow-xl rounded-3xl bg-white/80 backdrop-blur-md dark:bg-gray-900/70"
+          >
+            <CardContent class="flex flex-col items-center justify-center py-20 text-center">
+              <div class="p-4 mb-4 rounded-full shadow bg-amber-900/15">
+                <Icon name="alert-triangle" class="w-10 h-10 text-amber-500" />
+              </div>
+              <h3 class="text-lg font-semibold tracking-tight text-amber-600 dark:text-amber-300">
+                No Matches Found
+              </h3>
+              <p class="max-w-md mt-3 text-sm text-gray-600 dark:text-gray-300">
+                We couldn’t find a confident match for this photo. Try a clearer image,
+                zoom in on the most distinctive plant part, or choose a different organ.
+              </p>
+              <ul class="mt-4 text-sm text-gray-500 list-disc list-inside dark:text-gray-400">
+                <li>Use daylight and avoid blur.</li>
+                <li>Capture flowers or leaves head-on.</li>
+                <li>Ensure the plant fills most of the frame.</li>
+              </ul>
+              <Button
+                variant="outline"
+                size="sm"
+                class="mt-6 text-gray-700 border-gray-300 rounded-full hover:bg-gray-100 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-800"
+                @click="resetForm"
+              >
+                <Icon name="image" class="w-4 h-4 mr-2" /> Try a Different Photo
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

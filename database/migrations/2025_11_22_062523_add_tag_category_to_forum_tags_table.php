@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('forum_tags', function (Blueprint $table) {
-            $table->string('tag_category', 100)->after('tag_name');
+            if (!Schema::hasColumn('forum_tags', 'tag_category')) {
+                $table->string('tag_category', 100)->after('tag_name');
+            }
         });
     }
 
