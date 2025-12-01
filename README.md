@@ -8,6 +8,7 @@ features plant identification via image upload, a community forum, conservation 
 - **Plant Identification**: Upload images of plants to identify them using the PlantNet API
 - **Plant Database**: Access information about Malaysian native and endemic plant species
 - **Plant Map**: Interactive map displaying plant locations and distributions
+- **Sightings Map**: Visualize user-contributed plant sightings on an interactive map
 - **Plant Care Details**: Detailed care instructions for identified plants
 - **Community Forum**: Discuss plant-related topics with other enthusiasts
 - **User Authentication**: Secure registration and login system
@@ -19,7 +20,9 @@ features plant identification via image upload, a community forum, conservation 
 - **Frontend**: Vue.js 3 with Inertia.js
 - **UI Framework**: Tailwind CSS with custom components
 - **API Integration**: Saloon PHP HTTP client library
+- **Maps**: Leaflet.js
 - **Database**: SQLite (default), supports MySQL/PostgreSQL
+- **Caching**: Redis
 - **Authentication**: Laravel's built-in authentication
 - **Queue System**: Database queue for background jobs
 - **Testing**: PHPUnit with Pest
@@ -70,39 +73,61 @@ DB_CONNECTION=sqlite
 # DB_PASSWORD=
 ```
 
-7. Set up your PlantNet API key in the `.env` file:
+7. Configure Redis in the `.env` file (Required for caching):
+
+```
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+```
+
+8. Set up your PlantNet API key in the `.env` file:
 
 ```
 PLANTNET_API_KEY=your_plantnet_api_key_here
 PLANTNET_PROJECT=all
 ```
 
-8. Set up your Trefle API key in the `.env` file:
+9. Set up your Trefle API key in the `.env` file:
 
 ```
 TREFLE_API_KEY=your_trefle_api_key_here
 ```
 
-9. Set up your IUCN API key in the `.env` file:
+10. Set up your IUCN API key in the `.env` file:
 
 ```
 IUCN_API_KEY=your_iucn_api_key_here
 ```
 
-10. Run database migrations:
+11. Set up your Gemini API key in the `.env` file:
+
+```
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+12. Run database migrations:
 
 ```bash
 php artisan migrate
 ```
 
-11. Build frontend assets:
+13. Build frontend assets:
 
 ```bash
 npm run build
 ```
 
-12. Run the development server:
+14. Run the development server:
 
 ```bash
 composer run dev
+```
+
+## Testing
+
+Run the test suite:
+
+```bash
+php artisan test
 ```
