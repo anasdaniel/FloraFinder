@@ -1,12 +1,30 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Head, Link, usePage, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Textarea } from '@/components/ui/textarea';
 import Icon from '@/components/Icon.vue';
 import type { BreadcrumbItem } from '@/types';
+
+interface Reply {
+  id: number;
+  content: string;
+  date: string;
+  author: {
+    name: string;
+    avatar: string | null;
+  };
+  parent?: {
+    id: number;
+    content: string;
+    author: {
+      name: string;
+    };
+  } | null;
+}
 
 // Define the ForumPost type
 interface ForumPost {
@@ -21,6 +39,7 @@ interface ForumPost {
   category: string;
   replies: number;
   images?: string[];
+  posts?: Reply[];
 }
 
 // Get post data from Inertia page props
@@ -38,7 +57,8 @@ const post = computed<ForumPost>(() => {
       date: new Date().toISOString(),
       category: 'general',
       replies: 0,
-      images: []
+      images: [],
+      posts: []
     };
   }
   return postData;
@@ -48,6 +68,38 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Forum', href: '/forum' },
   { title: post.value.title || 'Post Details', href: `/forum/${post.value.id}` },
 ];
+
+const form = useForm({
+  content: '',
+  parent_id: null as number | null,
+});
+
+const replyingTo = ref<Reply | null>(null);
+
+const setReplyTo = (reply: Reply) => {
+  replyingTo.value = reply;
+  form.parent_id = reply.id;
+  // Scroll to form
+  const formElement = document.getElementById('reply-form');
+  if (formElement) {
+    formElement.scrollIntoView({ behavior: 'smooth' });
+  }
+};
+
+const cancelReply = () => {
+  replyingTo.value = null;
+  form.parent_id = null;
+};
+
+const submitReply = () => {
+  form.post(`/forum/${post.value.id}/reply`, {
+    preserveScroll: true,
+    onSuccess: () => {
+      form.reset();
+      cancelReply();
+    },
+  });
+};
 </script>
 
 <template>
@@ -72,7 +124,7 @@ const breadcrumbs: BreadcrumbItem[] = [
               <div class="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                 <span>By {{ post.author.name }}</span>
                 <span class="mx-1">•</span>
-                <span>{{ new Date(post.date).toLocaleDateString() }}</span>
+                <span>{{ new Date(post.date).toLocaleString() }}</span>
                 <span class="mx-1">•</span>
                 <span class="capitalize">{{ post.category.replace('-', ' ') }}</span>
               </div>
@@ -108,10 +160,63 @@ const breadcrumbs: BreadcrumbItem[] = [
           </div>
         </div>
       </div>
-      <!-- Replies section placeholder -->
-      <div v-if="post.id" class="mt-8">
-        <h2 class="text-lg font-semibold mb-4">Replies ({{ post.replies }})</h2>
-        <div class="text-muted-foreground text-sm">Replies UI coming soon...</div>
+      
+      <!-- Replies section -->
+      <div v-if="post.id" class="mt-8 space-y-6">
+        <h2 class="text-lg font-semibold">Replies ({{ post.replies }})</h2>
+        
+        <!-- Reply Form -->
+        <Card id="reply-form">
+            <CardContent class="p-4">
+                <div v-if="replyingTo" class="mb-4 p-3 bg-muted rounded-md flex justify-between items-start">
+                    <div class="text-sm">
+                        <span class="font-semibold">Replying to {{ replyingTo.author.name }}:</span>
+                        <p class="text-muted-foreground line-clamp-2 mt-1">{{ replyingTo.content }}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" @click="cancelReply" class="h-6 w-6 p-0">
+                        <Icon name="x" class="w-4 h-4" />
+                    </Button>
+                </div>
+                <form @submit.prevent="submitReply" class="space-y-4">
+                    <Textarea v-model="form.content" :placeholder="replyingTo ? 'Write a reply to ' + replyingTo.author.name + '...' : 'Write a reply...'" required />
+                    <div class="flex justify-end">
+                        <Button type="submit" :disabled="form.processing">
+                            {{ replyingTo ? 'Post Reply' : 'Post Comment' }}
+                        </Button>
+                    </div>
+                </form>
+            </CardContent>
+        </Card>
+
+        <!-- Replies List -->
+        <div class="space-y-4">
+            <Card v-for="reply in post.posts" :key="reply.id">
+                <CardHeader class="flex flex-row items-start gap-4 p-4 pb-2">
+                    <Avatar size="sm" shape="circle" class="mt-1">
+                        <AvatarImage v-if="reply.author.avatar" :src="reply.author.avatar" :alt="reply.author.name" />
+                        <AvatarFallback>{{ reply.author.name.split(' ').map(n => n[0]).join('') }}</AvatarFallback>
+                    </Avatar>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="text-sm font-semibold">{{ reply.author.name }}</div>
+                                <div class="text-xs text-muted-foreground">{{ new Date(reply.date).toLocaleString() }}</div>
+                            </div>
+                            <Button variant="ghost" size="sm" class="h-8 text-xs" @click="setReplyTo(reply)">
+                                <Icon name="reply" class="w-3 h-3 mr-1" /> Reply
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent class="p-4 pt-0 text-sm">
+                    <div v-if="reply.parent" class="mb-3 p-3 bg-muted/50 rounded-md border-l-2 border-primary/50 text-xs">
+                        <div class="font-medium mb-1">Replying to {{ reply.parent.author.name }}</div>
+                        <div class="text-muted-foreground line-clamp-2">{{ reply.parent.content }}</div>
+                    </div>
+                    <div class="whitespace-pre-line">{{ reply.content }}</div>
+                </CardContent>
+            </Card>
+        </div>
       </div>
     </div>
   </AppLayout>

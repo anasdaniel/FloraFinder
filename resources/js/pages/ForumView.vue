@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { Head, Link, usePage } from "@inertiajs/vue3";
+import { ref, onMounted, watch } from "vue";
+import { Head, Link, usePage, router } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,11 @@ import Heading from "@/components/Heading.vue";
 import Icon from "@/components/Icon.vue";
 import { useToast } from "@/composables/useToast";
 import type { BreadcrumbItem, User } from "@/types";
+
+const props = defineProps<{
+  threads: any[];
+  currentCategory: string;
+}>();
 
 const { toast } = useToast();
 const page = usePage();
@@ -36,58 +41,17 @@ onMounted(() => {
   }
 });
 
-// Example forum threads data
-const threads = ref([
-  {
-    id: 1,
-    title: "What is this plant I found in my backyard?",
-    author: {
-      id: 1,
-      name: "Alice Green",
-      avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-    } as User,
-    replies: 12,
-    date: "2025-05-04",
-    excerpt:
-      "I found this unusual plant and would love to know what it is. Anyone can help?",
-    category: "identification",
-  },
-  {
-    id: 2,
-    title: "Best soil for succulents?",
-    author: {
-      id: 2,
-      name: "Bob Plantman",
-      avatar: "",
-    } as User,
-    replies: 7,
-    date: "2025-05-03",
-    excerpt:
-      "I want to repot my succulents. What soil mix do you recommend for healthy growth?",
-    category: "care",
-  },
-  {
-    id: 3,
-    title: "How to propagate Monstera?",
-    author: {
-      id: 3,
-      name: "Cathy Leaf",
-      avatar: "https://randomuser.me/api/portraits/women/65.jpg",
-    } as User,
-    replies: 4,
-    date: "2025-05-02",
-    excerpt: "Looking for tips and tricks to propagate Monstera deliciosa successfully.",
-    category: "care",
-  },
-]);
-
 const categories = ref([
   { key: "general", name: "General", icon: "messages-square" },
   { key: "identification", name: "Plant Identification", icon: "search" },
   { key: "care", name: "Plant Care", icon: "leaf" },
   { key: "offtopic", name: "Off Topic", icon: "users" },
 ]);
-const selectedCategory = ref("general");
+const selectedCategory = ref(props.currentCategory);
+
+watch(selectedCategory, (newCategory) => {
+  router.get('/forum', { category: newCategory }, { preserveState: true, preserveScroll: true });
+});
 </script>
 
 <template>
@@ -127,9 +91,7 @@ const selectedCategory = ref("general");
       </div>
       <div class="space-y-6">
         <Card
-          v-for="thread in threads.filter(
-            (t) => selectedCategory === 'general' || t.category === selectedCategory
-          )"
+          v-for="thread in threads"
           :key="thread.id"
           class="transition-shadow hover:shadow-md"
         >
@@ -158,7 +120,7 @@ const selectedCategory = ref("general");
               <div class="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                 <span>By {{ thread.author.name }}</span>
                 <span class="mx-1">•</span>
-                <span>{{ new Date(thread.date).toLocaleDateString() }}</span>
+                <span>{{ new Date(thread.date).toLocaleString() }}</span>
               </div>
             </div>
             <div class="flex items-center gap-1 text-xs text-muted-foreground">

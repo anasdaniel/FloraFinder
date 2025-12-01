@@ -11,8 +11,11 @@ class ForumThread extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'title',
         'content',
+        'category',
+        'image',
     ];
 
     public function posts()
