@@ -12,6 +12,7 @@ class ForumTag extends Model
 
     protected $fillable = [
         'tag_name',
+        'tag_category',
     ];
 
     public function threads()

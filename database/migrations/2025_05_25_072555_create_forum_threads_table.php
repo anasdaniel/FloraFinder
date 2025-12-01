@@ -13,10 +13,14 @@ return new class extends Migration
     {
         Schema::create('forum_threads', function (Blueprint $table) {
             $table->id();
-            $table->foreignIdFor(\App\Models\User::class)->constrained()->cascadeOnDelete();
+            $table->unsignedBigInteger('user_id');
             $table->string('title', 255);
-            $table->text('content');
+            $table->text('category');
+            $table->text('content')->nullable();
+            $table->string('image')->nullable();
             $table->timestamps();
+
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }
 
@@ -25,6 +29,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('forum_threads');
+        Schema::table('forum_threads', function (Blueprint $table) {
+            $table->dropColumn(['content', 'image']);
+        });
     }
 };
