@@ -16,23 +16,17 @@ const mainNavItems: NavItem[] = [
     // },
 
     {
-        title: 'Welcome Plant',
+        title: 'Dashboard',
         href: '/welcome-plant',
         icon: LeafIcon,
     },
     {
-        title: 'Detect',
+        title: 'Detect Plant',
         href: '/plant-identifier',
         icon: SearchIcon,
     },
     {
-        title: 'Plant Search',
-        href: '/plant-search',
-        icon: Database,
-    },
-
-    {
-        title: 'Plant Map',
+        title: 'Sightings Map',
         href: '/plant-map',
         icon: Map,
     },
@@ -41,24 +35,10 @@ const mainNavItems: NavItem[] = [
         href: '/forum',
         icon: UsersRoundIcon,
     },
-    {
-        title: 'Trefle Test',
-        href: '/trefle-test',
-        icon: Database,
-    },
 ];
 
 const footerNavItems: NavItem[] = [
-    {
-        title: 'Github Repo',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits',
-        icon: BookOpen,
-    },
+
 ];
 </script>
 
