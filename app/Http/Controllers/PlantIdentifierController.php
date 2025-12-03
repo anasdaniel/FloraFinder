@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Integrations\IdentifyPlantRequest as IntegrationsIdentifyPlantRequest;
 use App\Models\PlantIdentification;
+use App\Services\PlantCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -16,6 +17,10 @@ use App\Http\Integrations\TrefleRequest;
 
 class PlantIdentifierController extends Controller
 {
+    public function __construct(
+        private PlantCacheService $plantCacheService
+    ) {}
+
     public function index()
     {
 
@@ -68,14 +73,15 @@ class PlantIdentifierController extends Controller
             return Inertia::render('DetectRevamp', [
                 'plantData' => $plantData
             ]);
-
         } catch (\Exception $e) {
             Log::error('Plant identification error: ' . $e->getMessage());
 
-            return back()->with('data', [
-                'success' => false,
-                'message' => 'An error occurred during identification',
-                'error' => $e->getMessage()
+            return Inertia::render('DetectRevamp', [
+                'plantData' => [
+                    'success' => false,
+                    'message' => 'An error occurred during identification',
+                    'error' => $e->getMessage()
+                ]
             ]);
         }
     }
@@ -147,73 +153,30 @@ class PlantIdentifierController extends Controller
     {
         $request->validate([
             'scientificName' => 'required|string|max:255',
+            'commonName' => 'nullable|string|max:255',
+            'family' => 'nullable|string|max:255',
         ]);
 
         try {
+            $scientificName = $request->input('scientificName');
+            $commonName = $request->input('commonName');
+            $family = $request->input('family');
 
-            $scientificName = 'Sorbus aucuparia';
-
-            $connector = new TrefleConnector();
-            $detailsRequest = new SearchPlantRequest($scientificName);
-            $detailsResponse = $connector->send($detailsRequest);
-
-            if (!$detailsResponse->successful()) {
-                Log::error('Details request failed: ' . $detailsResponse->body());
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to fetch plant details from Trefle API'
-                ], 500);
-            }
-
-            $detailsData = $detailsResponse->json();
-            $growth = $detailsData['data']['growth'] ?? null;
-
-            if (!$growth) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No plant data available'
-                ], 404);
-            }
-
-            $careDetails = [
-                'description' => $growth['description'] ?? 'No description available',
-                'sowing' => $growth['sowing'] ?? 'No sowing information available',
-                'days_to_harvest' => $growth['days_to_harvest'] ?? 'Unknown',
-                'row_spacing_cm' => $growth['row_spacing']['cm'] ?? 'Unknown',
-                'spread_cm' => $growth['spread']['cm'] ?? 'Unknown',
-                'ph_maximum' => $growth['ph_maximum'] ?? 'Unknown',
-                'ph_minimum' => $growth['ph_minimum'] ?? 'Unknown',
-                'light' => $growth['light'] ?? 'Unknown',
-                'atmospheric_humidity' => $growth['atmospheric_humidity'] ?? 'Unknown',
-                'growth_months' => $growth['growth_months'] ?? 'Unknown',
-                'bloom_months' => $growth['bloom_months'] ?? 'Unknown',
-                'fruit_months' => $growth['fruit_months'] ?? 'Unknown',
-                'minimum_precipitation' => $growth['minimum_precipitation']['mm'] ?? 'Unknown',
-                'maximum_precipitation' => $growth['maximum_precipitation']['mm'] ?? 'Unknown',
-                'minimum_temperature_celcius' => $growth['minimum_temperature']['deg_c'] ?? 'Unknown',
-                'maximum_temperature_celcius' => $growth['maximum_temperature']['deg_c'] ?? 'Unknown',
-                'soil_nutriments' => $growth['soil_nutriments'] ?? 'Unknown',
-                'soil_salinity' => $growth['soil_salinity'] ?? 'Unknown',
-                'soil_texture' => $growth['soil_texture'] ?? 'Unknown',
-                'soil_humidity' => $growth['soil_humidity'] ?? 'Unknown',
-            ];
-
-            //save to redis cache for 24 hours
-            $cacheKey = 'care_details_' . md5($scientificName);
-            Cache::store('redis')->put($cacheKey, $careDetails, 86400
+            // Use PlantCacheService to get cached care details
+            $careDetails = $this->plantCacheService->getCareDetails(
+                $scientificName,
+                $commonName,
+                $family
             );
 
-
-            Log::info("Logged care details", $careDetails);
-
+            Log::info("Retrieved care details for {$scientificName}", $careDetails);
 
             return response()->json([
                 'success' => true,
                 'data' => $careDetails
             ]);
-
         } catch (\Exception $e) {
-            Log::error('Trefle API error: ' . $e->getMessage());
+            Log::error('Care details error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return response()->json([

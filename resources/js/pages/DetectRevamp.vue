@@ -89,7 +89,6 @@ const selectedResultIndex = ref<number>(0);
 const fileUploadRef = ref<HTMLInputElement | null>(null);
 const extractingExif = ref<boolean>(false);
 const gettingLocation = ref<boolean>(false);
-const savingToDatabase = ref<boolean>(false);
 const bookmarkedResults = reactive<Record<string, boolean>>({});
 const careDetails = ref<any>(null);
 const fetchingCareDetails = ref<boolean>(false);
@@ -539,21 +538,6 @@ const toggleBookmark = () => {
   if (name) bookmarkedResults[name] = !bookmarkedResults[name];
 };
 
-const savePlantToDatabase = async () => {
-  if (uploadedImages.value.length === 0 || !selectedResult.value) return;
-  savingToDatabase.value = true;
-  const fd = new FormData();
-  fd.append("image", uploadedImages.value[0].file);
-  fd.append("organ", uploadedImages.value[0].organ || "leaf");
-  fd.append("saveToDatabase", "1");
-  fd.append("scientificName", selectedResult.value.species.scientificName);
-
-  setTimeout(() => {
-    savingToDatabase.value = false;
-    toast({ title: "Saved", variant: "success" });
-  }, 1000);
-};
-
 function getConservationAdvice(name: string) {
   return "Protect habitat.";
 }
@@ -606,21 +590,180 @@ const handleChatSend = async () => {
   isChatLoading.value = false;
 };
 
-// Sighting Modal State
-const showSightingModal = ref(false);
-const sightingReport = reactive({
+// Save & Report Modal State
+const showSaveModal = ref(false);
+const submittingSave = ref(false);
+const saveOptions = reactive({
+  saveToCollection: true,
+  reportSighting: true,
   locationName: "",
   region: "Peninsular Malaysia",
   latitude: null as number | null,
   longitude: null as number | null,
-  date: "",
+  date: new Date().toISOString().split("T")[0], // Default to today
   notes: "",
 });
-const openSightingModal = () => (showSightingModal.value = true);
-const closeSightingModal = () => (showSightingModal.value = false);
-const submitSightingReport = () => {
-  closeSightingModal();
-  toast({ title: "Reported", variant: "success" });
+
+const openSaveModal = () => {
+  // Pre-fill location data from identification form
+  saveOptions.saveToCollection = true;
+  saveOptions.reportSighting = true;
+  saveOptions.locationName = form.locationName || "";
+  saveOptions.region = form.region || "Peninsular Malaysia";
+  saveOptions.latitude = form.latitude;
+  saveOptions.longitude = form.longitude;
+  saveOptions.date = new Date().toISOString().split("T")[0];
+  saveOptions.notes = "";
+  showSaveModal.value = true;
+};
+
+const closeSaveModal = () => {
+  showSaveModal.value = false;
+};
+
+const getSaveLocation = () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        saveOptions.latitude = parseFloat(position.coords.latitude.toFixed(6));
+        saveOptions.longitude = parseFloat(position.coords.longitude.toFixed(6));
+        // Reverse geocode to get location name
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}&zoom=18&addressdetails=1`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data?.display_name) {
+              saveOptions.locationName =
+                data.name || data.address?.city || data.address?.town || "";
+              const region = data.address?.state || data.address?.province || "";
+              const matchedRegion = MALAYSIAN_REGIONS.find((r) =>
+                region.toLowerCase().includes(r.toLowerCase())
+              );
+              if (matchedRegion) saveOptions.region = matchedRegion;
+            }
+          }
+        } catch (e) {
+          console.error("Geocode error:", e);
+        }
+        toast({
+          title: "Location Detected",
+          description: "GPS coordinates applied.",
+          variant: "success",
+        });
+      },
+      () => {
+        toast({
+          title: "Location Error",
+          description: "Unable to access location.",
+          variant: "destructive",
+        });
+      }
+    );
+  }
+};
+
+const submitSaveAndReport = async () => {
+  if (!selectedResult.value || uploadedImages.value.length === 0) {
+    toast({
+      title: "Missing Data",
+      description: "No plant identification or images available.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (!saveOptions.saveToCollection && !saveOptions.reportSighting) {
+    toast({
+      title: "No Action Selected",
+      description: "Please select at least one option.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  submittingSave.value = true;
+
+  const formData = new FormData();
+  formData.append("scientific_name", selectedResult.value.species.scientificName);
+  formData.append(
+    "common_name",
+    selectedResult.value.species.commonNames?.[0] || ""
+  );
+  formData.append("family", selectedResult.value.species.family?.scientificNameWithoutAuthor || "");
+  formData.append("genus", selectedResult.value.species.genus?.scientificNameWithoutAuthor || "");
+  formData.append("confidence", String(selectedResult.value.score || 0));
+  formData.append("gbif_id", selectedResult.value.gbif?.id || "");
+  formData.append("powo_id", selectedResult.value.powo?.id || "");
+  formData.append("iucn_category", selectedResult.value.iucn?.category || "");
+
+  // Options
+  formData.append("save_to_collection", saveOptions.saveToCollection ? "1" : "0");
+  formData.append("report_sighting", saveOptions.reportSighting ? "1" : "0");
+
+  // Location data (for sighting)
+  if (saveOptions.reportSighting) {
+    if (saveOptions.latitude !== null) {
+      formData.append("latitude", saveOptions.latitude.toString());
+    }
+    if (saveOptions.longitude !== null) {
+      formData.append("longitude", saveOptions.longitude.toString());
+    }
+    if (saveOptions.locationName) {
+      formData.append("location_name", saveOptions.locationName);
+    }
+    if (saveOptions.region) {
+      formData.append("region", saveOptions.region);
+    }
+    if (saveOptions.date) {
+      formData.append("sighted_at", saveOptions.date);
+    }
+    if (saveOptions.notes) {
+      formData.append("description", saveOptions.notes);
+    }
+  }
+
+  // Append all images with their organs
+  uploadedImages.value.forEach((img, index) => {
+    formData.append(`images[${index}]`, img.file);
+    formData.append(`organs[${index}]`, img.organ || "");
+  });
+
+  try {
+    router.post(route("sightings.store"), formData, {
+      onSuccess: () => {
+        closeSaveModal();
+        const actions = [];
+        if (saveOptions.saveToCollection) actions.push("saved to collection");
+        if (saveOptions.reportSighting) actions.push("sighting reported");
+        toast({
+          title: "Success!",
+          description: `Plant ${actions.join(" and ")}.`,
+          variant: "success",
+        });
+      },
+      onError: (errs) => {
+        console.error("Submission errors:", errs);
+        toast({
+          title: "Submission Failed",
+          description: "Please check your inputs and try again.",
+          variant: "destructive",
+        });
+      },
+      onFinish: () => {
+        submittingSave.value = false;
+      },
+      preserveScroll: true,
+    });
+  } catch (error) {
+    submittingSave.value = false;
+    toast({
+      title: "Error",
+      description: "An unexpected error occurred.",
+      variant: "destructive",
+    });
+  }
 };
 
 const openFileUpload = () => nextTick(() => fileUploadRef.value?.click());
@@ -1339,18 +1482,10 @@ const truncateFileName = (name: string, max = 28) =>
                   </div>
                   <div class="flex gap-3 pt-2">
                     <Button
-                      @click="savePlantToDatabase"
-                      :disabled="savingToDatabase"
-                      class="flex-1 h-12 transition-all bg-gray-900 rounded-xl hover:bg-black dark:bg-white dark:text-black dark:hover:bg-gray-200"
-                      ><Icon name="database" class="w-4 h-4 mr-2" />
-                      {{ savingToDatabase ? "Saving..." : "Save Collection" }}</Button
-                    >
-                    <Button
-                      @click="openSightingModal"
-                      variant="outline"
-                      class="flex-1 h-12 border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                      ><Icon name="map-pin" class="w-4 h-4 mr-2" /> Report
-                      Sighting</Button
+                      @click="openSaveModal"
+                      class="flex-1 h-12 transition-all bg-green-600 rounded-xl hover:bg-green-700 text-white"
+                      ><Icon name="bookmark-plus" class="w-4 h-4 mr-2" />
+                      Save & Report</Button
                     >
                   </div>
 
@@ -1512,16 +1647,199 @@ const truncateFileName = (name: string, max = 28) =>
       </div>
     </div>
     <div
-      v-if="showSightingModal"
+      v-if="showSaveModal"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      @click.self="closeSaveModal"
     >
-      <Card class="w-full max-w-lg m-4">
-        <CardHeader><h3 class="font-bold">Report Sighting</h3></CardHeader>
-        <CardContent>
-          <Button class="w-full mt-4" @click="submitSightingReport">Submit Report</Button>
-          <Button variant="ghost" class="w-full mt-2" @click="closeSightingModal"
-            >Cancel</Button
+      <Card class="w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto">
+        <CardHeader class="pb-4 border-b">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-300">
+                <Icon name="bookmark-plus" class="w-5 h-5" />
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Save Plant</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ selectedResult?.species?.commonNames?.[0] || selectedResult?.species?.scientificName || 'Unknown Plant' }}
+                </p>
+              </div>
+            </div>
+            <button @click="closeSaveModal" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+              <Icon name="x" class="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent class="p-6 space-y-5">
+          <!-- Images Preview -->
+          <div>
+            <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Images ({{ uploadedImages.length }})
+            </label>
+            <div class="flex gap-2 overflow-x-auto pb-2">
+              <div
+                v-for="img in uploadedImages"
+                :key="img.id"
+                class="relative flex-shrink-0 w-16 h-16 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+              >
+                <img :src="img.preview" class="object-cover w-full h-full" />
+                <span
+                  v-if="img.organ"
+                  class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5 capitalize"
+                >
+                  {{ img.organ }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Save Options -->
+          <div class="space-y-3">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              What would you like to do?
+            </label>
+
+            <!-- Save to Collection Toggle -->
+            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+              <div class="flex items-center gap-3">
+                <div class="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                  <Icon name="folder-heart" class="w-4 h-4" />
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">Save to My Collection</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Add to your personal plant library</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="saveOptions.saveToCollection" class="sr-only peer" />
+                <div class="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"></div>
+              </label>
+            </div>
+
+            <!-- Report Sighting Toggle -->
+            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+              <div class="flex items-center gap-3">
+                <div class="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-300">
+                  <Icon name="map-pin" class="w-4 h-4" />
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">Report Public Sighting</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Contribute to biodiversity mapping</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="saveOptions.reportSighting" class="sr-only peer" />
+                <div class="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Location Section (only show when reporting sighting) -->
+          <Transition
+            enter-active-class="duration-200 animate-in fade-in slide-in-from-top-2"
+            leave-active-class="duration-150 animate-out fade-out slide-out-to-top-2"
           >
+            <div v-if="saveOptions.reportSighting" class="space-y-3 p-4 border border-green-200 rounded-xl bg-green-50/50 dark:border-green-800/50 dark:bg-green-900/20">
+              <div class="flex items-center justify-between">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Sighting Location
+                </label>
+                <button
+                  type="button"
+                  @click="getSaveLocation"
+                  class="flex items-center gap-1.5 text-xs font-medium text-green-600 hover:text-green-700 dark:text-green-400"
+                >
+                  <Icon name="crosshair" class="w-3.5 h-3.5" />
+                  Use Current GPS
+                </button>
+              </div>
+              <div class="relative">
+                <Icon name="map-pin" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <input
+                  v-model="saveOptions.locationName"
+                  placeholder="Location name (e.g., Taman Negara)"
+                  class="w-full py-2.5 pr-3 text-sm bg-white border border-gray-200 rounded-xl pl-10 focus:border-green-500 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                />
+              </div>
+              <div class="relative">
+                <Icon name="globe" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <select
+                  v-model="saveOptions.region"
+                  class="w-full py-2.5 pr-8 text-sm bg-white border border-gray-200 rounded-xl appearance-none pl-10 focus:border-green-500 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                >
+                  <option v-for="region in MALAYSIAN_REGIONS" :key="region" :value="region">
+                    {{ region }}
+                  </option>
+                </select>
+                <Icon name="chevron-down" class="absolute w-4 h-4 text-gray-400 pointer-events-none right-3 top-3" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="relative">
+                  <span class="absolute -top-2 left-2 bg-green-50 dark:bg-green-900/20 px-1 text-[10px] font-medium text-gray-500">
+                    Latitude
+                  </span>
+                  <input
+                    v-model="saveOptions.latitude"
+                    type="number"
+                    step="0.000001"
+                    placeholder="0.000000"
+                    class="w-full px-3 py-2.5 font-mono text-sm text-gray-600 bg-white border border-gray-200 rounded-xl focus:border-green-500 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
+                  />
+                </div>
+                <div class="relative">
+                  <span class="absolute -top-2 left-2 bg-green-50 dark:bg-green-900/20 px-1 text-[10px] font-medium text-gray-500">
+                    Longitude
+                  </span>
+                  <input
+                    v-model="saveOptions.longitude"
+                    type="number"
+                    step="0.000001"
+                    placeholder="0.000000"
+                    class="w-full px-3 py-2.5 font-mono text-sm text-gray-600 bg-white border border-gray-200 rounded-xl focus:border-green-500 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
+                  />
+                </div>
+              </div>
+
+              <!-- Date -->
+              <div class="relative">
+                <Icon name="calendar" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <input
+                  v-model="saveOptions.date"
+                  type="date"
+                  class="w-full py-2.5 pr-3 text-sm bg-white border border-gray-200 rounded-xl pl-10 focus:border-green-500 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                />
+              </div>
+
+              <!-- Notes -->
+              <textarea
+                v-model="saveOptions.notes"
+                rows="2"
+                placeholder="Notes about habitat, condition, observations... (optional)"
+                class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl resize-none focus:border-green-500 focus:ring-green-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              ></textarea>
+            </div>
+          </Transition>
+
+          <!-- Actions -->
+          <div class="flex gap-3 pt-2">
+            <Button
+              @click="submitSaveAndReport"
+              :disabled="submittingSave || (!saveOptions.saveToCollection && !saveOptions.reportSighting)"
+              class="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white rounded-xl transition-all disabled:opacity-50"
+            >
+              <Icon v-if="submittingSave" name="loader-2" class="w-4 h-4 mr-2 animate-spin" />
+              <Icon v-else name="check" class="w-4 h-4 mr-2" />
+              {{ submittingSave ? 'Saving...' : 'Confirm' }}
+            </Button>
+            <Button
+              variant="outline"
+              @click="closeSaveModal"
+              :disabled="submittingSave"
+              class="h-11 px-6 border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+            >
+              Cancel
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

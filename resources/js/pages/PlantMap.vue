@@ -539,94 +539,103 @@ const malaysianStates = ref([
               </div>
             </div>
             <!-- Grid View -->
-            <div
-              v-else-if="viewMode === 'grid'"
-              class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
-            >
-              <div
-                v-for="plant in paginatedPlants"
-                :key="plant.id"
-                @click="selectPlant(plant)"
-                class="cursor-pointer rounded-xl border border-gray-200 bg-gray-50 shadow transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-800"
-              >
-                <div class="relative h-44 overflow-hidden rounded-t-xl">
-                  <img
-                    :src="plant.path"
-                    :alt="plant.common_name"
-                    class="h-full w-full object-cover"
-                  />
-                  <div class="absolute right-2 top-2">
-                    <span
-                      class="rounded-full px-2 py-1 text-xs font-medium"
-                      :class="getConservationStatusColor(plant.iucn_category)"
+            <div v-else-if="viewMode === 'grid'">
+              <div v-if="paginatedPlants.length === 0" class="py-12 text-center">
+                <p class="text-gray-500 dark:text-gray-400">No plants to show yet.</p>
+              </div>
+              <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                  v-for="plant in paginatedPlants"
+                  :key="plant.id"
+                  @click="selectPlant(plant)"
+                  class="cursor-pointer rounded-xl border border-gray-200 bg-gray-50 shadow transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <div class="relative h-44 overflow-hidden rounded-t-xl">
+                    <img
+                      :src="plant.path"
+                      :alt="plant.common_name"
+                      class="h-full w-full object-cover"
+                    />
+                    <div class="absolute right-2 top-2">
+                      <span
+                        class="rounded-full px-2 py-1 text-xs font-medium"
+                        :class="getConservationStatusColor(plant.iucn_category)"
+                      >
+                        {{ getConservationStatusLabel(plant.iucn_category) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="p-4">
+                    <h3 class="font-semibold text-gray-900 dark:text-white">
+                      {{ plant.common_name }}
+                    </h3>
+                    <p class="text-sm italic text-gray-600 dark:text-gray-400">
+                      {{ plant.scientific_name }}
+                    </p>
+                    <div
+                      class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
                     >
-                      {{ getConservationStatusLabel(plant.iucn_category) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="p-4">
-                  <h3 class="font-semibold text-gray-900 dark:text-white">
-                    {{ plant.common_name }}
-                  </h3>
-                  <p class="text-sm italic text-gray-600 dark:text-gray-400">
-                    {{ plant.scientific_name }}
-                  </p>
-                  <div
-                    class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    <Icon name="map-pin" class="h-3 w-3" />
-                    <span>{{ plant.region }}</span>
-                  </div>
-                  <div
-                    class="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    <Icon name="calendar" class="h-3 w-3" />
-                    <span>{{ formatDate(plant.created_at) }}</span>
+                      <Icon name="map-pin" class="h-3 w-3" />
+                      <span>{{ plant.region }}</span>
+                    </div>
+                    <div
+                      class="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      <Icon name="calendar" class="h-3 w-3" />
+                      <span>{{ formatDate(plant.created_at) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
             <!-- List View -->
-            <div v-else-if="viewMode === 'list'" class="space-y-4">
-              <div
-                v-for="plant in paginatedPlants"
-                :key="plant.id"
-                @click="selectPlant(plant)"
-                class="flex cursor-pointer items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-800"
-              >
-                <div class="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg">
-                  <img
-                    :src="plant.path"
-                    :alt="plant.common_name"
-                    class="h-full w-full object-cover"
-                  />
-                  <div class="absolute -right-1 -top-1">
-                    <span
-                      class="rounded-full px-2 py-1 text-xs font-medium"
-                      :class="getConservationStatusColor(plant.iucn_category)"
+            <div v-else-if="viewMode === 'list'">
+              <div v-if="paginatedPlants.length === 0" class="py-12 text-center">
+                <p class="text-gray-500 dark:text-gray-400">No plants to show yet.</p>
+              </div>
+              <div v-else class="space-y-4">
+                <div
+                  v-for="plant in paginatedPlants"
+                  :key="plant.id"
+                  @click="selectPlant(plant)"
+                  class="flex cursor-pointer items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <div
+                    class="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg"
+                  >
+                    <img
+                      :src="plant.path"
+                      :alt="plant.common_name"
+                      class="h-full w-full object-cover"
+                    />
+                    <div class="absolute -right-1 -top-1">
+                      <span
+                        class="rounded-full px-2 py-1 text-xs font-medium"
+                        :class="getConservationStatusColor(plant.iucn_category)"
+                      >
+                        {{ plant.iucn_category }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <h3 class="font-semibold text-gray-900 dark:text-white">
+                      {{ plant.common_name }}
+                    </h3>
+                    <p class="text-sm italic text-gray-600 dark:text-gray-400">
+                      {{ plant.scientific_name }}
+                    </p>
+                    <div
+                      class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
                     >
-                      {{ plant.iucn_category }}
-                    </span>
-                  </div>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <h3 class="font-semibold text-gray-900 dark:text-white">
-                    {{ plant.common_name }}
-                  </h3>
-                  <p class="text-sm italic text-gray-600 dark:text-gray-400">
-                    {{ plant.scientific_name }}
-                  </p>
-                  <div
-                    class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    <Icon name="map-pin" class="h-3 w-3" />
-                    <span>{{ plant.region }}</span>
-                  </div>
-                  <div
-                    class="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    <Icon name="calendar" class="h-3 w-3" />
-                    <span>{{ formatDate(plant.created_at) }}</span>
+                      <Icon name="map-pin" class="h-3 w-3" />
+                      <span>{{ plant.region }}</span>
+                    </div>
+                    <div
+                      class="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      <Icon name="calendar" class="h-3 w-3" />
+                      <span>{{ formatDate(plant.created_at) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>

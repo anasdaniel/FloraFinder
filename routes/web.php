@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\PlantIdentifierController;
 use App\Http\Controllers\ForumController;
+use App\Http\Controllers\SightingController;
 use App\Http\Integrations\CheckStatusRequest;
 use App\Http\Integrations\IdentifyPlantRequest;
 use App\Http\Integrations\PlantNetConnector;
@@ -360,7 +361,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('sighting-map', function () {
         return Inertia::render(component: 'SightingMap');
-    })->name('plant-map');
+    })->name('sighting-map');
+
+    // Sighting routes
+    Route::post('/sightings', [SightingController::class, 'store'])->name('sightings.store');
+    Route::get('/sightings', [SightingController::class, 'index'])->name('sightings.index');
+    Route::get('/sightings/{sighting}', [SightingController::class, 'show'])->name('sightings.show');
 
     //detect route
     // Route::get('detect', function () {
@@ -388,6 +394,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::post('plant-identifier/identify', [PlantIdentifierController::class, 'identify'])->name('plant-identifier.identify');
+
+// Redirect GET requests to identify endpoint back to the main page
+Route::get('plant-identifier/identify', function () {
+    return redirect()->route('plant-identifier');
+});
 
 Route::get(
     '/plant-identifier/care-details',
