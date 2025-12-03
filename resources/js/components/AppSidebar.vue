@@ -26,6 +26,21 @@ const mainNavItems: NavItem[] = [
         icon: SearchIcon,
     },
     {
+        title: 'My Plants',
+        href: '/my-plants',
+        icon: Folder,
+    },
+    {
+        title: 'Plant Library',
+        href: '/plants',
+        icon: BookOpen,
+    },
+    {
+        title: 'My Sightings',
+        href: '/sightings',
+        icon: Database,
+    },
+    {
         title: 'Sightings Map',
         href: '/plant-map',
         icon: Map,

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\PlantIdentifierController;
 use App\Http\Controllers\ForumController;
+use App\Http\Controllers\PlantController;
 use App\Http\Controllers\SightingController;
 use App\Http\Integrations\CheckStatusRequest;
 use App\Http\Integrations\IdentifyPlantRequest;
@@ -367,6 +368,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/sightings', [SightingController::class, 'store'])->name('sightings.store');
     Route::get('/sightings', [SightingController::class, 'index'])->name('sightings.index');
     Route::get('/sightings/{sighting}', [SightingController::class, 'show'])->name('sightings.show');
+
+    // Plants database routes
+    Route::get('/plants', [PlantController::class, 'index'])->name('plants.index');
+    Route::get('/plants/{plant}', [PlantController::class, 'show'])->name('plants.show');
+    Route::post('/plants/{plant}/refresh-care', [PlantController::class, 'refreshCare'])->name('plants.refresh-care');
 
     //detect route
     // Route::get('detect', function () {
