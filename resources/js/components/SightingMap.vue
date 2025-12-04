@@ -51,7 +51,7 @@ onMounted(async () => {
     // Create map instance
     map = L.map(mapContainer.value, {
       center: [4.2105, 101.9758], // Centered on Malaysia
-      zoom: 7,
+      zoom: 6, // Lower zoom to show all of Malaysia
       zoomControl: true,
       scrollWheelZoom: true,
       doubleClickZoom: true,
@@ -85,21 +85,11 @@ onMounted(async () => {
   }
 });
 
-// Center map to fit all markers
+// Center map on Malaysia
 const centerMap = () => {
-  if (!map || !markersLayer) return;
-  const allMarkers = markersLayer.getLayers();
-  if (allMarkers.length > 0) {
-    const bounds = L.latLngBounds([]);
-    allMarkers.forEach((marker: any) => {
-      if (marker.getLatLng) bounds.extend(marker.getLatLng());
-    });
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [20, 20], maxZoom: 15 });
-    }
-  } else {
-    map.setView([4.2105, 101.9758], 7, { animate: true });
-  }
+  if (!map) return;
+  // Center on Malaysia with zoom level 6 to show the whole country
+  map.setView([4.2105, 101.9758], 6, { animate: true });
 };
 
 // Watch for changes in sightings data and update markers
@@ -135,15 +125,11 @@ const updateMarkers = (sightings: Sighting[]) => {
 
   if (sightings.length === 0) return;
 
-  const bounds = L.latLngBounds([]);
-  let validSightings = 0;
-
   sightings.forEach((sighting) => {
     const lat = Number(sighting.latitude);
     const lng = Number(sighting.longitude);
 
     if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-      const latLng: L.LatLngExpression = [lat, lng];
       const marker = createMarker(lat, lng, sighting.conservationStatus);
 
       // Simple popup with plant name and basic info
@@ -157,18 +143,11 @@ const updateMarkers = (sightings: Sighting[]) => {
       );
 
       markersLayer!.addLayer(marker);
-      bounds.extend(latLng);
-      validSightings++;
     }
   });
 
-  // Fit map to show all markers if we have valid sightings
-  if (validSightings > 0 && bounds.isValid()) {
-    map.fitBounds(bounds, {
-      padding: [20, 20],
-      maxZoom: 15,
-    });
-  }
+  // Keep map centered on Malaysia instead of fitting to markers
+  map.setView([4.2105, 101.9758], 6, { animate: true });
 };
 
 // Cleanup on unmount
