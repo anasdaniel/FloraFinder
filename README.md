@@ -103,7 +103,7 @@ IUCN_API_KEY=your_iucn_api_key_here
 11. Set up your Gemini API key in the `.env` file:
 
 ```
-GEMINI_API_KEY=your_gemini_api_key_here
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 12. Run database migrations:
