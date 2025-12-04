@@ -2,9 +2,11 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
+    BookOpen,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    Droplets,
     Filter,
     Grid3X3,
     Leaf,
@@ -12,10 +14,9 @@ import {
     RefreshCw,
     Search,
     SearchX,
-    Droplets,
     Sun,
     Thermometer,
-    Clock,
+    TreeDeciduous,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
@@ -69,7 +70,7 @@ const isLoading = ref(false);
 
 // Debounced search
 let searchTimeout: ReturnType<typeof setTimeout>;
-watch(searchQuery, (value) => {
+watch(searchQuery, () => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
         applyFilters();
@@ -109,6 +110,17 @@ const hasActiveFilters = computed(() => {
     return searchQuery.value || selectedFamily.value || hasCareOnly.value;
 });
 
+// Compute stats
+const stats = computed(() => {
+    const withCare = props.plants.data.filter(p => p.care_cached_at !== null).length;
+    const uniqueFamilies = new Set(props.plants.data.map(p => p.family).filter(Boolean)).size;
+    return {
+        total: props.plants.total,
+        withCare,
+        families: uniqueFamilies,
+    };
+});
+
 const getLightLabel = (value: number | null): string => {
     if (value === null) return 'Unknown';
     if (value <= 3) return 'Low Light';
@@ -142,121 +154,172 @@ const goToPage = (url: string | null) => {
 </script>
 
 <template>
-    <Head title="Plant Database" />
+    <Head title="Plant Library" />
 
     <AppLayout>
-        <div class="min-h-screen py-8 bg-white">
+        <div class="min-h-screen py-8 bg-gray-50">
             <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
                 <!-- Header -->
-                <div class="mb-12 text-center">
-                    <h1 class="mb-4 text-4xl font-bold text-gray-900">Plant Database</h1>
-                    <p class="max-w-2xl mx-auto text-lg text-gray-600">
-                        Browse our collection of plants with detailed care information. Each plant includes growing conditions, temperature
-                        requirements, and more.
-                    </p>
+                <div class="mb-8">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-900">Plant Library</h1>
+                            <p class="mt-1 text-gray-600">
+                                Browse our collection of plants with detailed care information
+                            </p>
+                        </div>
+                        <Link
+                            :href="route('plant-identifier')"
+                            class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors bg-gray-900 rounded-lg hover:bg-black"
+                        >
+                            <Leaf class="w-4 h-4" />
+                            Identify Plant
+                        </Link>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-2 gap-4 mb-8 md:grid-cols-4">
+                    <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-lg bg-gray-100">
+                                <BookOpen class="w-5 h-5 text-gray-600" />
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-gray-900">{{ plants.total }}</p>
+                                <p class="text-sm text-gray-500">Total Plants</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-lg bg-blue-50">
+                                <Leaf class="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-gray-900">{{ stats.withCare }}</p>
+                                <p class="text-sm text-gray-500">With Care Info</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-lg bg-purple-50">
+                                <TreeDeciduous class="w-5 h-5 text-purple-600" />
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-gray-900">{{ families.length }}</p>
+                                <p class="text-sm text-gray-500">Families</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-lg bg-amber-50">
+                                <Sun class="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-gray-900">{{ stats.families }}</p>
+                                <p class="text-sm text-gray-500">On This Page</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Search and Filter Section -->
-                <div class="p-6 mb-8 bg-white shadow-lg rounded-2xl ring-1 ring-gray-100">
+                <div class="p-6 mb-6 bg-white shadow-sm rounded-xl">
                     <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                        <!-- Main Search Bar -->
+                        <!-- Search Bar -->
                         <div class="lg:col-span-5">
-                            <label for="search" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                            <label class="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
                                 Search
                             </label>
                             <div class="relative group">
                                 <input
                                     v-model="searchQuery"
                                     type="text"
-                                    id="search"
                                     placeholder="Search by name, family..."
-                                    class="w-full rounded-xl border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm transition-all focus:border-black focus:bg-white focus:ring-black group-hover:bg-white"
+                                    class="w-full rounded-lg border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm transition-all focus:border-gray-400 focus:bg-white focus:ring-gray-400"
                                 />
-                                <Search
-                                    class="absolute left-3 top-2.5 h-5 w-5 text-gray-400 transition-colors group-hover:text-gray-600"
-                                />
+                                <Search class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                             </div>
                         </div>
 
                         <!-- Family Filter -->
                         <div class="lg:col-span-4">
-                            <label for="family" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                            <label class="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
                                 Family
                             </label>
-                            <div class="relative group">
+                            <div class="relative">
                                 <select
                                     v-model="selectedFamily"
-                                    id="family"
-                                    class="w-full appearance-none rounded-xl border-gray-200 bg-gray-50 py-2.5 pl-10 pr-8 text-sm transition-all focus:border-black focus:bg-white focus:ring-black group-hover:bg-white"
+                                    class="w-full appearance-none rounded-lg border-gray-200 bg-gray-50 py-2.5 pl-10 pr-8 text-sm focus:border-gray-400 focus:ring-gray-400"
                                 >
                                     <option value="">All Families</option>
                                     <option v-for="family in families" :key="family" :value="family">
                                         {{ family }}
                                     </option>
                                 </select>
-                                <Leaf
-                                    class="pointer-events-none absolute left-3 top-2.5 h-5 w-5 text-gray-400 transition-colors group-hover:text-gray-600"
-                                />
-                                <ChevronDown class="absolute w-4 h-4 text-gray-400 pointer-events-none right-3 top-3" />
+                                <Leaf class="pointer-events-none absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                                <ChevronDown class="pointer-events-none absolute right-3 top-3 h-4 w-4 text-gray-400" />
                             </div>
                         </div>
 
-                        <!-- Has Care Details Toggle -->
-                        <div class="lg:col-span-3">
-                            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500"> Filter </label>
-                            <label
-                                class="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 cursor-pointer hover:bg-white transition-all"
-                            >
+                        <!-- Has Care Filter -->
+                        <div class="lg:col-span-2">
+                            <label class="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                Filter
+                            </label>
+                            <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 cursor-pointer hover:bg-white transition-all">
                                 <input
                                     v-model="hasCareOnly"
                                     type="checkbox"
-                                    class="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
+                                    class="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-400"
                                 />
-                                <span class="text-sm text-gray-700">With care details</span>
+                                <span class="text-sm text-gray-700">With care</span>
                             </label>
                         </div>
+
+                        <!-- View Toggle -->
+                        <div class="lg:col-span-1">
+                            <label class="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                View
+                            </label>
+                            <div class="flex p-1 border border-gray-200 rounded-lg bg-gray-50">
+                                <button
+                                    @click="viewMode = 'grid'"
+                                    class="flex-1 p-2 transition-all rounded-md"
+                                    :class="viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'"
+                                >
+                                    <Grid3X3 class="w-4 h-4 mx-auto" />
+                                </button>
+                                <button
+                                    @click="viewMode = 'list'"
+                                    class="flex-1 p-2 transition-all rounded-md"
+                                    :class="viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'"
+                                >
+                                    <List class="w-4 h-4 mx-auto" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Clear Filters -->
-                    <div class="flex items-center justify-between pt-4 mt-4 border-t border-gray-100">
+                    <!-- Active Filters -->
+                    <div v-if="hasActiveFilters" class="flex items-center justify-between pt-4 mt-4 border-t border-gray-100">
                         <div class="flex items-center gap-2 text-sm text-gray-500">
                             <Filter class="w-4 h-4" />
-                            <span>{{ plants.total }} plants found</span>
+                            <span>Showing filtered results</span>
                         </div>
-
                         <button
-                            v-if="hasActiveFilters"
                             @click="clearFilters"
-                            class="text-xs font-medium text-red-500 hover:text-red-700 hover:underline"
+                            class="text-xs font-medium text-red-500 hover:text-red-700"
                         >
-                            Clear all filters
+                            Clear filters
                         </button>
                     </div>
                 </div>
 
-                <!-- View Toggle -->
-                <div class="flex items-center justify-end mb-6">
-                    <div class="flex items-center p-1 bg-white border border-gray-200 rounded-xl">
-                        <button
-                            @click="viewMode = 'grid'"
-                            class="p-2 transition-all duration-200 rounded-lg"
-                            :class="viewMode === 'grid' ? 'bg-black text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'"
-                            title="Grid View"
-                        >
-                            <Grid3X3 class="w-5 h-5" />
-                        </button>
-                        <button
-                            @click="viewMode = 'list'"
-                            class="p-2 transition-all duration-200 rounded-lg"
-                            :class="viewMode === 'list' ? 'bg-black text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'"
-                            title="List View"
-                        >
-                            <List class="w-5 h-5" />
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Loading Overlay -->
+                <!-- Loading State -->
                 <div v-if="isLoading" class="flex items-center justify-center py-12">
                     <RefreshCw class="w-8 h-8 text-gray-400 animate-spin" />
                 </div>
@@ -264,39 +327,41 @@ const goToPage = (url: string | null) => {
                 <!-- Plants Grid -->
                 <div v-else-if="plants.data.length > 0">
                     <!-- Grid View -->
-                    <div v-if="viewMode === 'grid'" class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div v-if="viewMode === 'grid'" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         <Link
                             v-for="plant in plants.data"
                             :key="plant.id"
                             :href="route('plants.show', plant.id)"
-                            class="overflow-hidden transition-all duration-300 bg-white border border-gray-100 shadow-sm cursor-pointer group rounded-xl hover:shadow-lg hover:border-gray-200"
+                            class="overflow-hidden transition-all duration-300 bg-white border border-gray-100 shadow-sm group rounded-xl hover:shadow-lg"
                         >
-                            <!-- Plant Header -->
-                            <div class="p-5 border-b border-gray-100 bg-gradient-to-br from-green-50 to-emerald-50">
-                                <div class="flex items-start justify-between mb-2">
-                                    <Leaf class="w-8 h-8 text-green-600" />
+                            <!-- Plant Header with gradient -->
+                            <div class="relative p-5 bg-gradient-to-br from-gray-50 to-gray-100">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="p-2 rounded-lg bg-white/80">
+                                        <Leaf class="w-6 h-6 text-gray-600" />
+                                    </div>
                                     <span
                                         v-if="hasCareDetails(plant)"
-                                        class="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full"
+                                        class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-200 rounded-full"
                                     >
                                         Care Info
                                     </span>
                                 </div>
-                                <h3 class="font-semibold text-gray-900 transition-colors group-hover:text-green-700">
+                                <h3 class="font-semibold text-gray-900 transition-colors group-hover:text-gray-600">
                                     {{ plant.common_name || plant.scientific_name }}
                                 </h3>
-                                <p class="text-sm italic text-gray-600">{{ plant.scientific_name }}</p>
+                                <p class="text-sm italic text-gray-500">{{ plant.scientific_name }}</p>
                             </div>
 
                             <!-- Plant Info -->
-                            <div class="p-4 space-y-3">
-                                <div v-if="plant.family" class="flex items-center text-sm text-gray-600">
-                                    <span class="font-medium text-gray-500 w-16">Family:</span>
+                            <div class="p-4">
+                                <div v-if="plant.family" class="flex items-center gap-2 mb-3 text-sm text-gray-600">
+                                    <TreeDeciduous class="w-4 h-4 text-gray-400" />
                                     <span>{{ plant.family }}</span>
                                 </div>
 
                                 <!-- Quick Care Stats -->
-                                <div v-if="hasCareDetails(plant)" class="grid grid-cols-2 gap-2 pt-2">
+                                <div v-if="hasCareDetails(plant)" class="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
                                     <div class="flex items-center gap-1.5 text-xs text-gray-500">
                                         <Sun class="w-3.5 h-3.5 text-yellow-500" />
                                         <span>{{ getLightLabel(plant.light) }}</span>
@@ -311,7 +376,7 @@ const goToPage = (url: string | null) => {
                                     </div>
                                 </div>
 
-                                <div v-else class="pt-2 text-xs text-gray-400 italic">
+                                <div v-else class="pt-3 text-xs italic text-gray-400 border-t border-gray-100">
                                     Care details not yet loaded
                                 </div>
                             </div>
@@ -319,34 +384,37 @@ const goToPage = (url: string | null) => {
                     </div>
 
                     <!-- List View -->
-                    <div v-else class="overflow-hidden bg-white shadow-lg rounded-xl">
-                        <div class="divide-y divide-gray-200">
+                    <div v-else class="overflow-hidden bg-white shadow-sm rounded-xl">
+                        <div class="divide-y divide-gray-100">
                             <Link
                                 v-for="plant in plants.data"
                                 :key="plant.id"
                                 :href="route('plants.show', plant.id)"
-                                class="flex items-center p-6 transition-colors duration-200 hover:bg-gray-50"
+                                class="flex items-center gap-4 p-4 transition-colors hover:bg-gray-50"
                             >
-                                <div class="flex items-center justify-center flex-shrink-0 w-12 h-12 mr-4 rounded-lg bg-green-50">
-                                    <Leaf class="w-6 h-6 text-green-600" />
+                                <!-- Icon -->
+                                <div class="flex items-center justify-center flex-shrink-0 w-12 h-12 rounded-lg bg-gray-100">
+                                    <Leaf class="w-6 h-6 text-gray-600" />
                                 </div>
 
+                                <!-- Info -->
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2">
-                                        <h3 class="text-lg font-semibold text-gray-900">
+                                        <h3 class="font-semibold text-gray-900">
                                             {{ plant.common_name || plant.scientific_name }}
                                         </h3>
                                         <span
                                             v-if="hasCareDetails(plant)"
-                                            class="px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full"
+                                            class="px-2 py-0.5 text-xs font-medium text-gray-700 bg-gray-200 rounded-full"
                                         >
                                             Care Info
                                         </span>
                                     </div>
-                                    <p class="text-sm italic text-gray-600">{{ plant.scientific_name }}</p>
+                                    <p class="text-sm italic text-gray-500">{{ plant.scientific_name }}</p>
                                     <p v-if="plant.family" class="mt-1 text-sm text-gray-500">Family: {{ plant.family }}</p>
                                 </div>
 
+                                <!-- Care Stats -->
                                 <div v-if="hasCareDetails(plant)" class="flex items-center gap-6 text-sm text-gray-500">
                                     <div class="flex items-center gap-1.5">
                                         <Sun class="w-4 h-4 text-yellow-500" />
@@ -358,7 +426,7 @@ const goToPage = (url: string | null) => {
                                     </div>
                                 </div>
 
-                                <ChevronRight class="flex-shrink-0 w-5 h-5 ml-4 text-gray-400" />
+                                <ChevronRight class="flex-shrink-0 w-5 h-5 text-gray-400" />
                             </Link>
                         </div>
                     </div>
@@ -379,7 +447,7 @@ const goToPage = (url: string | null) => {
                                     v-if="link.url"
                                     @click="goToPage(link.url)"
                                     class="px-3 py-2 text-sm font-medium transition-colors duration-200 rounded-md"
-                                    :class="link.active ? 'bg-black text-white' : 'text-gray-700 hover:bg-gray-100'"
+                                    :class="link.active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100'"
                                     v-html="link.label"
                                 />
                                 <span v-else class="px-2 text-gray-400">...</span>
@@ -397,17 +465,28 @@ const goToPage = (url: string | null) => {
                 </div>
 
                 <!-- No Results -->
-                <div v-else class="py-12 text-center">
-                    <SearchX class="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <div v-else class="py-16 text-center bg-white shadow-sm rounded-xl">
+                    <SearchX class="w-16 h-16 mx-auto mb-4 text-gray-300" />
                     <h3 class="mb-2 text-lg font-medium text-gray-900">No plants found</h3>
-                    <p class="text-gray-500">Try adjusting your search criteria or filters.</p>
-                    <button
-                        v-if="hasActiveFilters"
-                        @click="clearFilters"
-                        class="px-4 py-2 mt-4 text-white transition-colors duration-200 bg-black rounded-lg hover:bg-gray-800"
-                    >
-                        Clear Filters
-                    </button>
+                    <p class="mb-6 text-gray-500">
+                        {{ hasActiveFilters ? 'Try adjusting your filters.' : 'No plants in the database yet.' }}
+                    </p>
+                    <div class="flex items-center justify-center gap-3">
+                        <button
+                            v-if="hasActiveFilters"
+                            @click="clearFilters"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 transition-colors bg-gray-100 rounded-lg hover:bg-gray-200"
+                        >
+                            Clear Filters
+                        </button>
+                        <Link
+                            :href="route('plant-identifier')"
+                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors bg-gray-900 rounded-lg hover:bg-black"
+                        >
+                            <Leaf class="w-4 h-4" />
+                            Identify a Plant
+                        </Link>
+                    </div>
                 </div>
             </div>
         </div>

@@ -46,8 +46,8 @@ import { Head, Link } from "@inertiajs/vue3";
         >
           <h1 class="mb-1 font-medium">Let's get started</h1>
           <p class="mb-2 text-[#706f6c] dark:text-[#A1A09A]">
-            Laravel has an incredibly rich ecosystem. <br />We suggest starting with the
-            following.
+            FloraFinder helps you identify and manage plants.
+            <br />We suggest starting with the following resources.
           </p>
           <ul class="flex flex-col mb-4 lg:mb-6">
             <li
@@ -63,7 +63,7 @@ import { Head, Link } from "@inertiajs/vue3";
               <span>
                 Read the
                 <a
-                  href="https://laravel.com/docs"
+                  href="https://github.com/anas/FloraFinder#readme"
                   target="_blank"
                   class="ml-1 inline-flex items-center space-x-1 font-medium text-[#f53003] underline underline-offset-4 dark:text-[#FF4433]"
                 >
