@@ -4,6 +4,7 @@ use App\Http\Controllers\PlantIdentifierController;
 use App\Http\Controllers\ForumController;
 use App\Http\Controllers\PlantController;
 use App\Http\Controllers\SightingController;
+use App\Http\Controllers\MyPlantController;
 use App\Http\Integrations\CheckStatusRequest;
 use App\Http\Integrations\IdentifyPlantRequest;
 use App\Http\Integrations\PlantNetConnector;
@@ -20,16 +21,11 @@ use App\Http\Integrations\SearchPlantRequest;
 
 
 
-
 Route::get('/', function () {
-
 
 
     return Inertia::render('Welcome');
 })->name('home');
-
-// Map Test Route
-
 
 
 Route::get('/login', function () {
@@ -54,169 +50,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return redirect('welcome-plant');
     })->name('dashboard');
 
-
-    Route::get('/map-test', function () {
-        return Inertia::render('MapTest');
-    })->name('map-test');
-
-
-    Route::get('booking', function () {
-        return Inertia::render('Booking');
-    })->name('booking');
-
-
-
-    Route::get('trefle-test', function () {
-        $plantName = 'rose';
-
-        $cacheKey = 'trefle_test_' . $plantName;
-        $cachedPlants = Cache::get($cacheKey);
-
-        if ($cachedPlants) {
-            return Inertia::render('TrefleTest', [
-                'plants' => $cachedPlants
-            ]);
-        }
-
-        $connector = new TrefleConnector();
-        $request = new SearchPlantRequest($plantName);
-        $response = $connector->send($request);
-        $data = $response->json();
-
-        $plants = $data['data'];
-
-        // Cache for 1 hour
-        Cache::put($cacheKey, $plants, 3600);
-
-        return Inertia::render('TrefleTest', [
-            'plants' => $plants
-        ]);
-    })->name('trefle-test');
-
-    Route::get('trefle-species', function () {
-
-        $connector = new TrefleConnector();
-        $request = new TrefleRequest(
-            endpoint: 'plants/search',
-            queryParameters: ['q' => 'mango', 'limit' => 10]
-        );
-        $response = $connector->send($request);
-        $data = $response->json();
-        dd($data['data']);
-    });
-
-    Route::get('trefle-malaysia', function () {
-        $page = (int) request('page', 1);
-        $targetCount = 20; // Desired number of unique plants per page
-        $allPlants = [];
-        $seenIds = [];
-        $currentPage = $page;
-        $pagination = [];
-
-        $connector = new TrefleConnector();
-
-        // Loop to fetch pages until we have enough unique plants
-        while (count($allPlants) < $targetCount) {
-            $request = new TrefleRequest(
-                endpoint: 'distributions/42/species',
-                queryParameters: ['page' => $currentPage]
-            );
-            $response = $connector->send($request);
-            $data = $response->json();
-
-            $plants = $data['data'] ?? [];
-
-            // Filter out duplicates within this page and across accumulated plants
-            $uniquePlants = array_filter($plants, function ($plant) use (&$seenIds) {
-                if (in_array($plant['id'], $seenIds)) {
-                    return false;
-                }
-                $seenIds[] = $plant['id'];
-                return true;
-            });
-
-            // Add unique plants to the collection
-            $allPlants = array_merge($allPlants, $uniquePlants);
-
-            // Extract pagination links from the current response
-            if (isset($data['links'])) {
-                $pagination = [];
-                foreach ($data['links'] as $key => $link) {
-                    $pagination[$key] = str_replace('/api/v1/', '/', $link);
-                }
-            }
-
-            // Check if there's a next page; if not, stop
-            if (!isset($data['links']['next'])) {
-                break;
-            }
-
-            $currentPage++; // Move to next page for next iteration
-        }
-
-        // Trim to exactly 30 plants if we have more
-        $plants = array_slice($allPlants, 0, $targetCount);
-
-        return Inertia::render('TrefleMalaysia', [
-            'plants' => $plants,
-            'pagination' => $pagination,
-            'currentPage' => $page,
-        ]);
-    })->name('trefle-malaysia');
-
-
     //forum
     Route::get('/forum', [ForumController::class, 'index'])
         ->name('forum');
 
-    // Create new forum post
-    //    Route::post('forum/new', function () {
-    //        $validated = request()->validate([
-    //            'title' => 'required|string|max:255',
-    //            'content' => 'required|string',
-    //            'category' => 'required|string',
-    //            'image' => 'nullable|image|max:2048',
-    //        ]);
-    //
-    //        // Handle image upload
-    //        $imagePath = null;
-    //        if (request()->hasFile('image') && request()->file('image')->isValid()) {
-    //            $imagePath = request()->file('image')->store('forum', 'public');
-    //        }
-    //
-    //        // Create thread with content + image
-    //        $thread = \App\Models\ForumThread::create([
-    //            'title' => $validated['title'],
-    //            'category' => $validated['category'],
-    //            'content' => $validated['content'],
-    //            'image' => $imagePath,
-    //            'user_id' => auth()->id(),
-    //        ]);
-    //
-    //        return redirect()->route('forum')->with('success', 'Thread created successfully!');
-    //    })->name('forum.store');
-
-
 
     //welcome plant
     Route::get('welcome-plant', function () {
-        return Inertia::render('WelcomePlant');
+        return Inertia::render('Dashboard/Index');
     })->name('welcome-plant');
-
-    Route::get('event-listener', function () {
-
-        // get current user data
-        $user = auth()->user();
-
-
-        //dispatch an event
-        event(new App\Events\PodcastProcessed($user));
-    })->name('financial');
-
-    Route::get('/model', function () {
-        return Inertia::render('Model');
-    })->name('model');
-
 
     //view a post
     Route::get('/forum/{id}', function ($id) {
@@ -233,7 +75,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'posts.replies.user'
         ])->findOrFail($id);
 
-        return Inertia::render('ForumView', [
+        return Inertia::render('Forum/Post', [
             'thread' => $thread
         ]);
     })->name('forum.show');
@@ -309,7 +151,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
         return Inertia::render(
-            'PlantSearch',
+            'Search/Index',
             props: [
                 'plants' => $plants
             ]
@@ -318,44 +160,44 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Plant Map route
     Route::get('plant-map', function () {
+        // Fetch actual sightings from database
+        $sightings = \App\Models\Sighting::with(['images', 'user', 'plant'])
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get();
 
-
-        //fetch plant from database
-        $plants = PlantIdentification::all();
-
-        $plants = $plants->map(function ($plant) {
+        $sightings = $sightings->map(function ($sighting) {
             return [
-                'id' => $plant->id,
-                'user_id' => $plant->user_id,
-                'path' => $plant->url,
-                'filename' => $plant->filename,
-                'mime_type' => $plant->mime_type,
-                'size' => $plant->size,
-                'organ' => $plant->organ,
-                'scientific_name' => $plant->scientific_name,
-                'scientific_name_without_author' => $plant->scientific_name_without_author,
-                'common_name' => $plant->common_name,
-                'family' => $plant->family,
-                'genus' => $plant->genus,
-                'confidence' => $plant->confidence,
-                'gbif_id' => $plant->gbif_id,
-                'powo_id' => $plant->powo_id,
-                'iucn_category' => $plant->iucn_category,
-                'region' => $plant->region,
-                'latitude' => $plant->latitude,
-                'longitude' => $plant->longitude,
-                'created_at' => $plant->created_at,
-                'updated_at' => $plant->updated_at,
+                'id' => $sighting->id,
+                'user_id' => $sighting->user_id,
+                'user_name' => $sighting->user?->name,
+                'path' => $sighting->images->first()?->image_url ?? $sighting->image_url,
+                'images' => $sighting->images->map(fn($img) => [
+                    'id' => $img->id,
+                    'url' => $img->image_url,
+                    'organ' => $img->organ,
+                ])->toArray(),
+                'scientific_name' => $sighting->scientific_name,
+                'scientific_name_without_author' => $sighting->scientific_name,
+                'common_name' => $sighting->common_name,
+                'family' => $sighting->plant?->family ?? null,
+                'genus' => $sighting->plant?->genus ?? null,
+                'iucn_category' => $sighting->plant?->iucn_category ?? null,
+                'region' => $sighting->region,
+                'location_name' => $sighting->location_name,
+                'latitude' => $sighting->latitude,
+                'longitude' => $sighting->longitude,
+                'description' => $sighting->description,
+                'sighted_at' => $sighting->sighted_at,
+                'created_at' => $sighting->created_at,
+                'updated_at' => $sighting->updated_at,
             ];
         });
 
-        // dd($plants);
-
-
         return Inertia::render(
-            'PlantMap',
+            'Map/Index',
             props: [
-                'plants' => $plants
+                'plants' => $sightings
             ]
         );
     })->name('plant-map');
@@ -368,31 +210,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/sightings', [SightingController::class, 'store'])->name('sightings.store');
     Route::get('/sightings', [SightingController::class, 'index'])->name('sightings.index');
     Route::get('/sightings/{sighting}', [SightingController::class, 'show'])->name('sightings.show');
+    Route::delete('/sightings/{sighting}', [SightingController::class, 'destroy'])->name('sightings.destroy');
+
+    // My Plants routes (user's plant collection)
+    Route::get('/my-plants', [MyPlantController::class, 'index'])->name('my-plants.index');
+    Route::get('/my-plants/{plant}', [MyPlantController::class, 'show'])->name('my-plants.show');
+    Route::delete('/my-plants/{plant}', [MyPlantController::class, 'destroy'])->name('my-plants.destroy');
 
     // Plants database routes
     Route::get('/plants', [PlantController::class, 'index'])->name('plants.index');
     Route::get('/plants/{plant}', [PlantController::class, 'show'])->name('plants.show');
     Route::post('/plants/{plant}/refresh-care', [PlantController::class, 'refreshCare'])->name('plants.refresh-care');
 
-    //detect route
-    // Route::get('detect', function () {
-    //     return Inertia::render('Detect');
-    // })->name('detect');
-
-    //test dd env variable
-    Route::get('test-env', function () {
-        dd(env('PLANTNET_API_KEY'));
-    })->name('test-env');
-
-
     Route::get(
         '/plant-identifier',
         [PlantIdentifierController::class, 'index']
     )->name('plant-identifier');
-    // Route::post(
-    //     '/plant-identifier/identify',
-    //     [PlantIdentifierController::class, 'identify']
-    // )->name('plant-identifier.identify');
+
     Route::post(
         '/plant-identifier/save',
         [PlantIdentifierController::class, 'save']
@@ -410,6 +244,9 @@ Route::get(
     '/plant-identifier/care-details',
     [PlantIdentifierController::class, 'getCareDetails']
 )->name('plant-identifier.care-details');
+
+Route::post('/plant-identifier/description', [PlantIdentifierController::class, 'generateDescription'])->name('plant-identifier.description');
+Route::post('/plant-identifier/chat', [PlantIdentifierController::class, 'botanistChat'])->name('plant-identifier.chat');
 
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
