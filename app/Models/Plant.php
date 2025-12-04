@@ -17,6 +17,8 @@ class Plant extends Model
         'genus',
         'habitat',
         'lifespan',
+        'plant_category_id',
+        'conservation_status_id',
         'gbif_id',
         'powo_id',
         'iucn_category',

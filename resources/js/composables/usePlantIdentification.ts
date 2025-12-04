@@ -107,13 +107,15 @@ export function usePlantIdentification({
     const details = careDetails.value;
     if (!details) return false;
 
-    const textFields = ['description', 'water', 'light', 'soil', 'temperature', 'care_tips'];
-    const hasTextData = textFields.some((key) => {
+    // Check for Gemini text-based care fields
+    const geminiFields = ['watering_guide', 'sunlight_guide', 'soil_guide', 'temperature_guide', 'care_summary', 'description', 'care_tips'];
+    const hasGeminiData = geminiFields.some((key) => {
       const val = details[key as keyof typeof details];
       return typeof val === 'string' && val.trim().length > 10;
     });
-    if (hasTextData) return true;
+    if (hasGeminiData) return true;
 
+    // Check for Trefle numeric care fields
     return [
       'minimum_precipitation',
       'maximum_precipitation',

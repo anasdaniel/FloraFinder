@@ -37,6 +37,12 @@ interface Plant {
     maximum_precipitation_mm: number | null;
     soil_texture: number | null;
     soil_humidity: number | null;
+    watering_guide: string | null;
+    sunlight_guide: string | null;
+    soil_guide: string | null;
+    temperature_guide: string | null;
+    care_summary: string | null;
+    care_source: 'gemini' | 'trefle' | null;
     care_cached_at: string | null;
     created_at: string;
     updated_at: string;
@@ -143,7 +149,24 @@ const formatTemperature = (min: number | null, max: number | null): string => {
 };
 
 const hasCareDetails = (plant: Plant): boolean => {
-    return plant.care_cached_at !== null;
+    // Check for Gemini text-based care
+    const hasGeminiCare = plant.care_source === 'gemini' && (
+        plant.watering_guide ||
+        plant.sunlight_guide ||
+        plant.soil_guide ||
+        plant.temperature_guide ||
+        plant.care_summary
+    );
+
+    // Check for Trefle numeric care
+    const hasTrefleCare = plant.care_source === 'trefle' || (
+        plant.light !== null ||
+        plant.minimum_temperature_celsius !== null ||
+        plant.minimum_precipitation_mm !== null ||
+        plant.soil_texture !== null
+    );
+
+    return hasGeminiCare || hasTrefleCare;
 };
 
 const goToPage = (url: string | null) => {

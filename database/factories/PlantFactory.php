@@ -18,7 +18,7 @@ class PlantFactory extends Factory
     {
         return [
             'plant_category_id' => \App\Models\PlantCategory::factory(),
-            'conservation_status_id' => \App\Models\ConservationStatus::factory(),
+            'conservation_status_id' => \App\Models\ConservationStatus::inRandomOrder()->first()?->id ?? \App\Models\ConservationStatus::factory(),
             'planting_recommendation_id' => \App\Models\PlantingRecommendation::factory(),
             'common_name' => $this->faker->word(),
             'scientific_name' => fake()->unique()->word(),

@@ -24,7 +24,7 @@ interface HandleIdentifyOptions {
 export function usePlantIdentifierUploads({ toast }: UsePlantIdentifierUploadsOptions) {
   const MAX_IMAGES = 5;
   const ORGANS = [
-    { value: 'auto', label: 'Auto (AI detect)', icon: 'sparkles' },
+    { value: 'auto', label: 'Auto', icon: 'sparkles' },
     { value: 'leaf', label: 'Leaf', icon: 'leaf' },
     { value: 'flower', label: 'Flower', icon: 'flower' },
     { value: 'fruit', label: 'Fruit', icon: 'apple' },

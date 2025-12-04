@@ -139,8 +139,6 @@ const formatDate = (dateString: string): string => {
     });
 };
 
-const hasCareDetails = props.plant.care_cached_at !== null;
-
 // Check if we have Gemini text-based care
 const hasGeminiCare = computed(() => {
     return props.plant.care_source === 'gemini' && (
@@ -161,6 +159,9 @@ const hasTrefleCare = computed(() => {
         props.plant.soil_texture !== null
     );
 });
+
+// Has any care details (either Gemini or Trefle)
+const hasCareDetails = computed(() => hasGeminiCare.value || hasTrefleCare.value);
 </script>
 
 <template>

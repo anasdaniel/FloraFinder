@@ -177,7 +177,8 @@ class PlantCacheService
                             $plant->soil_texture = $growth['soil_texture'] ?? null;
                             $plant->soil_humidity = $growth['soil_humidity'] ?? null;
 
-                            // Mark as cached
+                            // Mark as cached from Trefle
+                            $plant->care_source = 'trefle';
                             $plant->care_cached_at = now();
                             $plant->save();
               }
