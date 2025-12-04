@@ -40,7 +40,16 @@ class Plant extends Model
         'soil_salinity',
         'soil_texture',
         'soil_humidity',
+        'watering_frequency',
+        'care_tips',
+        // Gemini text-based care fields
+        'watering_guide',
+        'sunlight_guide',
+        'soil_guide',
+        'temperature_guide',
+        'care_summary',
         'care_cached_at',
+        'care_source',
         'planting_recommendation_id',
     ];
 
@@ -90,7 +99,31 @@ class Plant extends Model
             'soil_salinity' => $this->soil_salinity,
             'soil_texture' => $this->soil_texture,
             'soil_humidity' => $this->soil_humidity,
+            'watering_frequency' => $this->watering_frequency,
+            'care_tips' => $this->care_tips,
+            // Gemini text-based care fields
+            'watering_guide' => $this->watering_guide,
+            'sunlight_guide' => $this->sunlight_guide,
+            'soil_guide' => $this->soil_guide,
+            'temperature_guide' => $this->temperature_guide,
+            'care_summary' => $this->care_summary,
         ];
+    }
+
+    /**
+     * Get the source of care details (gemini, trefle, or null)
+     */
+    public function getCareSource(): ?string
+    {
+        return $this->care_source;
+    }
+
+    /**
+     * Check if plant has care details stored
+     */
+    public function hasCareDetails(): bool
+    {
+        return $this->care_source !== null && $this->care_cached_at !== null;
     }
 
     public function category()
