@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Integrations\IdentifyPlantRequest as IntegrationsIdentifyPlantRequest;
 use App\Models\PlantIdentification;
 use App\Services\PlantCacheService;
+use App\Services\CareDetailsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -18,13 +19,13 @@ use App\Http\Integrations\TrefleRequest;
 class PlantIdentifierController extends Controller
 {
     public function __construct(
-        private PlantCacheService $plantCacheService
+        private PlantCacheService $plantCacheService,
+        private CareDetailsService $careDetailsService
     ) {}
 
     public function index()
     {
-
-        return Inertia::render('DetectRevamp');
+        return Inertia::render('Identifier/Index');
     }
 
     public function identify(Request $request)
@@ -70,13 +71,13 @@ class PlantIdentifierController extends Controller
                 $plantData = $result;
             }
 
-            return Inertia::render('DetectRevamp', [
+            return Inertia::render('Identifier/Index', [
                 'plantData' => $plantData
             ]);
         } catch (\Exception $e) {
             Log::error('Plant identification error: ' . $e->getMessage());
 
-            return Inertia::render('DetectRevamp', [
+            return Inertia::render('Identifier/Index', [
                 'plantData' => [
                     'success' => false,
                     'message' => 'An error occurred during identification',
@@ -84,6 +85,31 @@ class PlantIdentifierController extends Controller
                 ]
             ]);
         }
+    }
+
+    public function generateDescription(Request $request)
+    {
+        $request->validate([
+            'scientificName' => 'required|string|max:255',
+        ]);
+        $scientificName = $request->input('scientificName');
+        $text = $this->careDetailsService->generatePlantDescription($scientificName);
+        return response()->json(['success' => true, 'description' => $text]);
+    }
+
+    public function botanistChat(Request $request)
+    {
+        $request->validate([
+            'plantName' => 'required|string|max:255',
+            'message' => 'required|string',
+            'history' => 'nullable|array',
+        ]);
+        $plantName = $request->input('plantName');
+        $message = $request->input('message');
+        $history = $request->input('history', []);
+
+        $reply = $this->careDetailsService->generateBotReply($plantName, $history, $message);
+        return response()->json(['success' => true, 'reply' => $reply]);
     }
 
     public function save(Request $request)
@@ -162,25 +188,26 @@ class PlantIdentifierController extends Controller
             $commonName = $request->input('commonName');
             $family = $request->input('family');
 
-            // Use PlantCacheService to get cached care details
-            $careDetails = $this->plantCacheService->getCareDetails(
+            // Use CareDetailsService to get care details (Trefle first, Gemini fallback)
+            $result = $this->careDetailsService->getCareDetails(
                 $scientificName,
                 $commonName,
                 $family
             );
 
-            Log::info("Retrieved care details for {$scientificName}", $careDetails);
-
-            return response()->json([
-                'success' => true,
-                'data' => $careDetails
+            Log::info("Retrieved care details for {$scientificName}", [
+                'source' => $result['source'] ?? 'unknown',
+                'success' => $result['success'] ?? false,
             ]);
+
+            return response()->json($result);
         } catch (\Exception $e) {
             Log::error('Care details error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return response()->json([
                 'success' => false,
+                'source' => 'none',
                 'message' => 'Failed to fetch care details',
                 'error' => $e->getMessage()
             ], 500);

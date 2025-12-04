@@ -30,7 +30,7 @@ class ForumController extends Controller
 
         $allTags = ForumTag::all();
 
-        return Inertia::render('ForumView', [
+        return Inertia::render('Forum/Index', [
             'threads' => $threads,
             'allTags' => $allTags,
         ]);
@@ -38,7 +38,7 @@ class ForumController extends Controller
 
     public function create()
     {
-        return Inertia::render('ForumCreate');
+        return Inertia::render('Forum/Create');
     }
 
     public function store(Request $request)
@@ -118,7 +118,7 @@ class ForumController extends Controller
     {
         $thread = ForumThread::with(['posts.user'])->findOrFail($id);
 
-        return inertia('Forum/ForumView', [
+        return inertia('Forum/Post', [
             'thread' => $thread,
         ]);
     }
@@ -187,7 +187,4 @@ class ForumController extends Controller
 
         return back();
     }
-
-
-
 }

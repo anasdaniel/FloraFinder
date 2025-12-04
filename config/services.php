@@ -39,5 +39,14 @@ return [
         'api_key' => env('PLANTNET_API_KEY'),
         'project' => env('PLANTNET_PROJECT'),
         'base_url' => env('PLANTNET_BASE_URL', 'https://my-api.plantnet.org/v2'),
-    ]
+    ],
+
+    'trefle' => [
+        'api_key' => env('TREFLE_API_KEY'),
+        'base_url' => env('TREFLE_BASE_URL', 'https://trefle.io/api/v1'),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+    ],
 ];

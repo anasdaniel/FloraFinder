@@ -10,6 +10,7 @@ use App\Services\PlantCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 
 class SightingController extends Controller
 {
@@ -197,19 +198,52 @@ class SightingController extends Controller
     }
 
     /**
-     * Get all sightings (for map display).
+     * Get all sightings for the current user.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $sightings = Sighting::with(['user', 'images', 'zone'])
+        $query = Sighting::with(['user', 'images', 'zone', 'plant'])
+            ->where('user_id', Auth::id())
             ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->latest()
-            ->get();
+            ->whereNotNull('longitude');
 
-        return response()->json([
-            'success' => true,
+        // Apply search filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('scientific_name', 'like', "%{$search}%")
+                    ->orWhere('common_name', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply region filter
+        if ($request->filled('region')) {
+            $query->where('region', $request->input('region'));
+        }
+
+        // Apply date filters
+        if ($request->filled('date_from')) {
+            $query->whereDate('sighted_at', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('sighted_at', '<=', $request->input('date_to'));
+        }
+
+        $sightings = $query->latest('sighted_at')->paginate(12)->withQueryString();
+
+        // Get unique regions for filter dropdown
+        $regions = Sighting::where('user_id', Auth::id())
+            ->whereNotNull('region')
+            ->distinct()
+            ->pluck('region')
+            ->sort()
+            ->values()
+            ->toArray();
+
+        return Inertia::render('Sightings/Index', [
             'sightings' => $sightings,
+            'regions' => $regions,
+            'filters' => $request->only(['search', 'region', 'date_from', 'date_to']),
         ]);
     }
 
@@ -218,9 +252,37 @@ class SightingController extends Controller
      */
     public function show(Sighting $sighting)
     {
-        return response()->json([
-            'success' => true,
-            'sighting' => $sighting->load(['user', 'images', 'zone']),
+        // Ensure user can only view their own sightings
+        if ($sighting->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized');
+        }
+
+        $sighting->load(['user', 'images', 'zone', 'plant']);
+
+        return Inertia::render('Sightings/Show', [
+            'sighting' => $sighting,
         ]);
+    }
+
+    /**
+     * Delete a sighting.
+     */
+    public function destroy(Sighting $sighting)
+    {
+        // Ensure user can only delete their own sightings
+        if ($sighting->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Delete associated images from storage
+        foreach ($sighting->images as $image) {
+            $path = str_replace('/storage/', '', $image->image_url);
+            Storage::disk('public')->delete($path);
+        }
+
+        // Delete the sighting (images will be cascade deleted)
+        $sighting->delete();
+
+        return redirect()->route('sightings.index')->with('success', 'Sighting deleted successfully.');
     }
 }
