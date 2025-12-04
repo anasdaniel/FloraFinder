@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ForumCreate from "@/pages/Forum/Create.vue";
-import { Trash2, MessageCircle, SendHorizontal } from 'lucide-vue-next';
+import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus } from 'lucide-vue-next';
 
 const activeCommentThread = ref<number | null>(null);
 const newComment = ref("");
@@ -39,7 +39,7 @@ const addTag = (threadId) => {
         { preserveScroll: true }
     );
 
-    showTagDropdown.value = false;
+    showTagDropdown[threadId] = false;
     selectedTag.value = null;
 };
 
@@ -71,7 +71,7 @@ const props = defineProps<{
 }>();
 
 // Category filter state
-const selectedCategory = ref("all");
+const selectedCategory = ref("general");
 const showNewThread = ref(false);
 
 const filteredThreads = computed(() => {
@@ -131,45 +131,96 @@ const fetchComments = async (threadId: number) => {
 };
 
 // Post a comment and refresh the comment list
-const postComment = (threadId: number) => {
+const postComment = async (threadId: number) => {
     if (!newComment.value.trim()) return;
 
-    Inertia.post(`/forum/${threadId}/comments`, {
-        content: newComment.value,
-    }, {
-        preserveState: true,
-        onSuccess: () => {
-            // clear input and refresh comments for this thread
-            newComment.value = '';
-            fetchComments(threadId);
-            // keep the comment panel open
-        },
-        onError: () => {
-            // handle error silently
+    try {
+        console.debug('Posting comment', { threadId, content: newComment.value });
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${threadId}/comments`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ content: newComment.value }),
+        });
+
+        if (!res.ok) {
+            const json = await res.json().catch(() => null);
+            console.error('Failed to post comment', json || res.status);
+            return;
         }
-    });
+
+        const json = await res.json();
+        const createdPost = json.post;
+        createdPost.replies = createdPost.replies || [];
+
+        newComment.value = '';
+        // Insert into cached comments
+        commentsMap.value[threadId] = commentsMap.value[threadId] || [];
+        commentsMap.value[threadId].push(createdPost);
+    } catch (e) {
+        console.error(e);
+    }
 };
 
 // Post a reply to a comment (threadId & commentId come from template)
-const postReply = (commentId: number, threadId: number) => {
+const postReply = async (commentId: number, threadId: number) => {
     const content = (newReplies[commentId] || "").trim();
     if (!content) return;
 
-    Inertia.post(`/forum/${threadId}/reply/${commentId}`, {
-        content,
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            // clear the reply input for that comment and collapse input
-            newReplies[commentId] = "";
-            activeReplyComment.value = null;
-            // reload comments so reply appears under the comment
-            fetchComments(threadId);
-        },
-        onError: () => {
-            // optional: show error
+    try {
+        console.debug('Posting reply', { threadId, commentId, content });
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+        const res = await fetch(`/forum/${threadId}/reply/${commentId}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ content }),
+        });
+
+        if (!res.ok) {
+            // If validation error returns json, you could display it here
+            const json = await res.json().catch(() => null);
+            console.error('Failed to post reply', json || res.status);
+            return;
         }
-    });
+
+        // If server responded with non-JSON (e.g. redirect to HTML), log and bail
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            console.error('Unexpected response content type when posting reply', contentType);
+            return;
+        }
+
+        const json = await res.json();
+        const createdReply = json.post;
+
+        // clear the reply input for that comment and collapse input
+        newReplies[commentId] = "";
+        activeReplyComment.value = null;
+
+        // Update comments locally: find the parent comment in the cached comments and add the reply
+        const comments = commentsMap.value[threadId] || [];
+        const parent = comments.find((c: any) => c.id === commentId);
+        if (parent) {
+            parent.replies = parent.replies || [];
+            parent.replies.push(createdReply);
+        } else {
+            // if local cache doesn't have comments, fetch them
+            fetchComments(threadId);
+        }
+    } catch (e) {
+        console.error(e);
+    }
 };
 
 // delete comment (or reply). Accept optional threadId to refresh comments after deletion
@@ -194,276 +245,282 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="w-full max-w-3xl px-4 py-8 mx-auto">
             <!-- Header -->
-            <div class="flex flex-col items-start justify-between gap-4 mb-8 sm:flex-row sm:items-center">
-                <Heading
-                    title="Forum"
-                    description="Ask questions, share knowledge, and connect with the FloraFinder community."
-                />
+            <div class="flex flex-col items-start justify-between gap-4 mb-6 sm:flex-row sm:items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Forum</h1>
+                    <p class="mt-1 text-sm text-gray-500">Ask questions, share knowledge, and connect with the FloraFinder community.</p>
+                </div>
                 <!-- open modal instead of navigating -->
-                <Button type="button" variant="default" size="sm" class="gap-2" @click="showNewThread = true">
-                    <span class="flex items-center gap-2">
-                        <Icon name="plus" class="w-4 h-4" />
-                        New Thread
-                    </span>
+                <Button type="button" variant="default" size="sm" class="gap-2 bg-gray-900 hover:bg-gray-800" @click="showNewThread = true">
+                    <Plus class="w-4 h-4" />
+                    New Post
                 </Button>
             </div>
 
-            <!-- Category Filter Buttons -->
-            <div class="flex gap-3 mb-6">
+            <!-- Category Filter Tabs -->
+            <div class="flex flex-wrap gap-2 mb-8">
                 <button
-                    class="px-3 py-1 rounded text-sm"
-                    :class="selectedCategory === 'all' ? 'bg-green-600 text-white' : 'bg-gray-200'"
-                    @click="selectedCategory = 'all'"
-                >
-                    All
-                </button>
-
-                <button
-                    class="px-3 py-1 rounded text-sm"
-                    :class="selectedCategory === 'general' ? 'bg-green-600 text-white' : 'bg-gray-200'"
-                    @click="selectedCategory= 'general'"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all"
+                    :class="selectedCategory === 'general'
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                    @click="selectedCategory = 'general'"
                 >
                     General
                 </button>
 
                 <button
-                    class="px-3 py-1 rounded text-sm"
-                    :class="selectedCategory=== 'identification' ? 'bg-green-600 text-white' : 'bg-gray-200'"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all"
+                    :class="selectedCategory === 'identification'
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
                     @click="selectedCategory = 'identification'"
                 >
-                    Identification
+                    <Search class="w-4 h-4" />
+                    Plant Identification
                 </button>
 
                 <button
-                    class="px-3 py-1 rounded text-sm"
-                    :class="selectedCategory === 'care' ? 'bg-green-600 text-white' : 'bg-gray-200'"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all"
+                    :class="selectedCategory === 'care'
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
                     @click="selectedCategory = 'care'"
                 >
-                    Care
+                    <Leaf class="w-4 h-4" />
+                    Plant Care
                 </button>
 
                 <button
-                    class="px-3 py-1 rounded text-sm"
-                    :class="selectedCategory === 'offtopic' ? 'bg-green-600 text-white' : 'bg-gray-200'"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all"
+                    :class="selectedCategory === 'offtopic'
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
                     @click="selectedCategory = 'offtopic'"
                 >
+                    <Users class="w-4 h-4" />
                     Off Topic
                 </button>
             </div>
 
             <!-- Threads List -->
-            <div class="space-y-6">
-                <Card v-for="thread in filteredThreads" :key="thread.id" class="p-4 space-y-3">
-                    <div class="flex items-center gap-2 flex-wrap">
+            <div class="space-y-4">
+                <div
+                    v-for="thread in filteredThreads"
+                    :key="thread.id"
+                    class="bg-white border border-gray-100 rounded-xl p-5 hover:shadow-sm transition-shadow"
+                >
+                    <!-- Main thread row -->
+                    <div class="flex items-start gap-4">
+                        <!-- Avatar -->
+                        <Avatar class="h-10 w-10 rounded-full flex-shrink-0">
+                            <AvatarImage :src="thread.user?.avatar" />
+                            <AvatarFallback class="text-sm font-medium bg-gray-100 text-gray-600">
+                                {{ (thread.user?.name || thread.title).substring(0, 2).toUpperCase() }}
+                            </AvatarFallback>
+                        </Avatar>
 
-                        <!-- Existing Tags -->
-                        <span v-for="tag in thread.tags" :key="tag.id"
-                              class="px-2 py-1 bg-green-200 rounded-md text-sm flex items-center gap-1"
-                        >
-        {{ tag.tag_name }}
+                        <!-- Thread content -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="font-semibold text-gray-900 text-base">{{ thread.title }}</h3>
+                                    <div class="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                                        <span>By {{ thread.user?.name || 'Unknown' }}</span>
+                                        <span class="text-gray-300">•</span>
+                                        <span>{{ new Date(thread.created_at).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' }) }}</span>
+                                    </div>
+                                </div>
 
-                            <!-- X button only visible to owner -->
-        <button
-            v-if="isOwner(thread)"
-            class="text-red-600 font-bold"
-            @click="removeTag(thread.id, tag.id)"
-        >
-            ×
-        </button>
-    </span>
+                                <!-- Reply count + actions -->
+                                <div class="flex flex-col items-end gap-2 flex-shrink-0">
+                                    <span class="text-sm font-medium text-gray-500">{{ thread.posts_count || 0 }}</span>
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            @click="toggleCommentField(thread.id)"
+                                            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                                            title="Comments"
+                                        >
+                                            <MessageCircle class="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            v-if="isOwner(thread)"
+                                            @click="deleteThread(thread.id)"
+                                            class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                            title="Delete Thread"
+                                        >
+                                            <Trash2 class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
 
-                        <!-- + Add Tag (visible to owner) -->
-                        <div v-if="isOwner(thread)" class="relative">
-                            <button
-                                class="px-2 py-1 bg-blue-200 rounded-md text-xl"
-                                @click="showTagDropdown[thread.id] = !showTagDropdown[thread.id]"
-                            >
-                                +
-                            </button>
+                            <!-- Thread content preview -->
+                            <p v-if="thread.content" class="mt-2 text-sm text-gray-600 line-clamp-2">
+                                {{ thread.content }}
+                            </p>
 
-                            <!-- Dropdown -->
-                            <div
-                                v-if="showTagDropdown[thread.id]"
-                                class="absolute mt-2 bg-white shadow-lg border rounded-md p-2 z-50"
-                                style="min-width: 180px;"
-                            >
-                                <select v-model="selectedTag" class="border px-2 py-1 w-full">
-                                    <option disabled value="">Select tag</option>
-                                    <option v-for="t in allTags" :key="t.id" :value="t.id">
-                                        {{ t.tag_name }}
-                                    </option>
-                                </select>
+                            <!-- Thread image -->
+                            <div v-if="thread.image" class="mt-3">
+                                <img
+                                    :src="`/storage/${thread.image}`"
+                                    class="w-full rounded-lg max-h-48 object-cover"
+                                />
+                            </div>
 
-                                <button
-                                    class="mt-2 w-full bg-blue-500 text-white px-2 py-1 rounded-md"
-                                    @click="addTag(thread.id)"
+                            <!-- Tags -->
+                            <div v-if="thread.tags?.length" class="flex flex-wrap gap-2 mt-3">
+                                <span
+                                    v-for="tag in thread.tags"
+                                    :key="tag.id"
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-full"
                                 >
-                                    Add Tag
+                                    {{ tag.tag_name }}
+                                    <button
+                                        v-if="isOwner(thread)"
+                                        class="text-gray-400 hover:text-red-500 ml-1"
+                                        @click="removeTag(thread.id, tag.id)"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+
+                                <!-- Add tag button -->
+                                <div v-if="isOwner(thread)" class="relative">
+                                    <button
+                                        class="px-2 py-0.5 text-xs font-medium text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-full border border-dashed border-gray-300"
+                                        @click="showTagDropdown[thread.id] = !showTagDropdown[thread.id]"
+                                    >
+                                        + Add
+                                    </button>
+                                    <div
+                                        v-if="showTagDropdown[thread.id]"
+                                        class="absolute left-0 mt-2 bg-white shadow-lg border rounded-lg p-3 z-50"
+                                        style="min-width: 180px;"
+                                    >
+                                        <select v-model="selectedTag" class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm">
+                                            <option disabled value="">Select tag</option>
+                                            <option v-for="t in allTags" :key="t.id" :value="t.id">
+                                                {{ t.tag_name }}
+                                            </option>
+                                        </select>
+                                        <button
+                                            class="mt-2 w-full bg-gray-900 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-800"
+                                            @click="addTag(thread.id)"
+                                        >
+                                            Add Tag
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Comment input -->
+                            <div class="mt-4 relative">
+                                <input
+                                    v-model="newComment"
+                                    type="text"
+                                    placeholder="Write a comment..."
+                                    class="w-full border border-gray-200 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:border-gray-400 focus:ring-0"
+                                    @focus="activeCommentThread = thread.id"
+                                />
+                                <button
+                                    @click="postComment(thread.id)"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-700"
+                                >
+                                    <SendHorizontal class="w-5 h-5" />
                                 </button>
                             </div>
-                        </div>
 
-                    </div>
+                            <!-- Display comments -->
+                            <div v-if="activeCommentThread === thread.id" class="mt-4 space-y-4">
+                                <div v-if="commentsLoading" class="text-sm text-muted-foreground">Loading comments...</div>
 
-
-
-
-
-                    <div class="flex items-start gap-3 w-full">
-                        <!-- Avatar + Title -->
-                        <div class="flex items-center gap-3">
-                            <Avatar class="h-10 w-10 rounded-full">
-                                <AvatarImage :src="null" />
-                                <AvatarFallback class="text-xs">
-                                    {{ thread.title.substring(0, 2).toUpperCase() }}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div class="font-semibold text-base">{{ thread.title }}</div>
-                        </div>
-
-                        <!-- Category + Date -->
-                        <div class="ml-auto text-xs text-muted-foreground flex items-center gap-3 whitespace-nowrap">
-                            <span class="capitalize">{{ thread.category }}</span>
-                            <span>{{ new Date(thread.created_at).toLocaleDateString() }}</span>
-                            <!-- Show trash icon only for the thread owner -->
-                            <Trash2
-                                v-if="thread.user_id === $page.props.auth.user.id"
-                                @click="deleteThread(thread.id)"
-                                class="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer"
-                                title="Delete Thread"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Thread image -->
-                    <div v-if="thread.image">
-                        <img
-                            :src="`/storage/${thread.image}`"
-                            class="w-full rounded-md max-h-64 object-cover"
-                        />
-                    </div>
-
-                    <!-- Thread content -->
-                    <div v-if="thread.content" class="mt-2 text-sm">
-                        {{ thread.content }}
-                    </div>
-
-                    <!-- Action icons -->
-                    <div class="flex gap-2 mt-2">
-                        <MessageCircle
-                            @click="toggleCommentField(thread.id)"
-                            class="w-4 h-4 text-blue-600 hover:text-blue-800 cursor-pointer"
-                            title="Comment"
-                        />
-                    </div>
-
-                    <!-- Comment input -->
-                    <div v-if="activeCommentThread === thread.id" class="mt-3 flex items-center gap-2">
-                        <input
-                            v-model="newComment"
-                            type="text"
-                            placeholder="Write a comment..."
-                            class="border rounded p-2 w-full text-sm"
-                        />
-
-                        <SendHorizontal
-                            @click="postComment(thread.id)"
-                            class="w-5 h-5 text-blue-600 hover:text-blue-800 cursor-pointer"
-                            title="Post Comment"
-                        />
-                    </div>
-
-                    <!-- Display comments (only when the comment panel is open) -->
-                    <div v-if="activeCommentThread === thread.id" class="mt-4 border-t pt-3">
-                        <div v-if="commentsLoading" class="text-sm text-muted-foreground">Loading comments...</div>
-
-                        <div v-else>
-                            <div
-                                v-if="(commentsMap[thread.id] || []).length === 0"
-                                class="text-sm text-muted-foreground"
-                            >
-                                No comments yet.
-                            </div>
-
-                            <!-- Comments list -->
-                            <div
-                                v-for="comment in commentsMap[thread.id] || []"
-                                :key="comment.id"
-                                class="text-sm mb-2"
-                            >
-                                <div class="flex justify-between items-start w-full">
-                                    <div class="flex flex-col">
-                                        <strong>{{ comment.user?.name || 'Unknown' }}:</strong>
-                                        <span>{{ comment.content }}</span>
-
-                                        <!-- Timestamp + Reply link inline -->
-                                        <div class="text-xs text-gray-400 flex items-center gap-3 mt-1">
-                                            <span>{{ new Date(comment.created_at).toLocaleString() }}</span>
-
-                                            <!-- Reply link beside timestamp -->
-                                            <span
-                                                class="text-blue-600 cursor-pointer"
-                                                @click="activeReplyComment = (activeReplyComment === comment.id ? null : comment.id)"
-                                            >
-                Reply
-            </span>
-                                        </div>
-
-                                        <!-- Reply input (only when active) -->
-                                        <div v-if="activeReplyComment === comment.id" class="ml-0 mt-2 flex items-center gap-2">
-                                            <input
-                                                v-model="newReplies[comment.id]"
-                                                type="text"
-                                                placeholder="Write a reply..."
-                                                class="border rounded p-2 w-full text-xs"
-                                            />
-
-                                            <SendHorizontal
-                                                class="w-4 h-4 text-blue-600 hover:text-blue-800 cursor-pointer"
-                                                title="Post Reply"
-                                                @click="postReply(comment.id, thread.id)"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <!-- Delete comment icon -->
-                                    <Trash2
-                                        v-if="comment.user_id === $page.props.auth.user.id"
-                                        class="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer ml-3"
-                                        title="Delete Comment"
-                                        @click="deleteComment(comment.id, thread.id)"
-                                    />
-                                </div>
-
-
-                                <!-- Replies for this comment -->
-                                <div v-if="comment.replies && comment.replies.length" class="ml-4 mt-2 text-sm">
+                                <div v-else>
                                     <div
-                                        v-for="reply in comment.replies"
-                                        :key="reply.id"
-                                        class="mb-1 flex justify-between items-start"
+                                        v-if="(commentsMap[thread.id] || []).length === 0"
+                                        class="text-sm text-muted-foreground"
                                     >
-                                        <div>
-                                            <strong class="text-xs">{{ reply.user?.name || 'Unknown' }}:</strong>
-                                            <span class="text-xs ml-1">{{ reply.content }}</span>
+                                        No comments yet.
+                                    </div>
+
+                                    <!-- Comments list -->
+                                    <div
+                                        v-for="comment in commentsMap[thread.id] || []"
+                                        :key="comment.id"
+                                        class="text-sm group"
+                                    >
+                                        <div class="flex justify-between items-start w-full">
+                                            <div class="flex flex-col w-full">
+                                                <div class="font-semibold text-gray-900">{{ comment.user?.name || 'Unknown' }}:</div>
+                                                <div class="text-gray-700 mt-0.5">{{ comment.content }}</div>
+
+                                                <!-- Timestamp + Reply link inline -->
+                                                <div class="text-xs text-gray-400 flex items-center gap-3 mt-1">
+                                                    <span>{{ new Date(comment.created_at).toLocaleString() }}</span>
+
+                                                    <!-- Reply link beside timestamp -->
+                                                    <span
+                                                        class="text-blue-600 cursor-pointer hover:underline"
+                                                        @click="activeReplyComment = (activeReplyComment === comment.id ? null : comment.id)"
+                                                    >
+                                                        Reply
+                                                    </span>
+                                                </div>
+
+                                                <!-- Reply input (only when active) -->
+                                                <div v-if="activeReplyComment === comment.id" class="mt-2 flex items-center gap-2">
+                                                    <input
+                                                        v-model="newReplies[comment.id]"
+                                                        type="text"
+                                                        placeholder="Write a reply..."
+                                                        class="border rounded p-2 w-full text-xs"
+                                                    />
+
+                                                    <SendHorizontal
+                                                        class="w-4 h-4 text-blue-600 hover:text-blue-800 cursor-pointer"
+                                                        title="Post Reply"
+                                                        @click="postReply(comment.id, thread.id)"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <!-- Delete comment icon -->
+                                            <Trash2
+                                                v-if="comment.user_id === $page.props.auth.user.id"
+                                                class="w-4 h-4 text-red-400 hover:text-red-600 cursor-pointer ml-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Delete Comment"
+                                                @click="deleteComment(comment.id, thread.id)"
+                                            />
                                         </div>
 
-                                        <!-- Delete reply icon -->
-                                        <Trash2
-                                            v-if="reply.user_id === $page.props.auth.user.id"
-                                            class="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer ml-3"
-                                            title="Delete Reply"
-                                            @click="deleteComment(reply.id, thread.id)"
-                                        />
+
+                                        <!-- Replies for this comment -->
+                                        <div v-if="comment.replies && comment.replies.length" class="ml-4 mt-2 text-sm border-l-2 border-gray-100 pl-3">
+                                            <div
+                                                v-for="reply in comment.replies"
+                                                :key="reply.id"
+                                                class="mb-2 flex justify-between items-start group/reply"
+                                            >
+                                                <div>
+                                                    <div class="text-xs font-semibold text-gray-900">{{ reply.user?.name || 'Unknown' }}:</div>
+                                                    <div class="text-xs text-gray-600">{{ reply.content }}</div>
+                                                </div>
+
+                                                <!-- Delete reply icon -->
+                                                <Trash2
+                                                    v-if="reply.user_id === $page.props.auth.user.id"
+                                                    class="w-3 h-3 text-red-400 hover:text-red-600 cursor-pointer ml-3 opacity-0 group-hover/reply:opacity-100 transition-opacity"
+                                                    title="Delete Reply"
+                                                    @click="deleteComment(reply.id, thread.id)"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-
-
-                </Card>
+                </div>
             </div>
 
             <!-- Modal: embedded ForumCreate -->
@@ -484,126 +541,3 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
         </div>
     </AppLayout>
 </template>
-
-
-
-<!--      &lt;!&ndash; Forum Categories &ndash;&gt;-->
-<!--      <div class="flex flex-wrap gap-2 mb-8">-->
-<!--        <button-->
-<!--          v-for="cat in categories"-->
-<!--          :key="cat.key"-->
-<!--          @click="selectedCategory = cat.key"-->
-<!--          :class="[-->
-<!--            'inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition',-->
-<!--            selectedCategory === cat.key-->
-<!--              ? 'bg-primary text-primary-foreground border-primary shadow'-->
-<!--              : 'bg-background text-muted-foreground border-muted hover:bg-muted',-->
-<!--          ]"-->
-<!--        >-->
-<!--          <Icon :name="cat.icon" class="w-4 h-4" />-->
-<!--          <span>{{ cat.name }}</span>-->
-<!--        </button>-->
-<!--      </div>-->
-<!--      <div class="space-y-6">-->
-<!--        <Card-->
-<!--          v-for="thread in threads.filter(-->
-<!--            (t) => selectedCategory === 'general' || t.category === selectedCategory-->
-<!--          )"-->
-<!--          :key="thread.id"-->
-<!--          class="transition-shadow hover:shadow-md"-->
-<!--        >-->
-<!--          <CardHeader class="flex flex-row items-center gap-4 p-6 pb-2">-->
-<!--            <Avatar size="sm" shape="circle">-->
-<!--              <AvatarImage-->
-<!--                v-if="thread.author.avatar"-->
-<!--                :src="thread.author.avatar"-->
-<!--                :alt="thread.author.name"-->
-<!--              />-->
-<!--              <AvatarFallback>{{-->
-<!--                thread.author.name-->
-<!--                  .split(" ")-->
-<!--                  .map((n) => n[0])-->
-<!--                  .join("")-->
-<!--              }}</AvatarFallback>-->
-<!--            </Avatar>-->
-<!--            <div class="flex-1 min-w-0">-->
-<!--              <CardTitle class="text-lg font-semibold truncate">-->
-<!--                <Link-->
-<!--                  :href="`/forum/${thread.id}`"-->
-<!--                  class="transition-colors hover:text-primary"-->
-<!--                  >{{ thread.title }}</Link-->
-<!--                >-->
-<!--              </CardTitle>-->
-<!--              <div class="flex items-center gap-2 mt-1 text-xs text-muted-foreground">-->
-<!--                <span>By {{ thread.author.name }}</span>-->
-<!--                <span class="mx-1">•</span>-->
-<!--                <span>{{ new Date(thread.date).toLocaleDateString() }}</span>-->
-<!--              </div>-->
-<!--            </div>-->
-<!--            <div class="flex items-center gap-1 text-xs text-muted-foreground">-->
-<!--              <Icon name="message-circle" class="w-4 h-4" />-->
-<!--              <span>{{ thread.replies }}</span>-->
-<!--            </div>-->
-<!--          </CardHeader>-->
-<!--          <CardContent class="pt-2 pb-4 text-sm text-muted-foreground">-->
-<!--            {{ thread.excerpt }}-->
-<!--          </CardContent>-->
-<!--        </Card>-->
-<!--      </div>-->
-<!--      <div class="mt-10 text-xs text-center text-muted-foreground">-->
-<!--        <span>Powered by FloraFinder Community</span>-->
-<!--      </div>-->
-<!--    </div>-->
-
-<!--// // Example forum threads data-->
-<!--// const threads = ref([-->
-<!--//   {-->
-<!--//     id: 1,-->
-<!--//     title: "What is this plant I found in my backyard?",-->
-<!--//     author: {-->
-<!--//       id: 1,-->
-<!--//       name: "Alice Green",-->
-<!--//       avatar: "https://randomuser.me/api/portraits/women/44.jpg",-->
-<!--//     } as User,-->
-<!--//     replies: 12,-->
-<!--//     date: "2025-05-04",-->
-<!--//     excerpt:-->
-<!--//       "I found this unusual plant and would love to know what it is. Anyone can help?",-->
-<!--//     category: "identification",-->
-<!--//   },-->
-<!--//   {-->
-<!--//     id: 2,-->
-<!--//     title: "Best soil for succulents?",-->
-<!--//     author: {-->
-<!--//       id: 2,-->
-<!--//       name: "Bob Plantman",-->
-<!--//       avatar: "",-->
-<!--//     } as User,-->
-<!--//     replies: 7,-->
-<!--//     date: "2025-05-03",-->
-<!--//     excerpt:-->
-<!--//       "I want to repot my succulents. What soil mix do you recommend for healthy growth?",-->
-<!--//     category: "care",-->
-<!--//   },-->
-<!--//   {-->
-<!--//     id: 3,-->
-<!--//     title: "How to propagate Monstera?",-->
-<!--//     author: {-->
-<!--//       id: 3,-->
-<!--//       name: "Cathy Leaf",-->
-<!--//       avatar: "https://randomuser.me/api/portraits/women/65.jpg",-->
-<!--//     } as User,-->
-<!--//     replies: 4,-->
-<!--//     date: "2025-05-02",-->
-<!--//     excerpt: "Looking for tips and tricks to propagate Monstera deliciosa successfully.",-->
-<!--//     category: "care",-->
-<!--//   },-->
-<!--// ]);-->
-<!--//-->
-<!--// const categories = ref([-->
-<!--//   { key: "general", name: "General", icon: "messages-square" },-->
-<!--//   { key: "identification", name: "Plant Identification", icon: "search" },-->
-<!--//   { key: "care", name: "Plant Care", icon: "leaf" },-->
-<!--//   { key: "offtopic", name: "Off Topic", icon: "users" },-->
-<!--// ]);-->
-<!--// const selectedCategory = ref("general");-->

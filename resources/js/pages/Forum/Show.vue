@@ -131,45 +131,93 @@ const fetchComments = async (threadId: number) => {
 };
 
 // Post a comment and refresh the comment list
-const postComment = (threadId: number) => {
+const postComment = async (threadId: number) => {
     if (!newComment.value.trim()) return;
 
-    Inertia.post(`/forum/${threadId}/comments`, {
-        content: newComment.value,
-    }, {
-        preserveState: true,
-        onSuccess: () => {
-            // clear input and refresh comments for this thread
-            newComment.value = '';
-            fetchComments(threadId);
-            // keep the comment panel open
-        },
-        onError: () => {
-            // handle error silently
+    try {
+        console.debug('Posting comment', { threadId, content: newComment.value });
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${threadId}/comments`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ content: newComment.value }),
+        });
+
+        if (!res.ok) {
+            const json = await res.json().catch(() => null);
+            console.error('Failed to post comment', json || res.status);
+            return;
         }
-    });
+
+        const json = await res.json();
+        const createdPost = json.post;
+        createdPost.replies = createdPost.replies || [];
+
+        newComment.value = '';
+        commentsMap.value[threadId] = commentsMap.value[threadId] || [];
+        commentsMap.value[threadId].push(createdPost);
+        // keep reply panel open
+    } catch (e) {
+        console.error(e);
+    }
 };
 
 // Post a reply to a comment (threadId & commentId come from template)
-const postReply = (commentId: number, threadId: number) => {
+const postReply = async (commentId: number, threadId: number) => {
     const content = (newReplies[commentId] || "").trim();
     if (!content) return;
 
-    Inertia.post(`/forum/${threadId}/reply/${commentId}`, {
-        content,
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            // clear the reply input for that comment and collapse input
-            newReplies[commentId] = "";
-            activeReplyComment.value = null;
-            // reload comments so reply appears under the comment
-            fetchComments(threadId);
-        },
-        onError: () => {
-            // optional: show error
+    try {
+        console.debug('Posting reply', { threadId, commentId, content });
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+        const res = await fetch(`/forum/${threadId}/reply/${commentId}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ content }),
+        });
+
+        if (!res.ok) {
+            const json = await res.json().catch(() => null);
+            console.error('Failed to post reply', json || res.status);
+            return;
         }
-    });
+
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            console.error('Unexpected response content type when posting reply', contentType);
+            return;
+        }
+
+        const json = await res.json();
+        const createdReply = json.post;
+
+        // clear the reply input for that comment and collapse input
+        newReplies[commentId] = "";
+        activeReplyComment.value = null;
+
+        // Update comments locally: find the parent comment in the cached comments and add the reply
+        const comments = commentsMap.value[threadId] || [];
+        const parent = comments.find((c: any) => c.id === commentId);
+        if (parent) {
+            parent.replies = parent.replies || [];
+            parent.replies.push(createdReply);
+        } else {
+            fetchComments(threadId);
+        }
+    } catch (e) {
+        console.error(e);
+    }
 };
 
 // delete comment (or reply). Accept optional threadId to refresh comments after deletion

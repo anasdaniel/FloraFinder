@@ -105,7 +105,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
     //store reply
-    Route::post('/forum/{thread}/reply/{post}', [ForumController::class, 'storeReply'])->name('forum.reply');
+    Route::post('/forum/{thread}/reply/{post}', [ForumController::class, 'storeReply'])->name('forum.reply')->middleware('auth');
 
     // Add tag to thread
     Route::post('/forum/{thread}/tags', [ForumController::class, 'addTag'])
@@ -245,7 +245,7 @@ Route::get(
     [PlantIdentifierController::class, 'getCareDetails']
 )->name('plant-identifier.care-details');
 
-Route::post('/plant-identifier/description', [PlantIdentifierController::class, 'generateDescription'])->name('plant-identifier.description');
+Route::get('/plant-identifier/description', [PlantIdentifierController::class, 'generateDescription'])->name('plant-identifier.description');
 Route::post('/plant-identifier/chat', [PlantIdentifierController::class, 'botanistChat'])->name('plant-identifier.chat');
 
 require __DIR__ . '/settings.php';

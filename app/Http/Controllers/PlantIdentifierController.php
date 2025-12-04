@@ -42,7 +42,7 @@ class PlantIdentifierController extends Controller
             'images' => 'required|array|min:1|max:5',
             'images.*' => 'file|image|max:10240',
             'organs' => 'required|array',
-            'organs.*' => 'required|string|in:flower,leaf,fruit,bark,habit,other',
+            'organs.*' => 'required|string|in:flower,leaf,fruit,bark,auto',
         ]);
 
         if (count($request->input('organs', [])) !== count($request->file('images', []))) {
@@ -56,17 +56,20 @@ class PlantIdentifierController extends Controller
 
             $images = $request->file('images');
             $organs = $request->input('organs');
-            $primaryImage = $images[0];
-            $primaryOrgan = $organs[0] ?? 'flower';
 
-            $cacheKey = 'plant_' . hash_file('sha256', $primaryImage->getRealPath());
+            // Create cache key based on all images
+            $cacheKeyParts = [];
+            foreach ($images as $image) {
+                $cacheKeyParts[] = hash_file('sha256', $image->getRealPath());
+            }
+            $cacheKey = 'plant_' . md5(implode('_', $cacheKeyParts));
 
             $plantData = null;
             $cachedResult = Cache::store('redis')->get($cacheKey);
             if ($cachedResult) {
                 $plantData = $cachedResult;
             } else {
-                $result = $this->processPlantIdentification($primaryImage, $primaryOrgan);
+                $result = $this->processPlantIdentification($images, $organs);
                 Cache::store('redis')->put($cacheKey, $result, 3600);
                 $plantData = $result;
             }
@@ -118,7 +121,7 @@ class PlantIdentifierController extends Controller
 
         $request->validate([
             'image' => 'required|image|max:10240',
-            'organ' => 'required|string|in:flower,leaf,fruit,bark,habit,other',
+            'organ' => 'required|string|in:flower,leaf,fruit,bark,auto',
             'saveToDatabase' => 'required|boolean',
             'scientificName' => 'required|string|max:255',
             'scientificNameWithoutAuthor' => 'required|string|max:255',
@@ -214,21 +217,28 @@ class PlantIdentifierController extends Controller
         }
     }
 
-    private function processPlantIdentification($imageFile, $organ)
+    private function processPlantIdentification(array $imageFiles, array $organs)
     {
-        // Save the uploaded image
-        $path = $imageFile->store('temp-plant-images');
-        $fullPath = Storage::path($path);
+        // Save all uploaded images
+        $paths = [];
+        $fullPaths = [];
+        foreach ($imageFiles as $imageFile) {
+            $path = $imageFile->store('temp-plant-images');
+            $paths[] = $path;
+            $fullPaths[] = Storage::path($path);
+        }
 
         try {
-            // Get API response
-            $response = $this->sendIdentificationRequest($fullPath, $organ);
+            // Get API response with all images
+            $response = $this->sendIdentificationRequest($fullPaths, $organs);
 
             // Process response
             if ($response->successful()) {
+                $json = $response->json();
                 $result = [
                     'success' => true,
-                    'data' => $response->json()
+                    'data' => $json,
+                    'predictedOrgans' => $json['predictedOrgans'] ?? [],
                 ];
             } else {
                 $result = [
@@ -240,23 +250,24 @@ class PlantIdentifierController extends Controller
 
             return $result;
         } finally {
-            // Clean up the temporary file
-            Storage::delete($path);
+            // Clean up all temporary files
+            foreach ($paths as $path) {
+                Storage::delete($path);
+            }
         }
     }
 
-    private function sendIdentificationRequest($imagePath, $organ)
+    private function sendIdentificationRequest(array $imagePaths, array $organs)
     {
         $apiKey = env('PLANTNET_API_KEY');
-
 
         $connector = new IntegrationsPlantNetConnector();
 
         $plantNetRequest = new IntegrationsIdentifyPlantRequest(
-            'all',     // project
-            $imagePath, // local image path
-            $apiKey,   // API key
-            $organ     // organ type
+            'all',       // project
+            $imagePaths, // array of local image paths
+            $apiKey,     // API key
+            $organs      // array of organ types
         );
 
         return $connector->send($plantNetRequest);

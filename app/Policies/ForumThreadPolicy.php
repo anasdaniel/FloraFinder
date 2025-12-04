@@ -29,7 +29,7 @@ class ForumThreadPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -45,7 +45,7 @@ class ForumThreadPolicy
      */
     public function delete(User $user, ForumThread $forumThread): bool
     {
-        return$user->id === $forumThread->user_id;
+        return $user->id === $forumThread->user_id;
     }
 
     /**

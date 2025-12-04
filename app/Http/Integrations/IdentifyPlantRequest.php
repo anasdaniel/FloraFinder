@@ -15,45 +15,56 @@ class IdentifyPlantRequest extends Request implements HasBody
 
     protected Method $method = Method::POST;
     protected string $project;
-    protected $imageURL;
+    protected array $imagePaths = [];
+    protected array $organs = [];
     protected string $apiKey;
-    protected string $organ;
-    protected ?string $tempImage = null;
+    protected array $tempImages = [];
 
-    public function __construct(string $project, $imageURL, string $apiKey, string $organ = 'flower')
+    /**
+     * @param string $project
+     * @param array $imagePaths Array of image paths or URLs
+     * @param string $apiKey
+     * @param array $organs Array of organ types corresponding to each image
+     */
+    public function __construct(string $project, array $imagePaths, string $apiKey, array $organs = [])
     {
         $this->project = $project;
-        $this->imageURL = $imageURL;
         $this->apiKey = $apiKey;
-        $this->organ = $organ;
+        $this->organs = $organs;
 
-        // Process the image - try to download it if it's a URL
-        if (filter_var($imageURL, FILTER_VALIDATE_URL)) {
-            $this->downloadImage();
-        } elseif (file_exists($imageURL)) {
-            // If it's already a local file path
-            $this->tempImage = $imageURL;
+        // Process each image
+        foreach ($imagePaths as $imagePath) {
+            if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
+                $tempImage = $this->downloadImage($imagePath);
+                if ($tempImage) {
+                    $this->tempImages[] = $tempImage;
+                }
+            } elseif (file_exists($imagePath)) {
+                $this->tempImages[] = $imagePath;
+            }
         }
     }
 
-    protected function downloadImage(): void
+    protected function downloadImage(string $imageURL): ?string
     {
         try {
             $tempImage = storage_path('app/temp-plant-image-' . uniqid('', true) . '.jpg');
-            $imageContents = @file_get_contents($this->imageURL);
+            $imageContents = @file_get_contents($imageURL);
 
             if ($imageContents === false) {
-                Log::error('Failed to download image from URL: ' . $this->imageURL);
-                return;
+                Log::error('Failed to download image from URL: ' . $imageURL);
+                return null;
             }
 
             if (file_put_contents($tempImage, $imageContents)) {
-                $this->tempImage = $tempImage;
+                return $tempImage;
             } else {
                 Log::error('Failed to save downloaded image to: ' . $tempImage);
+                return null;
             }
         } catch (\Exception $e) {
             Log::error('Exception while downloading image: ' . $e->getMessage());
+            return null;
         }
     }
 
@@ -74,31 +85,51 @@ class IdentifyPlantRequest extends Request implements HasBody
 
     protected function defaultBody(): array
     {
-        if (!$this->tempImage || !file_exists($this->tempImage)) {
-            throw new \RuntimeException('No valid image available for plant identification');
+        if (empty($this->tempImages)) {
+            throw new \RuntimeException('No valid images available for plant identification');
         }
 
-        return [
-            new MultipartValue(
+        $body = [];
+
+        // Add all images and their corresponding organs
+        foreach ($this->tempImages as $index => $tempImage) {
+            if (!file_exists($tempImage)) {
+                continue;
+            }
+
+            $body[] = new MultipartValue(
                 name: 'images',
-                value: fopen($this->tempImage, 'r'),
-                filename: 'plant-image.jpg'
-            ),
-            new MultipartValue(
-                name: 'organs',
-                value: $this->organ
-            )
-        ];
+                value: fopen($tempImage, 'r'),
+                filename: 'plant-image-' . ($index + 1) . '.jpg'
+            );
+
+            // Add corresponding organ if it's not 'auto'
+            $organ = $this->organs[$index] ?? 'auto';
+            if (strtolower($organ) !== 'auto') {
+                $body[] = new MultipartValue(
+                    name: 'organs',
+                    value: $organ
+                );
+            }
+        }
+
+        if (empty($body)) {
+            throw new \RuntimeException('No valid images available for plant identification');
+        }
+
+        return $body;
     }
 
     public function __destruct()
     {
         // Clean up temporary files if we created them
-        if ($this->tempImage && strpos(
-            $this->tempImage,
-            'temp-plant-image-'
-        ) !== false && file_exists($this->tempImage)) {
-            @unlink($this->tempImage);
+        foreach ($this->tempImages as $tempImage) {
+            if ($tempImage && strpos(
+                $tempImage,
+                'temp-plant-image-'
+            ) !== false && file_exists($tempImage)) {
+                @unlink($tempImage);
+            }
         }
     }
 }

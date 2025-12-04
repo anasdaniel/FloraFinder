@@ -155,7 +155,7 @@ const getOrganLabel = (organ: string): string => {
         leaf: '🍃 Leaf',
         fruit: '🍎 Fruit',
         bark: '🪵 Bark',
-        habit: '🌳 Habit',
+        auto: '✨ Auto',
     };
     return labels[organ] || organ;
 };
@@ -257,7 +257,7 @@ const deleteSighting = () => {
                                         />
                                         <div v-if="img.organ && img.organ !== 'unknown'"
                                             class="absolute bottom-0 left-0 right-0 px-1 py-0.5 text-[10px] text-center text-white capitalize bg-black/60">
-                                            {{ img.organ }}
+                                            {{ getOrganLabel(img.organ) }}
                                         </div>
                                     </button>
                                 </div>

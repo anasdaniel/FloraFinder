@@ -13,6 +13,7 @@ class SightingImage extends Model
                             'sighting_id',
                             'image_url',
                             'organ',
+                            'organ_score',
               ];
 
               /**

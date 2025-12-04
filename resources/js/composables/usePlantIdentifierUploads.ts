@@ -24,11 +24,11 @@ interface HandleIdentifyOptions {
 export function usePlantIdentifierUploads({ toast }: UsePlantIdentifierUploadsOptions) {
   const MAX_IMAGES = 5;
   const ORGANS = [
-    { value: 'flower', label: 'Flower', icon: 'flower' },
+    { value: 'auto', label: 'Auto (AI detect)', icon: 'sparkles' },
     { value: 'leaf', label: 'Leaf', icon: 'leaf' },
+    { value: 'flower', label: 'Flower', icon: 'flower' },
     { value: 'fruit', label: 'Fruit', icon: 'apple' },
     { value: 'bark', label: 'Bark', icon: 'tree' },
-    { value: 'habit', label: 'Whole', icon: 'sprout' },
   ];
 
   const MALAYSIAN_REGIONS = [
@@ -252,7 +252,7 @@ export function usePlantIdentifierUploads({ toast }: UsePlantIdentifierUploadsOp
         id: Math.random().toString(36).substring(2, 9),
         file,
         preview: URL.createObjectURL(file),
-        organ: null,
+        organ: 'auto',
       });
     }
 

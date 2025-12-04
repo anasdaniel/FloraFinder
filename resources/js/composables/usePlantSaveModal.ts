@@ -145,7 +145,11 @@ export function usePlantSaveModal({
 
     uploadedImages.value.forEach((img, index) => {
       formData.append(`images[${index}]`, img.file);
-      formData.append(`organs[${index}]`, img.organ || '');
+      formData.append(`organs[${index}]`, img.organ || 'auto');
+      // Include organ score as percentage (0-100)
+      if (img.organScore !== undefined) {
+        formData.append(`organ_scores[${index}]`, Math.round(img.organScore * 100).toString());
+      }
     });
 
     try {

@@ -91,18 +91,22 @@ class ForumController extends Controller
 
     public function storeComment(Request $request, $threadId)
     {
+        $this->authorize('create', ForumPost::class);
+
         $request->validate([
             'content' => 'required|string|max:2000',
         ]);
 
-        ForumPost::create([
+        $post = ForumPost::create([
             'forum_thread_id' => $threadId,
             'user_id' => auth()->id(),
             'content' => $request->content,
             'parent_post_id' => null,
         ]);
 
-        return back();   // ← This fixes the Inertia error
+        $post->load('user');
+
+        return response()->json(['post' => $post], 201);
     }
 
     public function deleteComment(ForumPost $post)
@@ -111,7 +115,7 @@ class ForumController extends Controller
 
         $post->delete();
 
-        return back()->with('success', 'Comment deleted.');
+        return response()->json(['success' => true]);
     }
 
     public function show($id)
@@ -126,19 +130,24 @@ class ForumController extends Controller
 
     public function storeReply(Request $request, $threadId, $commentId)
     {
+        $this->authorize('create', ForumPost::class);
+
         $request->validate(['content' => 'required']);
 
         // Ensure comment exists (parent)
         $comment = ForumPost::findOrFail($commentId);
 
-        ForumPost::create([
+        $post = ForumPost::create([
             'forum_thread_id' => $threadId,
             'user_id' => auth()->id(),
             'content' => $request->content,
             'parent_post_id' => $comment->id,
         ]);
 
-        return back();
+        // load user relation for frontend display
+        $post->load('user');
+
+        return response()->json(['post' => $post], 201);
     }
 
     // New: return thread's top-level posts (with user + replies) as JSON for dynamic loading
@@ -174,7 +183,7 @@ class ForumController extends Controller
             $thread->tags()->attach($request->tag_id);
         }
 
-        return back()->with('success', 'Tag added.');
+        return response()->json(['success' => true]);
     }
 
     public function removeTag(ForumThread $thread, ForumTag $forumTag)
@@ -185,6 +194,6 @@ class ForumController extends Controller
 
         $thread->tags()->detach($forumTag->id);
 
-        return back();
+        return response()->json(['success' => true]);
     }
 }

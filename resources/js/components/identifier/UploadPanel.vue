@@ -117,28 +117,29 @@ const handleIdentifyClick = () => {
               <Icon name="x" class="w-3 h-3" />
             </button>
           </div>
-          <div class="flex flex-col justify-center flex-1">
+          <div class="flex flex-col justify-center flex-1 min-w-0">
             <span class="mb-1 text-sm font-medium text-gray-600 truncate dark:text-gray-300">
               {{ props.truncateFileName(img.file.name) }}
             </span>
-            <span class="mb-1.5 text-sm font-bold uppercase tracking-wide text-gray-400"
-              >Select visible part</span
-            >
-            <div class="flex flex-wrap gap-1.5">
-              <button
-                v-for="organ in props.organs"
-                :key="organ.value"
-                @click="props.setOrgan(img.id, organ.value)"
-                :class="[
-                  'flex items-center gap-1 rounded-md border px-2 py-1 text-sm font-medium transition-all',
-                  img.organ === organ.value
-                    ? 'border-green-200 bg-green-200 text-black shadow-sm'
-                    : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300',
-                ]"
-              >
-                <span>{{ img.organ === organ.value ? "✓" : "" }} {{ organ.label }}</span>
-              </button>
+            <div v-if="img.organScore !== undefined" class="flex items-center gap-2">
+              <span class="text-xs text-gray-500">Predicted organ:</span>
+              <span class="text-xs font-semibold text-moss-600 dark:text-moss-400">{{ Math.round((img.organScore || 0) * 100) }}%</span>
             </div>
+            <div v-else class="text-xs text-gray-400">
+              Select organ or use Auto
+            </div>
+          </div>
+          <div class="flex items-center ml-3 pl-2 pr-2 flex-shrink-0 w-36">
+            <label class="text-xs text-gray-500 mr-2 hidden sm:inline">Organ:</label>
+            <select
+              :value="img.organ"
+              @change="(e) => props.setOrgan(img.id, e.target.value)"
+              class="text-sm rounded-md border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-1 px-2 w-full"
+            >
+              <option v-for="organ in props.organs" :value="organ.value" :key="organ.value">
+                {{ organ.label }}
+              </option>
+            </select>
           </div>
         </div>
       </div>

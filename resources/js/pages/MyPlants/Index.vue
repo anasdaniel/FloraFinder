@@ -190,13 +190,13 @@ const getConfidenceColor = (confidence: number) => {
   return "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30";
 };
 
-const getOrganLabel = (organ: string) => {
+  const getOrganLabel = (organ: string) => {
   const labels: Record<string, string> = {
     flower: "🌸 Flower",
     leaf: "🍃 Leaf",
     fruit: "🍎 Fruit",
     bark: "🪵 Bark",
-    habit: "🌳 Habit",
+    auto: "✨ Auto",
   };
   return labels[organ] || organ;
 };

@@ -120,6 +120,17 @@ const resetIdentifier = () => {
   uploads.resetUploads();
   resetResults();
 };
+
+const getOrganLabel = (organ: string) => {
+  const labels: Record<string, string> = {
+    flower: '🌸 Flower',
+    leaf: '🍃 Leaf',
+    fruit: '🍎 Fruit',
+    bark: '🪵 Bark',
+    auto: '✨ Auto',
+  };
+  return labels[organ] || organ;
+};
 </script>
 
 <template>
@@ -298,7 +309,7 @@ const resetIdentifier = () => {
               </h3>
               <p class="max-w-md mt-3 text-sm text-gray-600 dark:text-gray-300">
                 We couldn't find a confident match for this photo. Try a clearer image,
-                zoom in on the most distinctive plant part, or choose a different organ.
+                zoom in on the most distinctive plant part, or choose a different organ, or select Auto to let AI detect the organ.
               </p>
               <ul
                 class="mt-4 text-sm text-gray-500 list-disc list-inside dark:text-gray-400"
@@ -376,7 +387,7 @@ const resetIdentifier = () => {
                   v-if="img.organ"
                   class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5 capitalize"
                 >
-                  {{ img.organ }}
+                  {{ getOrganLabel(img.organ) }}
                 </span>
               </div>
             </div>
@@ -838,7 +849,7 @@ const resetIdentifier = () => {
                         v-if="img.organ"
                         class="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5 capitalize"
                       >
-                        {{ img.organ }}
+                        {{ getOrganLabel(img.organ) }}
                       </span>
                     </div>
                   </div>

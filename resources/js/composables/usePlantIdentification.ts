@@ -138,7 +138,7 @@ export function usePlantIdentification({
     const formData = new FormData();
     uploadedImages.value.forEach((img, index) => {
       formData.append(`images[${index}]`, img.file);
-      formData.append(`organs[${index}]`, img.organ || 'leaf');
+      formData.append(`organs[${index}]`, img.organ || 'auto');
     });
 
     try {
@@ -156,6 +156,18 @@ export function usePlantIdentification({
           }
 
           results.value = plantData;
+
+          // Update uploaded images with predicted organs from API
+          if (plantData.predictedOrgans && plantData.predictedOrgans.length > 0) {
+            plantData.predictedOrgans.forEach((predicted, index) => {
+              if (uploadedImages.value[index]) {
+                // Update organ with predicted value
+                uploadedImages.value[index].organ = predicted.organ;
+                // Store the score (already 0-1, convert to percentage when displaying)
+                uploadedImages.value[index].organScore = predicted.score;
+              }
+            });
+          }
 
           if (!results.value.success) {
             toast({

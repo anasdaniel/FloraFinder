@@ -5,6 +5,14 @@ export interface ImageUpload {
   file: File;
   preview: string;
   organ: string | null;
+  organScore?: number; // Score from API prediction (0-1)
+}
+
+export interface PredictedOrgan {
+  image: string;
+  filename: string;
+  organ: string;
+  score: number;
 }
 
 export interface PlantResult {
@@ -12,6 +20,7 @@ export interface PlantResult {
   message?: string;
   error?: string;
   savedToDatabase?: boolean;
+  predictedOrgans?: PredictedOrgan[];
   data?: {
     results: Array<{
       score: number;

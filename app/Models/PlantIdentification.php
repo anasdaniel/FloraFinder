@@ -13,6 +13,7 @@ class PlantIdentification extends Model
         'mime_type',
         'size',
         'organ',
+        'organ_score',
         'scientific_name',
         'scientific_name_without_author',
         'common_name',

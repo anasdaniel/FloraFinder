@@ -41,7 +41,9 @@ class SightingController extends Controller
             'images' => 'required|array|min:1',
             'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:10240',
             'organs' => 'nullable|array',
-            'organs.*' => 'nullable|string|in:flower,leaf,fruit,bark,habit',
+            'organs.*' => 'nullable|string|in:flower,leaf,fruit,bark,auto',
+            'organ_scores' => 'nullable|array',
+            'organ_scores.*' => 'nullable|integer|between:0,100',
             'save_to_collection' => 'nullable|string|in:0,1',
             'report_sighting' => 'nullable|string|in:0,1',
         ]);
@@ -58,6 +60,7 @@ class SightingController extends Controller
 
         $images = $request->file('images');
         $organs = $validated['organs'] ?? [];
+        $organScores = $validated['organ_scores'] ?? [];
         $savedImages = [];
 
         // Upload all images first
@@ -69,7 +72,8 @@ class SightingController extends Controller
                 'filename' => $image->getClientOriginalName(),
                 'mime_type' => $image->getMimeType(),
                 'size' => $image->getSize(),
-                'organ' => $organs[$index] ?? 'leaf',
+                'organ' => $organs[$index] ?? 'auto',
+                'organ_score' => isset($organScores[$index]) ? (int) $organScores[$index] : null,
             ];
         }
 
@@ -87,6 +91,7 @@ class SightingController extends Controller
                     'mime_type' => $img['mime_type'],
                     'size' => $img['size'],
                     'organ' => $img['organ'],
+                    'organ_score' => $img['organ_score'],
                     'scientific_name' => $validated['scientific_name'],
                     'scientific_name_without_author' => $validated['scientific_name'],
                     'common_name' => $validated['common_name'] ?? null,
@@ -137,6 +142,7 @@ class SightingController extends Controller
                     'sighting_id' => $sighting->id,
                     'image_url' => $img['url'],
                     'organ' => $img['organ'],
+                    'organ_score' => $img['organ_score'],
                 ]);
             }
 

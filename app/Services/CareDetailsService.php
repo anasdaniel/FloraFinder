@@ -355,9 +355,9 @@ PROMPT;
 
         try {
             $connector = new \App\Http\Integrations\GeminiConnector();
-            $req = new \App\Http\Integrations\GeminiRequest('gemini-2.5-flash', [
+            $req = new \App\Http\Integrations\GeminiRequest('gemini-2.0-flash', [
                 ['parts' => [['text' => $prompt]]]
-            ]);
+            ], null); // null = no responseMimeType, returns plain text
             $response = $connector->send($req);
             if (!$response->successful()) {
                 Log::warning('Gemini generate description failed: ' . $response->status());
@@ -392,7 +392,7 @@ PROMPT;
 
         try {
             $connector = new \App\Http\Integrations\GeminiConnector();
-            $req = new \App\Http\Integrations\GeminiRequest('gemini-2.5-flash', $contents);
+            $req = new \App\Http\Integrations\GeminiRequest('gemini-2.0-flash', $contents, null); // null for plain text
             $response = $connector->send($req);
             if (!$response->successful()) {
                 Log::warning('Gemini chat request failed: ' . $response->status());
