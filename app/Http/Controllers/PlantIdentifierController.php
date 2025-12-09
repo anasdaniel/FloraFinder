@@ -184,18 +184,24 @@ class PlantIdentifierController extends Controller
             'scientificName' => 'required|string|max:255',
             'commonName' => 'nullable|string|max:255',
             'family' => 'nullable|string|max:255',
+            'provider' => 'nullable|string|in:gemini,trefle',
+            'forceRefresh' => 'nullable|boolean',
         ]);
 
         try {
             $scientificName = $request->input('scientificName');
             $commonName = $request->input('commonName');
             $family = $request->input('family');
+            $provider = $request->input('provider', 'gemini'); // Default to gemini
+            $forceRefresh = $request->boolean('forceRefresh', false);
 
-            // Use CareDetailsService to get care details (Trefle first, Gemini fallback)
+            // Use CareDetailsService to get care details with provider preference
             $result = $this->careDetailsService->getCareDetails(
                 $scientificName,
                 $commonName,
-                $family
+                $family,
+                $provider,
+                $forceRefresh
             );
 
             Log::info("Retrieved care details for {$scientificName}", [

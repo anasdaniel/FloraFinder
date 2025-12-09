@@ -30,6 +30,7 @@ export function usePlantIdentification({
   const bookmarkedResults = ref<Record<string, boolean>>({});
   const careDetails = ref<Record<string, unknown> | null>(null);
   const careSource = ref<CareSource>(null);
+  const preferredProvider = ref<'gemini' | 'trefle'>('gemini'); // Default to Gemini
   const fetchingCareDetails = ref(false);
   const plantDescription = ref('');
   const descriptionLoading = ref(false);
@@ -220,12 +221,16 @@ export function usePlantIdentification({
     }
   };
 
-  const fetchCareDetails = async (scientificName: string) => {
+  const fetchCareDetails = async (scientificName: string, forceRefresh = false) => {
     fetchingCareDetails.value = true;
     careSource.value = null;
     try {
       const url = new URL(route('plant-identifier.care-details'));
       url.searchParams.append('scientificName', scientificName);
+      url.searchParams.append('provider', preferredProvider.value);
+      if (forceRefresh) {
+        url.searchParams.append('forceRefresh', '1');
+      }
       const res = await fetch(url.toString());
       const data = await res.json();
       if (data.success) {
@@ -240,6 +245,16 @@ export function usePlantIdentification({
       careSource.value = 'none';
     } finally {
       fetchingCareDetails.value = false;
+    }
+  };
+
+  const switchProvider = (provider: 'gemini' | 'trefle') => {
+    if (provider !== preferredProvider.value) {
+      preferredProvider.value = provider;
+      // Re-fetch care details with new provider if we have a selected result
+      if (selectedResult.value?.species?.scientificName) {
+        fetchCareDetails(selectedResult.value.species.scientificName, true);
+      }
     }
   };
 
@@ -351,6 +366,7 @@ export function usePlantIdentification({
     bookmarkedResults,
     careDetails,
     careSource,
+    preferredProvider,
     fetchingCareDetails,
     plantDescription,
     descriptionLoading,
@@ -371,6 +387,7 @@ export function usePlantIdentification({
     formatRange,
     identifyPlant,
     fetchCareDetails,
+    switchProvider,
     toggleBookmark,
     handleChatSend,
     selectResult,

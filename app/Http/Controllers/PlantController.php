@@ -87,9 +87,11 @@ class PlantController extends Controller
     /**
      * Force refresh care details for a plant.
      */
-    public function refreshCare(Plant $plant)
+    public function refreshCare(Request $request, Plant $plant)
     {
-        $success = $this->plantCacheService->forceRefresh($plant);
+        $provider = $request->input('provider', 'gemini'); // Default to gemini
+        
+        $success = $this->plantCacheService->forceRefresh($plant, $provider);
 
         if ($success) {
             return redirect()->back()->with('success', 'Care details refreshed successfully!');

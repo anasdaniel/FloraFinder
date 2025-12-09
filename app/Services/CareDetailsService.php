@@ -16,68 +16,74 @@ class CareDetailsService
     private const DB_CACHE_DAYS = 7;
 
     /**
-     * Get care details for a plant, checking DB first, then Gemini, then Trefle
+     * Get care details for a plant, checking DB first, then preferred provider, then fallback.
+     * 
+     * @param string $scientificName
+     * @param string|null $commonName
+     * @param string|null $family
+     * @param string $preferredProvider 'gemini' (default) or 'trefle'
+     * @param bool $forceRefresh Skip cache and fetch fresh data
      */
-    public function getCareDetails(string $scientificName, ?string $commonName = null, ?string $family = null): array
-    {
-        Log::info("=== CareDetailsService: Getting care for {$scientificName} ===");
+    public function getCareDetails(
+        string $scientificName,
+        ?string $commonName = null,
+        ?string $family = null,
+        string $preferredProvider = 'gemini',
+        bool $forceRefresh = false
+    ): array {
+        Log::info("=== CareDetailsService: Getting care for {$scientificName} (provider: {$preferredProvider}, force: " . ($forceRefresh ? 'yes' : 'no') . ") ===");
 
-        $cacheKey = 'care_details_' . md5($scientificName);
+        $cacheKey = 'care_details_' . md5($scientificName . '_' . $preferredProvider);
 
-        // Check Redis cache first (short-term)
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            Log::info("Returning cached care details for {$scientificName} (source: {$cached['source']})");
-            return $cached;
+        // Check Redis cache first (short-term) unless forcing refresh
+        if (!$forceRefresh) {
+            $cached = Cache::get($cacheKey);
+            if ($cached) {
+                Log::info("Returning cached care details for {$scientificName} (source: {$cached['source']})");
+                return $cached;
+            }
+
+            // Check database for existing plant with care details from preferred provider
+            $plant = Plant::where('scientific_name', $scientificName)->first();
+
+            if ($plant && $plant->hasCareDetails() && !$plant->needsCareRefresh() && $plant->getCareSource() === $preferredProvider) {
+                Log::info("Returning DB cached care details for {$scientificName} (source: {$plant->getCareSource()})");
+                $result = [
+                    'success' => true,
+                    'source' => $plant->getCareSource(),
+                    'data' => $plant->getCareDetails(),
+                ];
+                Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
+                return $result;
+            }
         }
 
-        // Check database for existing plant with care details
-        $plant = Plant::where('scientific_name', $scientificName)->first();
+        Log::info("Fetching fresh care details for {$scientificName} from {$preferredProvider}");
 
-        if ($plant && $plant->hasCareDetails() && !$plant->needsCareRefresh()) {
-            Log::info("Returning DB cached care details for {$scientificName} (source: {$plant->getCareSource()})");
-            $result = [
-                'success' => true,
-                'source' => $plant->getCareSource(),
-                'data' => $plant->getCareDetails(),
-            ];
-            Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
-            return $result;
-        }
+        // Determine provider order based on preference
+        $providers = $preferredProvider === 'trefle' 
+            ? ['trefle', 'gemini'] 
+            : ['gemini', 'trefle'];
 
-        Log::info("No cache found, fetching fresh care details for {$scientificName}");
+        foreach ($providers as $provider) {
+            $providerResult = $provider === 'gemini'
+                ? $this->fetchFromGemini($scientificName, $commonName, $family)
+                : $this->fetchFromTrefle($scientificName);
 
-        // Try Gemini first
-        $geminiResult = $this->fetchFromGemini($scientificName, $commonName, $family);
+            if ($providerResult && $this->hasUsefulData($providerResult)) {
+                // Store in database
+                $this->storeCareDetails($scientificName, $commonName, $family, $providerResult, $provider);
 
-        if ($geminiResult && $this->hasUsefulData($geminiResult)) {
-            // Store in database
-            $this->storeCareDetails($scientificName, $commonName, $family, $geminiResult, 'gemini');
+                $result = [
+                    'success' => true,
+                    'source' => $provider,
+                    'data' => $providerResult,
+                ];
+                Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
+                return $result;
+            }
 
-            $result = [
-                'success' => true,
-                'source' => 'gemini',
-                'data' => $geminiResult,
-            ];
-            Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
-            return $result;
-        }
-
-        // Fallback to Trefle
-        Log::info("Gemini has no data for {$scientificName}, trying Trefle");
-        $trefleResult = $this->fetchFromTrefle($scientificName);
-
-        if ($trefleResult && $this->hasUsefulData($trefleResult)) {
-            // Store in database
-            $this->storeCareDetails($scientificName, $commonName, $family, $trefleResult, 'trefle');
-
-            $result = [
-                'success' => true,
-                'source' => 'trefle',
-                'data' => $trefleResult,
-            ];
-            Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
-            return $result;
+            Log::info("{$provider} has no data for {$scientificName}, trying next provider");
         }
 
         // No data from either source

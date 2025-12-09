@@ -22,6 +22,7 @@ const props = defineProps<{
   activeImageIndex: number;
   careDetails: CareDetails;
   careSource: CareSource;
+  preferredProvider: 'gemini' | 'trefle';
   fetchingCareDetails: boolean;
   plantDescription: string;
   descriptionLoading: boolean;
@@ -32,7 +33,8 @@ const props = defineProps<{
   formatRange: FormatRange;
   setActiveImage: (index: number) => void;
   toggleBookmark: () => void;
-  fetchCareDetails: (scientificName: string) => void;
+  fetchCareDetails: (scientificName: string, forceRefresh?: boolean) => void;
+  switchProvider: (provider: 'gemini' | 'trefle') => void;
   openSaveModal: () => void;
 }>();
 </script>
@@ -210,28 +212,59 @@ const props = defineProps<{
           </div>
         </div>
         <div>
-          <h3
-            class="flex items-center mb-4 text-lg font-normal text-gray-900 dark:text-white"
-          >
-            <div
-              class="mr-3 rounded-lg bg-green-100 p-1.5 text-green-700 dark:bg-green-900 dark:text-green-300"
+          <div class="flex items-center justify-between mb-4">
+            <h3
+              class="flex items-center text-lg font-normal text-gray-900 dark:text-white"
             >
-              <Icon name="sprout" class="w-5 h-5" />
+              <div
+                class="mr-3 rounded-lg bg-green-100 p-1.5 text-green-700 dark:bg-green-900 dark:text-green-300"
+              >
+                <Icon name="sprout" class="w-5 h-5" />
+              </div>
+              Care Essentials
+              <span
+                v-if="props.isGeminiCare"
+                class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+              >
+                <Icon name="sparkles" class="w-3 h-3" /> AI Generated
+              </span>
+              <span
+                v-else-if="props.careSource === 'trefle'"
+                class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+              >
+                <Icon name="database" class="w-3 h-3" /> Trefle
+              </span>
+            </h3>
+            <!-- Provider Toggle -->
+            <div class="flex items-center gap-1 p-1 bg-gray-100 rounded-lg dark:bg-gray-800">
+              <button
+                @click="props.switchProvider('gemini')"
+                :class="[
+                  'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all',
+                  props.preferredProvider === 'gemini'
+                    ? 'bg-white text-purple-700 shadow-sm dark:bg-gray-700 dark:text-purple-300'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ]"
+                :disabled="props.fetchingCareDetails"
+              >
+                <Icon name="sparkles" class="w-3 h-3" />
+                Gemini
+              </button>
+              <button
+                @click="props.switchProvider('trefle')"
+                :class="[
+                  'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all',
+                  props.preferredProvider === 'trefle'
+                    ? 'bg-white text-green-700 shadow-sm dark:bg-gray-700 dark:text-green-300'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ]"
+                :disabled="props.fetchingCareDetails"
+              >
+                <Icon name="database" class="w-3 h-3" />
+                Trefle
+              </button>
             </div>
-            Care Essentials
-            <span
-              v-if="props.isGeminiCare"
-              class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
-            >
-              <Icon name="sparkles" class="w-3 h-3" /> AI Generated
-            </span>
-            <span
-              v-else-if="props.careSource === 'trefle'"
-              class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-            >
-              <Icon name="database" class="w-3 h-3" /> Trefle
-            </span>
-          </h3>
+          </div>
           <div class="overflow-hidden rounded-2xl dark:border-gray-700 dark:bg-gray-800">
             <div
               v-if="props.fetchingCareDetails"

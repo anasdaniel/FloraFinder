@@ -14,6 +14,7 @@ import {
     RefreshCw,
     Search,
     SearchX,
+    Sparkles,
     Sun,
     Thermometer,
     TreeDeciduous,
@@ -384,18 +385,32 @@ const goToPage = (url: string | null) => {
                                 </div>
 
                                 <!-- Quick Care Stats -->
-                                <div v-if="hasCareDetails(plant)" class="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-                                    <div class="flex items-center gap-1.5 text-xs text-gray-500">
-                                        <Sun class="w-3.5 h-3.5 text-yellow-500" />
-                                        <span>{{ getLightLabel(plant.light) }}</span>
+                                <div v-if="hasCareDetails(plant)" class="pt-3 border-t border-gray-100">
+                                    <!-- Trefle Numeric Stats -->
+                                    <div v-if="plant.care_source === 'trefle' || plant.light !== null" class="grid grid-cols-2 gap-2">
+                                        <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                                            <Sun class="w-3.5 h-3.5 text-yellow-500" />
+                                            <span>{{ getLightLabel(plant.light) }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                                            <Droplets class="w-3.5 h-3.5 text-blue-500" />
+                                            <span>{{ getHumidityLabel(plant.atmospheric_humidity) }}</span>
+                                        </div>
+                                        <div class="flex items-center col-span-2 gap-1.5 text-xs text-gray-500">
+                                            <Thermometer class="w-3.5 h-3.5 text-red-500" />
+                                            <span>{{ formatTemperature(plant.minimum_temperature_celsius, plant.maximum_temperature_celsius) }}</span>
+                                        </div>
                                     </div>
-                                    <div class="flex items-center gap-1.5 text-xs text-gray-500">
-                                        <Droplets class="w-3.5 h-3.5 text-blue-500" />
-                                        <span>{{ getHumidityLabel(plant.atmospheric_humidity) }}</span>
-                                    </div>
-                                    <div class="flex items-center col-span-2 gap-1.5 text-xs text-gray-500">
-                                        <Thermometer class="w-3.5 h-3.5 text-red-500" />
-                                        <span>{{ formatTemperature(plant.minimum_temperature_celsius, plant.maximum_temperature_celsius) }}</span>
+
+                                    <!-- Gemini Text Stats Summary -->
+                                    <div v-else-if="plant.care_source === 'gemini'" class="space-y-2">
+                                        <div class="flex items-center gap-2 text-xs text-purple-600">
+                                            <Sparkles class="w-3.5 h-3.5" />
+                                            <span class="font-medium">AI Care Guide Available</span>
+                                        </div>
+                                        <p v-if="plant.care_summary" class="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                                            {{ plant.care_summary }}
+                                        </p>
                                     </div>
                                 </div>
 
@@ -439,14 +454,22 @@ const goToPage = (url: string | null) => {
 
                                 <!-- Care Stats -->
                                 <div v-if="hasCareDetails(plant)" class="flex items-center gap-6 text-sm text-gray-500">
-                                    <div class="flex items-center gap-1.5">
-                                        <Sun class="w-4 h-4 text-yellow-500" />
-                                        <span>{{ getLightLabel(plant.light) }}</span>
-                                    </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <Thermometer class="w-4 h-4 text-red-500" />
-                                        <span>{{ formatTemperature(plant.minimum_temperature_celsius, plant.maximum_temperature_celsius) }}</span>
-                                    </div>
+                                    <template v-if="plant.care_source === 'trefle' || plant.light !== null">
+                                        <div class="flex items-center gap-1.5">
+                                            <Sun class="w-4 h-4 text-yellow-500" />
+                                            <span>{{ getLightLabel(plant.light) }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <Thermometer class="w-4 h-4 text-red-500" />
+                                            <span>{{ formatTemperature(plant.minimum_temperature_celsius, plant.maximum_temperature_celsius) }}</span>
+                                        </div>
+                                    </template>
+                                    <template v-else-if="plant.care_source === 'gemini'">
+                                        <div class="flex items-center gap-1.5 text-purple-600 bg-purple-50 px-3 py-1 rounded-full">
+                                            <Sparkles class="w-4 h-4" />
+                                            <span class="font-medium">AI Care Guide</span>
+                                        </div>
+                                    </template>
                                 </div>
 
                                 <ChevronRight class="flex-shrink-0 w-5 h-5 text-gray-400" />

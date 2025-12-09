@@ -16,6 +16,9 @@ import {
     Trash2,
     User,
     Image as ImageIcon,
+    Share2,
+    Info,
+    Maximize2
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { Button } from '@/components/ui/button';
@@ -78,6 +81,7 @@ const props = defineProps<{
 const currentImageIndex = ref(0);
 const deleteDialogOpen = ref(false);
 const isDeleting = ref(false);
+const isImageModalOpen = ref(false);
 
 const images = computed(() => {
     if (props.sighting.images && props.sighting.images.length > 0) {
@@ -149,6 +153,12 @@ const getConservationStatusLabel = (status: string | null): string => {
     return labels[status || ''] || 'Unknown';
 };
 
+const formatCoordinates = (lat: number, lng: number): string => {
+    const latDir = lat >= 0 ? 'N' : 'S';
+    const lngDir = lng >= 0 ? 'E' : 'W';
+    return `${latDir} ${Math.abs(lat).toFixed(5)}, ${lngDir} ${Math.abs(lng).toFixed(5)}`;
+};
+
 const getOrganLabel = (organ: string): string => {
     const labels: Record<string, string> = {
         flower: '🌸 Flower',
@@ -184,54 +194,106 @@ const deleteSighting = () => {
     <Head :title="`${sighting.common_name || sighting.scientific_name} - Sighting`" />
 
     <AppLayout>
-        <div class="min-h-screen py-8 bg-gray-50">
-            <div class="px-4 mx-auto max-w-5xl sm:px-6 lg:px-8">
-                <!-- Back Button -->
-                <div class="mb-6">
-                    <Link
-                        :href="route('sightings.index')"
-                        class="inline-flex items-center gap-2 text-sm text-gray-600 transition-colors hover:text-gray-900"
-                    >
-                        <ArrowLeft class="w-4 h-4" />
-                        Back to My Sightings
-                    </Link>
+        <div class="min-h-screen pb-12 bg-gray-50">
+            <!-- Hero Section -->
+            <div class="relative text-white bg-gray-900">
+                <div class="absolute inset-0 overflow-hidden">
+                    <img
+                        :src="currentImage.image_url"
+                        class="object-cover w-full h-full scale-105 opacity-40 blur-sm"
+                        alt="Sighting background"
+                    />
+                    <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
                 </div>
 
-                <div class="grid gap-8 lg:grid-cols-5">
-                    <!-- Image Gallery -->
-                    <div class="lg:col-span-3">
-                        <div class="overflow-hidden bg-white shadow-sm rounded-2xl">
-                            <!-- Main Image -->
-                            <div class="relative aspect-[4/3] bg-gray-100">
+                <div class="relative px-4 py-12 mx-auto max-w-7xl sm:px-6 lg:px-8 sm:py-20">
+                    <div class="flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
+                        <div class="flex-1">
+                            <Link
+                                :href="route('sightings.index')"
+                                class="inline-flex items-center gap-2 mb-6 text-sm text-gray-300 transition-colors hover:text-white"
+                            >
+                                <ArrowLeft class="w-4 h-4" />
+                                Back to My Sightings
+                            </Link>
+
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-sm backdrop-blur-sm border border-white/10">
+                                    <Calendar class="w-3.5 h-3.5" />
+                                    {{ formatDate(sighting.sighted_at) }}
+                                </span>
+                                <span v-if="sighting.zone" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-100 text-sm backdrop-blur-sm border border-amber-500/20">
+                                    <Navigation class="w-3.5 h-3.5" />
+                                    {{ sighting.zone.zone_name }}
+                                </span>
+                            </div>
+
+                            <h1 class="mb-2 text-4xl font-bold tracking-tight md:text-5xl">
+                                {{ sighting.common_name || sighting.scientific_name }}
+                            </h1>
+                            <p class="font-serif text-xl italic text-gray-300">
+                                {{ sighting.scientific_name }}
+                            </p>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <button
+                                @click="openInMaps"
+                                class="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+                            >
+                                <MapPin class="w-4 h-4" />
+                                View Map
+                            </button>
+                            <button
+                                @click="deleteDialogOpen = true"
+                                class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-200 transition-colors border rounded-lg bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm border-red-500/20"
+                            >
+                                <Trash2 class="w-4 h-4" />
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative z-10 px-4 mx-auto -mt-8 max-w-7xl sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                    <!-- Main Content -->
+                    <div class="space-y-8 lg:col-span-2">
+
+                        <!-- Image Gallery -->
+                        <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
+                            <div class="relative aspect-[4/3] bg-gray-100 group">
                                 <img
                                     :src="currentImage.image_url"
                                     :alt="sighting.common_name || sighting.scientific_name"
-                                    class="object-contain w-full h-full"
+                                    class="object-contain w-full h-full cursor-zoom-in"
+                                    @click="isImageModalOpen = true"
                                 />
 
                                 <!-- Image counter -->
                                 <div v-if="images.length > 1"
-                                    class="absolute px-3 py-1 text-sm font-medium text-white rounded-full top-4 right-4 bg-black/60">
+                                    class="absolute px-3 py-1 text-sm font-medium text-white rounded-full top-4 right-4 bg-black/60 backdrop-blur-sm">
                                     {{ currentImageIndex + 1 }} / {{ images.length }}
                                 </div>
 
                                 <!-- Organ badge -->
                                 <div v-if="currentImage.organ && currentImage.organ !== 'unknown'"
-                                    class="absolute px-3 py-1 text-sm font-medium text-white bg-gray-800 rounded-full top-4 left-4">
+                                    class="absolute px-3 py-1 text-sm font-medium text-white capitalize rounded-full bg-black/60 backdrop-blur-sm top-4 left-4">
                                     {{ getOrganLabel(currentImage.organ) }}
                                 </div>
 
                                 <!-- Navigation arrows -->
                                 <template v-if="images.length > 1">
                                     <button
-                                        @click="prevImage"
-                                        class="absolute p-2 text-white transition-colors -translate-y-1/2 rounded-full left-4 top-1/2 bg-black/50 hover:bg-black/70"
+                                        @click.stop="prevImage"
+                                        class="absolute p-3 text-white transition-all -translate-y-1/2 rounded-full opacity-0 left-4 top-1/2 bg-black/30 hover:bg-black/60 group-hover:opacity-100"
                                     >
                                         <ChevronLeft class="w-6 h-6" />
                                     </button>
                                     <button
-                                        @click="nextImage"
-                                        class="absolute p-2 text-white transition-colors -translate-y-1/2 rounded-full right-4 top-1/2 bg-black/50 hover:bg-black/70"
+                                        @click.stop="nextImage"
+                                        class="absolute p-3 text-white transition-all -translate-y-1/2 rounded-full opacity-0 right-4 top-1/2 bg-black/30 hover:bg-black/60 group-hover:opacity-100"
                                     >
                                         <ChevronRight class="w-6 h-6" />
                                     </button>
@@ -239,214 +301,174 @@ const deleteSighting = () => {
                             </div>
 
                             <!-- Thumbnail Strip -->
-                            <div v-if="images.length > 1" class="p-4 border-t border-gray-100">
-                                <div class="flex gap-2 overflow-x-auto">
+                            <div v-if="images.length > 1" class="p-4 border-t border-gray-100 bg-gray-50/50">
+                                <div class="flex gap-3 pb-2 overflow-x-auto scrollbar-hide">
                                     <button
                                         v-for="(img, index) in images"
                                         :key="img.id"
                                         @click="currentImageIndex = index"
-                                        class="relative flex-shrink-0 w-16 h-16 overflow-hidden border-2 rounded-lg transition-all"
+                                        class="relative flex-shrink-0 w-20 h-20 overflow-hidden transition-all duration-200 rounded-lg"
                                         :class="currentImageIndex === index
-                                            ? 'border-gray-800 ring-2 ring-gray-300'
-                                            : 'border-transparent hover:border-gray-300'"
+                                            ? 'ring-2 ring-offset-2 ring-gray-900 shadow-md scale-105'
+                                            : 'opacity-70 hover:opacity-100 hover:scale-105'"
                                     >
                                         <img
                                             :src="img.image_url"
                                             :alt="`Image ${index + 1}`"
                                             class="object-cover w-full h-full"
                                         />
-                                        <div v-if="img.organ && img.organ !== 'unknown'"
-                                            class="absolute bottom-0 left-0 right-0 px-1 py-0.5 text-[10px] text-center text-white capitalize bg-black/60">
-                                            {{ getOrganLabel(img.organ) }}
-                                        </div>
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Description -->
-                        <div v-if="sighting.description" class="p-6 mt-6 bg-white shadow-sm rounded-2xl">
-                            <h3 class="mb-3 text-lg font-semibold text-gray-900">Description</h3>
-                            <p class="leading-relaxed text-gray-600">{{ sighting.description }}</p>
+                        <div v-if="sighting.description" class="p-8 bg-white border border-gray-100 shadow-sm rounded-2xl">
+                            <h2 class="flex items-center gap-2 mb-4 text-xl font-bold text-gray-900">
+                                <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                                Field Notes
+                            </h2>
+                            <p class="text-lg leading-relaxed text-gray-600">{{ sighting.description }}</p>
                         </div>
 
-                        <!-- Location Map Preview -->
-                        <div v-if="sighting.latitude && sighting.longitude" class="p-6 mt-6 bg-white shadow-sm rounded-2xl">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-gray-900">Location</h3>
-                                <button
-                                    @click="openInMaps"
-                                    class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
-                                >
-                                    <ExternalLink class="w-4 h-4" />
-                                    Open in Maps
-                                </button>
+                        <!-- Location Map -->
+                        <div v-if="sighting.latitude && sighting.longitude" class="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+                            <div class="flex items-center justify-between mb-6">
+                                <h2 class="flex items-center gap-2 text-xl font-bold text-gray-900">
+                                    <span class="w-1 h-6 bg-purple-500 rounded-full"></span>
+                                    Location
+                                </h2>
+                                <div class="px-3 py-1 font-mono text-sm text-gray-500 bg-gray-100 rounded-md">
+                                    {{ formatCoordinates(sighting.latitude, sighting.longitude) }}
+                                </div>
                             </div>
-                            <div class="overflow-hidden rounded-xl">
+                            <div class="overflow-hidden border border-gray-200 shadow-inner rounded-xl">
                                 <iframe
-                                    :src="`https://www.openstreetmap.org/export/embed.html?bbox=${sighting.longitude - 0.01},${sighting.latitude - 0.01},${sighting.longitude + 0.01},${sighting.latitude + 0.01}&layer=mapnik&marker=${sighting.latitude},${sighting.longitude}`"
-                                    class="w-full h-64 border-0"
+                                    :src="`https://www.openstreetmap.org/export/embed.html?bbox=${Number(sighting.longitude) - 0.01},${Number(sighting.latitude) - 0.01},${Number(sighting.longitude) + 0.01},${Number(sighting.latitude) + 0.01}&layer=mapnik&marker=${sighting.latitude},${sighting.longitude}`"
+                                    class="w-full border-0 h-80"
                                     loading="lazy"
                                 ></iframe>
                             </div>
-                            <p class="mt-3 text-sm text-gray-500">
-                                Coordinates: {{ Number(sighting.latitude).toFixed(6) }}, {{ Number(sighting.longitude).toFixed(6) }}
-                            </p>
+                            <div class="flex items-center justify-between mt-4 text-sm">
+                                <span class="flex items-center gap-2 text-gray-600">
+                                    <MapPin class="w-4 h-4 text-gray-400" />
+                                    {{ sighting.location_name || 'Unknown Location' }}
+                                </span>
+                                <button @click="openInMaps" class="flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700">
+                                    Open in Google Maps <ExternalLink class="w-3 h-3" />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Sidebar Info -->
-                    <div class="space-y-6 lg:col-span-2">
+                    <!-- Sidebar -->
+                    <div class="space-y-6">
                         <!-- Plant Info Card -->
-                        <div class="p-6 bg-white shadow-sm rounded-2xl">
-                            <div class="flex items-start gap-3 mb-4">
-                                <div class="p-2 rounded-lg bg-gray-100">
-                                    <Leaf class="w-6 h-6 text-gray-600" />
+                        <div class="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+                            <h3 class="mb-4 font-semibold text-gray-900">Identification</h3>
+
+                            <div class="flex items-start gap-4 mb-6">
+                                <div class="p-3 text-green-600 rounded-xl bg-green-50">
+                                    <Leaf class="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h1 class="text-xl font-bold text-gray-900">
+                                    <h4 class="mb-1 text-lg font-bold leading-tight text-gray-900">
                                         {{ sighting.common_name || sighting.scientific_name }}
-                                    </h1>
-                                    <p class="text-sm italic text-gray-500">{{ sighting.scientific_name }}</p>
+                                    </h4>
+                                    <p class="italic text-gray-500">{{ sighting.scientific_name }}</p>
                                 </div>
                             </div>
 
-                            <!-- Conservation Status -->
-                            <div v-if="sighting.plant?.iucn_category" class="mb-4">
-                                <span
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border"
-                                    :class="getConservationStatusColor(sighting.plant.iucn_category)"
-                                >
-                                    {{ getConservationStatusLabel(sighting.plant.iucn_category) }}
-                                </span>
-                            </div>
-
-                            <!-- Plant Details -->
-                            <div class="pt-4 space-y-3 border-t border-gray-100">
-                                <div v-if="sighting.plant?.family" class="flex justify-between text-sm">
-                                    <span class="text-gray-500">Family</span>
-                                    <span class="font-medium text-gray-900">{{ sighting.plant.family }}</span>
+                            <div class="pt-4 space-y-4 border-t border-gray-100">
+                                <div v-if="sighting.plant?.family" class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-500">Family</span>
+                                    <span class="text-sm font-medium text-gray-900">{{ sighting.plant.family }}</span>
                                 </div>
-                                <div v-if="sighting.plant?.genus" class="flex justify-between text-sm">
-                                    <span class="text-gray-500">Genus</span>
-                                    <span class="font-medium text-gray-900">{{ sighting.plant.genus }}</span>
+                                <div v-if="sighting.plant?.genus" class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-500">Genus</span>
+                                    <span class="text-sm font-medium text-gray-900">{{ sighting.plant.genus }}</span>
                                 </div>
-                                <div v-if="sighting.plant?.habitat" class="flex justify-between text-sm">
-                                    <span class="text-gray-500">Habitat</span>
-                                    <span class="font-medium text-gray-900">{{ sighting.plant.habitat }}</span>
+                                <div v-if="sighting.plant?.iucn_category" class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-500">Status</span>
+                                    <span
+                                        class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border"
+                                        :class="getConservationStatusColor(sighting.plant.iucn_category)"
+                                    >
+                                        {{ getConservationStatusLabel(sighting.plant.iucn_category) }}
+                                    </span>
                                 </div>
                             </div>
 
-                            <!-- View Plant Button -->
-                            <div v-if="sighting.plant_id" class="mt-4">
+                            <div v-if="sighting.plant_id" class="pt-4 mt-6 border-t border-gray-100">
                                 <Link
                                     :href="route('plants.show', sighting.plant_id)"
-                                    class="flex items-center justify-center w-full gap-2 px-4 py-2 text-sm font-medium text-gray-700 transition-colors border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100"
+                                    class="flex items-center justify-center w-full gap-2 px-4 py-3 text-sm font-medium text-white transition-colors bg-gray-900 hover:bg-black rounded-xl"
                                 >
-                                    <Leaf class="w-4 h-4" />
-                                    View Plant Details
+                                    <Info class="w-4 h-4" />
+                                    View Full Plant Profile
                                 </Link>
                             </div>
                         </div>
 
                         <!-- Sighting Details Card -->
-                        <div class="p-6 bg-white shadow-sm rounded-2xl">
-                            <h3 class="mb-4 text-lg font-semibold text-gray-900">Sighting Details</h3>
+                        <div class="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+                            <h3 class="mb-4 font-semibold text-gray-900">Sighting Details</h3>
 
                             <div class="space-y-4">
-                                <!-- Date -->
-                                <div class="flex items-start gap-3">
-                                    <div class="p-2 rounded-lg bg-blue-50">
-                                        <Calendar class="w-4 h-4 text-blue-600" />
+                                <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                                    <div class="p-2 text-gray-500 bg-white rounded-lg shadow-sm">
+                                        <User class="w-4 h-4" />
                                     </div>
                                     <div>
-                                        <p class="text-xs font-medium text-gray-500 uppercase">Date Spotted</p>
-                                        <p class="text-sm text-gray-900">{{ formatDate(sighting.sighted_at || sighting.created_at) }}</p>
+                                        <div class="text-xs font-medium text-gray-500 uppercase">Observer</div>
+                                        <div class="text-sm font-medium text-gray-900">{{ sighting.user?.name || 'Unknown' }}</div>
                                     </div>
                                 </div>
 
-                                <!-- Location -->
-                                <div v-if="sighting.location_name || sighting.region" class="flex items-start gap-3">
-                                    <div class="p-2 rounded-lg bg-purple-50">
-                                        <MapPin class="w-4 h-4 text-purple-600" />
+                                <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                                    <div class="p-2 text-gray-500 bg-white rounded-lg shadow-sm">
+                                        <Clock class="w-4 h-4" />
                                     </div>
                                     <div>
-                                        <p class="text-xs font-medium text-gray-500 uppercase">Location</p>
-                                        <p class="text-sm text-gray-900">{{ sighting.location_name || sighting.region }}</p>
-                                        <p v-if="sighting.region && sighting.location_name" class="text-xs text-gray-500">{{ sighting.region }}</p>
+                                        <div class="text-xs font-medium text-gray-500 uppercase">Recorded At</div>
+                                        <div class="text-sm font-medium text-gray-900">{{ formatDateTime(sighting.created_at) }}</div>
                                     </div>
                                 </div>
 
-                                <!-- Zone -->
-                                <div v-if="sighting.zone" class="flex items-start gap-3">
-                                    <div class="p-2 rounded-lg bg-amber-50">
-                                        <Navigation class="w-4 h-4 text-amber-600" />
+                                <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                                    <div class="p-2 text-gray-500 bg-white rounded-lg shadow-sm">
+                                        <ImageIcon class="w-4 h-4" />
                                     </div>
                                     <div>
-                                        <p class="text-xs font-medium text-gray-500 uppercase">Zone</p>
-                                        <p class="text-sm text-gray-900">{{ sighting.zone.zone_name }}</p>
+                                        <div class="text-xs font-medium text-gray-500 uppercase">Evidence</div>
+                                        <div class="text-sm font-medium text-gray-900">{{ images.length }} Photo{{ images.length !== 1 ? 's' : '' }}</div>
                                     </div>
                                 </div>
-
-                                <!-- Reported By -->
-                                <div v-if="sighting.user" class="flex items-start gap-3">
-                                    <div class="p-2 rounded-lg bg-gray-50">
-                                        <User class="w-4 h-4 text-gray-600" />
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-medium text-gray-500 uppercase">Reported By</p>
-                                        <p class="text-sm text-gray-900">{{ sighting.user.name }}</p>
-                                    </div>
-                                </div>
-
-                                <!-- Recorded At -->
-                                <div class="flex items-start gap-3">
-                                    <div class="p-2 rounded-lg bg-gray-50">
-                                        <Clock class="w-4 h-4 text-gray-600" />
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-medium text-gray-500 uppercase">Recorded</p>
-                                        <p class="text-sm text-gray-900">{{ formatDateTime(sighting.created_at) }}</p>
-                                    </div>
-                                </div>
-
-                                <!-- Images Count -->
-                                <div class="flex items-start gap-3">
-                                    <div class="p-2 rounded-lg bg-pink-50">
-                                        <ImageIcon class="w-4 h-4 text-pink-600" />
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-medium text-gray-500 uppercase">Photos</p>
-                                        <p class="text-sm text-gray-900">{{ images.length }} image{{ images.length !== 1 ? 's' : '' }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Actions Card -->
-                        <div class="p-6 bg-white shadow-sm rounded-2xl">
-                            <h3 class="mb-4 text-lg font-semibold text-gray-900">Actions</h3>
-                            <div class="space-y-3">
-                                <Link
-                                    :href="route('plant-map')"
-                                    class="flex items-center justify-center w-full gap-2 px-4 py-2 text-sm font-medium text-gray-700 transition-colors border border-gray-200 rounded-lg hover:bg-gray-50"
-                                >
-                                    <MapPin class="w-4 h-4" />
-                                    View on Map
-                                </Link>
-                                <button
-                                    @click="deleteDialogOpen = true"
-                                    class="flex items-center justify-center w-full gap-2 px-4 py-2 text-sm font-medium text-red-600 transition-colors border border-red-200 rounded-lg hover:bg-red-50"
-                                >
-                                    <Trash2 class="w-4 h-4" />
-                                    Delete Sighting
-                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Image Modal -->
+        <Dialog :open="isImageModalOpen" @update:open="isImageModalOpen = $event">
+            <DialogContent class="max-w-4xl p-0 overflow-hidden bg-black border-0">
+                <div class="relative w-full h-[80vh] flex items-center justify-center">
+                    <img
+                        :src="currentImage.image_url"
+                        :alt="sighting.common_name"
+                        class="object-contain max-w-full max-h-full"
+                    />
+                    <button
+                        @click="isImageModalOpen = false"
+                        class="absolute p-2 text-white rounded-full top-4 right-4 bg-black/50 hover:bg-black/70"
+                    >
+                        <Maximize2 class="w-5 h-5" />
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
 
         <!-- Delete Confirmation Dialog -->
         <Dialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">

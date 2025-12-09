@@ -67,6 +67,7 @@ const {
   activeImageIndex,
   careDetails,
   careSource,
+  preferredProvider,
   fetchingCareDetails,
   plantDescription,
   descriptionLoading,
@@ -85,6 +86,7 @@ const {
   formatCareValue,
   formatRange,
   fetchCareDetails,
+  switchProvider,
   toggleBookmark,
   handleChatSend,
   setActiveImage,
@@ -229,6 +231,7 @@ const getOrganLabel = (organ: string) => {
                 :active-image-index="activeImageIndex"
                 :care-details="careDetails"
                 :care-source="careSource"
+                :preferred-provider="preferredProvider"
                 :fetching-care-details="fetchingCareDetails"
                 :plant-description="plantDescription"
                 :description-loading="descriptionLoading"
@@ -240,6 +243,7 @@ const getOrganLabel = (organ: string) => {
                 :set-active-image="setActiveImage"
                 :toggle-bookmark="toggleBookmark"
                 :fetch-care-details="fetchCareDetails"
+                :switch-provider="switchProvider"
                 :open-save-modal="openSaveModal"
               />
             </Transition>
