@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import BotanistChat from "@/components/identifier/BotanistChat.vue";
 import IdentifierResultCard from "@/components/identifier/IdentifierResultCard.vue";
 import UploadPanel from "@/components/identifier/UploadPanel.vue";
 import Icon from "@/components/Icon.vue";
@@ -281,21 +280,13 @@ const isThreatenedSpecies = computed(() => {
                 :fetch-care-details="fetchCareDetails"
                 :switch-provider="switchProvider"
                 :open-save-modal="openSaveModal"
+                :chat-messages="chatMessages"
+                :chat-input="chatInput"
+                :is-chat-loading="isChatLoading"
+                :update-chat-input="(val: string) => chatInput = val"
+                :handle-chat-send="handleChatSend"
               />
             </Transition>
-
-            <!-- Botanist Chat -->
-            <BotanistChat
-              :plant-name="selectedResult.species.commonNames?.[0] || selectedResult.species.scientificNameWithoutAuthor || 'plant'"
-              :chat-messages="chatMessages"
-              :chat-input="chatInput"
-              :is-chat-loading="isChatLoading"
-              :is-threatened-species="isThreatenedSpecies"
-              :iucn-category="selectedResult.iucn?.category"
-              :has-care-data="hasCareData"
-              @update:chat-input="chatInput = $event"
-              @send="handleChatSend"
-            />
           </template>
 
           <!-- Error State -->

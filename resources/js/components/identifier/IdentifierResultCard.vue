@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import Icon from "@/components/Icon.vue";
+import BotanistChat from "@/components/identifier/BotanistChat.vue";
 import { Button } from "@/components/ui/button";
-import type { CareSource, PlantResult } from "@/types/plant-identifier";
+import type { CareSource, PlantResult, ChatMessage } from "@/types/plant-identifier";
 import { computed } from "vue";
 
 type PlantMatch = NonNullable<NonNullable<PlantResult["data"]>["results"]>[number];
@@ -38,6 +39,12 @@ const props = defineProps<{
   fetchCareDetails: (scientificName: string, forceRefresh?: boolean) => void;
   switchProvider: (provider: "gemini" | "trefle") => void;
   openSaveModal: () => void;
+  // Chat props
+  chatMessages: ChatMessage[];
+  chatInput: string;
+  isChatLoading: boolean;
+  handleChatSend: () => void;
+  updateChatInput: (val: string) => void;
 }>();
 
 // IUCN Category helpers
@@ -186,7 +193,7 @@ const isThreatenedSpecies = computed(() => {
 // Conservation authority contacts for threatened species
 const conservationContacts = [
   {
-    name: "PERHILITAN (Wildlife Dept. Malaysia)",
+    name: "PERHILITAN",
     description: "Department of Wildlife and National Parks",
     phone: "+603-9086 6800",
     website: "https://www.wildlife.gov.my",
@@ -201,7 +208,7 @@ const conservationContacts = [
     icon: "trees",
   },
   {
-    name: "Sarawak Forestry Corporation",
+    name: "Sarawak Forestry",
     description: "For sightings in Sarawak region",
     phone: "+6082-610 088",
     website: "https://www.sarawakforestry.com",
@@ -448,7 +455,7 @@ const isDisplayingScientificName = computed(() => {
           </div>
         </div>
         <div>
-          <div v-if="!isThreatenedSpecies" class="flex items-center justify-between mb-4">
+          <div v-if="!isThreatenedSpecies" class="flex items-center justify-between gap-4 mb-4">
             <h3
               class="flex items-center text-lg font-normal text-gray-900 dark:text-white"
             >
@@ -460,7 +467,7 @@ const isDisplayingScientificName = computed(() => {
               Care Essentials
               <span
                 v-if="props.isGeminiCare"
-                class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-100 text-purple-700 whitespace-nowrap dark:bg-purple-900/40 dark:text-purple-300"
               >
                 <Icon name="sparkles" class="w-3 h-3" /> AI Generated
               </span>
@@ -581,52 +588,52 @@ const isDisplayingScientificName = computed(() => {
                   <Icon name="phone" class="w-4 h-4" />
                   Report Sightings to Local Authorities
                 </h5>
-                <div class="grid gap-3 sm:grid-cols-1 md:grid-cols-3">
+                <div class="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 snap-x scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
                   <div
                     v-for="contact in conservationContacts"
                     :key="contact.name"
-                    class="p-3 transition bg-white border border-gray-200 dark:bg-gray-800 rounded-xl dark:border-gray-700 hover:shadow-md"
+                    class="flex-none w-[280px] snap-center p-4 transition bg-white border border-gray-200 dark:bg-gray-800 rounded-xl dark:border-gray-700 hover:shadow-md"
                   >
                     <div class="flex items-start gap-3">
                       <div
                         class="flex-shrink-0 p-2 text-green-700 bg-green-100 rounded-lg dark:bg-green-900/40 dark:text-green-400"
                       >
-                        <Icon :name="contact.icon" class="w-4 h-4" />
+                        <Icon :name="contact.icon" class="w-5 h-5" />
                       </div>
-                      <div class="flex-1 min-w-0">
+                      <div class="flex-1">
                         <h6
-                          class="text-sm font-semibold text-gray-900 truncate dark:text-white"
+                          class="mb-1 text-sm font-bold text-gray-900 dark:text-white"
                         >
                           {{ contact.name }}
                         </h6>
-                        <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                        <p class="mb-3 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
                           {{ contact.description }}
                         </p>
-                        <div class="space-y-1">
+                        <div class="space-y-1.5">
                           <a
                             v-if="contact.phone"
                             :href="`tel:${contact.phone.replace(/\s/g, '')}`"
-                            class="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 hover:underline"
+                            class="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 hover:underline"
                           >
-                            <Icon name="phone" class="w-3 h-3" />
-                            {{ contact.phone }}
+                            <Icon name="phone" class="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{{ contact.phone }}</span>
                           </a>
                           <a
                             v-if="contact.website"
                             :href="contact.website"
                             target="_blank"
-                            class="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                            class="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                           >
-                            <Icon name="external-link" class="w-3 h-3" />
-                            Website
+                            <Icon name="external-link" class="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>Website</span>
                           </a>
                           <a
                             v-if="contact.email"
                             :href="`mailto:${contact.email}`"
-                            class="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                            class="flex items-center gap-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline break-all"
                           >
-                            <Icon name="mail" class="w-3 h-3" />
-                            {{ contact.email }}
+                            <Icon name="mail" class="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{{ contact.email }}</span>
                           </a>
                         </div>
                       </div>
@@ -1140,17 +1147,6 @@ const isDisplayingScientificName = computed(() => {
                   </a>
                 </div>
 
-                <!-- AI Botanist Tip -->
-                <div
-                  class="p-3 border border-purple-100 bg-purple-50 dark:bg-purple-950/30 rounded-xl dark:border-purple-900"
-                >
-                  <p class="text-xs text-center text-purple-700 dark:text-purple-300">
-                    <Icon name="sparkles" class="w-3.5 h-3.5 inline mr-1" />
-                    <span class="font-medium">Curious to learn more?</span> Ask the AI
-                    Botanist below about this species' ecology, habitat, or conservation
-                    status.
-                  </p>
-                </div>
               </div>
             </template>
 
@@ -1343,28 +1339,33 @@ const isDisplayingScientificName = computed(() => {
                 </a>
               </div>
 
-              <!-- AI Botanist Tip -->
-              <div
-                class="p-3 border border-purple-100 bg-purple-50 dark:bg-purple-950/30 rounded-xl dark:border-purple-900"
-              >
-                <p class="text-xs text-center text-purple-700 dark:text-purple-300">
-                  <Icon name="sparkles" class="w-3.5 h-3.5 inline mr-1" />
-                  <span class="font-medium">Curious to learn more?</span> Ask the AI
-                  Botanist below about this species' ecology, habitat, or conservation
-                  status.
-                </p>
-              </div>
             </div>
           </div>
         </div>
-        <div class="flex gap-3 pt-2">
-          <Button
-            @click="props.openSaveModal()"
-            class="flex-1 h-12 text-white transition-all bg-green-600 rounded-xl hover:bg-green-700"
-          >
-            <Icon name="bookmark-plus" class="w-4 h-4 mr-2" /> Save &amp; Report
-          </Button>
-        </div>
+      </div>
+    </div>
+
+    <!-- Full Width Chat Section -->
+    <div class="px-6 pb-6 md:px-8 md:pb-8 border-t border-gray-200 dark:border-gray-800">
+      <BotanistChat
+        class="!border-t-0 !mt-0"
+        :plant-name="props.selectedResult.species.commonNames?.[0] || props.selectedResult.species.scientificNameWithoutAuthor || 'plant'"
+        :chat-messages="props.chatMessages"
+        :chat-input="props.chatInput"
+        :is-chat-loading="props.isChatLoading"
+        :is-threatened-species="isThreatenedSpecies"
+        :iucn-category="props.selectedResult.iucn?.category"
+        :has-care-data="props.hasCareData"
+        @update:chat-input="props.updateChatInput"
+        @send="props.handleChatSend"
+      />
+      <div class="flex gap-3 pt-2">
+        <Button
+          @click="props.openSaveModal()"
+          class="flex-1 h-12 text-white transition-all bg-green-600 rounded-xl hover:bg-green-700"
+        >
+          <Icon name="bookmark-plus" class="w-4 h-4 mr-2" /> Save &amp; Report
+        </Button>
       </div>
     </div>
   </div>
