@@ -6,6 +6,8 @@ use App\Models\Plant;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use App\Http\Integrations\GeminiConnector;
+use App\Http\Integrations\GeminiRequest;
 
 class CareDetailsService
 {
@@ -14,70 +16,129 @@ class CareDetailsService
     private const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
     private const CACHE_DURATION_HOURS = 24;
     private const DB_CACHE_DAYS = 7;
+    private const THREAT_CACHE_HOURS = 24;
 
     /**
-     * Get care details for a plant, checking DB first, then Gemini, then Trefle
+     * Get care details for a plant, checking DB first, then preferred provider, then fallback.
+     *
+     * @param string $scientificName
+     * @param string|null $commonName
+     * @param string|null $family
+     * @param string $preferredProvider 'gemini' (default) or 'trefle'
+     * @param bool $forceRefresh Skip cache and fetch fresh data
      */
-    public function getCareDetails(string $scientificName, ?string $commonName = null, ?string $family = null): array
-    {
-        Log::info("=== CareDetailsService: Getting care for {$scientificName} ===");
+    public function getCareDetails(
+        string $scientificName,
+        ?string $commonName = null,
+        ?string $family = null,
+        string $preferredProvider = 'gemini',
+        bool $forceRefresh = false
+    ): array {
+        // Validate and sanitize scientific name (primary identifier)
+        $scientificName = trim($scientificName);
+        if (empty($scientificName)) {
+            Log::warning('getCareDetails called with empty scientific name');
+            return [
+                'success' => false,
+                'source' => 'none',
+                'data' => [],
+                'message' => 'Scientific name is required to fetch care details',
+            ];
+        }
 
-        $cacheKey = 'care_details_' . md5($scientificName);
+        // Sanitize optional parameters
+        $commonName = $commonName ? trim($commonName) : null;
+        $commonName = $commonName === '' ? null : $commonName;
+        $family = $family ? trim($family) : null;
+        $family = $family === '' ? null : $family;
 
-        // Check Redis cache first (short-term)
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            Log::info("Returning cached care details for {$scientificName} (source: {$cached['source']})");
-            return $cached;
+        Log::info("=== CareDetailsService: Getting care for {$scientificName} (provider: {$preferredProvider}, force: " . ($forceRefresh ? 'yes' : 'no') . ") ===");
+
+        $cacheKey = 'care_details_' . md5($scientificName . '_' . $preferredProvider);
+
+        // Check Redis cache first (short-term) - skip if forcing refresh
+        if (!$forceRefresh) {
+            $cached = Cache::get($cacheKey);
+            if ($cached && isset($cached['success'])) {
+                Log::info("Returning Redis cached care details for {$scientificName} (source: " . ($cached['source'] ?? 'unknown') . ")");
+                return $cached;
+            }
         }
 
         // Check database for existing plant with care details
         $plant = Plant::where('scientific_name', $scientificName)->first();
 
-        if ($plant && $plant->hasCareDetails() && !$plant->needsCareRefresh()) {
-            Log::info("Returning DB cached care details for {$scientificName} (source: {$plant->getCareSource()})");
-            $result = [
-                'success' => true,
-                'source' => $plant->getCareSource(),
-                'data' => $plant->getCareDetails(),
-            ];
-            Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
-            return $result;
+        // If we have DB cache from the requested provider and it's not stale, use it
+        if (!$forceRefresh && $plant && $plant->hasCareDetails() && !$plant->needsCareRefresh()) {
+            // Check if we have data from the requested provider
+            $currentSource = $plant->getCareSource();
+
+            // If the plant has data from the requested provider, return it immediately
+            if ($currentSource === $preferredProvider) {
+                Log::info("Returning DB cached care details for {$scientificName} (source: {$currentSource})");
+                $result = [
+                    'success' => true,
+                    'source' => $currentSource,
+                    'data' => $plant->getCareDetails(),
+                ];
+                Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
+                return $result;
+            }
+
+            // If forceRefresh is false and we have ANY recent care data,
+            // we can try to fetch from the new provider without marking as "forced"
+            Log::info("Plant has {$currentSource} data, attempting to fetch {$preferredProvider} data...");
         }
 
-        Log::info("No cache found, fetching fresh care details for {$scientificName}");
-
-        // Try Gemini first
-        $geminiResult = $this->fetchFromGemini($scientificName, $commonName, $family);
-
-        if ($geminiResult && $this->hasUsefulData($geminiResult)) {
-            // Store in database
-            $this->storeCareDetails($scientificName, $commonName, $family, $geminiResult, 'gemini');
-
-            $result = [
-                'success' => true,
-                'source' => 'gemini',
-                'data' => $geminiResult,
-            ];
-            Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
-            return $result;
+        // Only make API call if forced or we don't have data from this provider
+        if ($forceRefresh || !$plant || !$plant->hasCareDetails() || $plant->getCareSource() !== $preferredProvider) {
+            Log::info("Fetching fresh care details for {$scientificName} from {$preferredProvider}");
+        } else {
+            // We have data but it's stale, so we'll try to refresh
+            Log::info("Refreshing stale care details for {$scientificName}");
         }
 
-        // Fallback to Trefle
-        Log::info("Gemini has no data for {$scientificName}, trying Trefle");
-        $trefleResult = $this->fetchFromTrefle($scientificName);
+        // Determine provider order based on preference
+        $providers = $preferredProvider === 'trefle'
+            ? ['trefle', 'gemini']
+            : ['gemini', 'trefle'];
 
-        if ($trefleResult && $this->hasUsefulData($trefleResult)) {
-            // Store in database
-            $this->storeCareDetails($scientificName, $commonName, $family, $trefleResult, 'trefle');
+        foreach ($providers as $provider) {
+            $providerResult = $provider === 'gemini'
+                ? $this->fetchFromGemini($scientificName, $commonName, $family)
+                : $this->fetchFromTrefle($scientificName);
 
-            $result = [
-                'success' => true,
-                'source' => 'trefle',
-                'data' => $trefleResult,
-            ];
-            Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
-            return $result;
+            if ($providerResult && $this->hasUsefulData($providerResult)) {
+                $result = [
+                    'success' => true,
+                    'source' => $provider,
+                    'data' => $providerResult,
+                ];
+
+                // Store in Redis cache for fast access (24 hours)
+                Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
+
+                // Only store in database if:
+                // 1. We're forcing a refresh (user explicitly requested new data)
+                // 2. OR we don't have any plant record yet
+                // 3. OR the plant's current source matches the provider we just fetched
+                // This prevents overwriting good DB data when just switching providers temporarily
+                $shouldStoreInDb = $forceRefresh ||
+                    !$plant ||
+                    !$plant->hasCareDetails() ||
+                    $plant->getCareSource() === $provider;
+
+                if ($shouldStoreInDb) {
+                    $this->storeCareDetails($scientificName, $commonName, $family, $providerResult, $provider);
+                    Log::info("Stored {$provider} care details in database for {$scientificName}");
+                } else {
+                    Log::info("Cached {$provider} care details in Redis (not overwriting DB with {$plant->getCareSource()} data)");
+                }
+
+                return $result;
+            }
+
+            Log::info("{$provider} has no data for {$scientificName}, trying next provider");
         }
 
         // No data from either source
@@ -87,6 +148,103 @@ class CareDetailsService
             'data' => [],
             'message' => 'Care details not available from any provider',
         ];
+    }
+
+    public function inferThreatStatus(string $scientificName): array
+    {
+        $scientificName = trim($scientificName);
+        if ($scientificName === '') {
+            return [
+                'success' => false,
+                'source' => 'gemini',
+                'category' => null,
+                'reasoning' => 'Scientific name is required',
+            ];
+        }
+
+        $cacheKey = 'threat_status_' . md5($scientificName);
+        if ($cached = Cache::get($cacheKey)) {
+            return $cached;
+        }
+
+        try {
+            $prompt = <<<EOT
+You are a botanist consultant. Given a plant scientific name, determine its IUCN Red List conservation status category.
+
+Plant: {$scientificName}
+
+Return ONLY valid JSON in this exact format:
+{"category":"<IUCN_CODE>","reason":"<brief explanation>"}
+
+Valid IUCN codes:
+- EX (Extinct)
+- EW (Extinct in the Wild)
+- CR (Critically Endangered)
+- EN (Endangered)
+- VU (Vulnerable)
+- NT (Near Threatened)
+- LC (Least Concern)
+- DD (Data Deficient)
+- NE (Not Evaluated)
+
+IMPORTANT: For Rafflesia species and other rare endemic species, use CR, EN, or VU as appropriate based on their known conservation status. Do NOT guess LC unless you're confident the species is common.
+EOT;
+
+            $connector = new GeminiConnector();
+            $request = new GeminiRequest('gemini-2.5-flash', [
+                ['parts' => [['text' => $prompt]]],
+            ]);
+
+            $response = $connector->send($request);
+
+            if (!$response->successful()) {
+                Log::warning("Gemini threat status request failed for {$scientificName}", ['status' => $response->status(), 'body' => $response->body()]);
+                return [
+                    'success' => false,
+                    'source' => 'gemini',
+                    'category' => null,
+                    'reasoning' => 'Gemini request failed',
+                ];
+            }
+
+            $json = $response->json();
+            $text = $json['candidates'][0]['content']['parts'][0]['text'] ?? null;
+
+            // Clean markdown formatting if present
+            $text = preg_replace('/^```json\s*/i', '', $text ?? '');
+            $text = preg_replace('/^```\s*/i', '', $text ?? '');
+            $text = preg_replace('/\s*```$/', '', $text ?? '');
+            $text = trim($text);
+
+            $parsed = $text ? json_decode($text, true) : null;
+            $category = strtoupper(trim($parsed['category'] ?? ''));
+
+            $allowed = ['EX', 'EW', 'CR', 'EN', 'VU', 'NT', 'LC', 'DD', 'NE'];
+            if (!in_array($category, $allowed, true)) {
+                Log::warning("Invalid IUCN category '{$category}' returned for {$scientificName}, defaulting to NE");
+                $category = 'NE';
+            }
+
+            $result = [
+                'success' => true,
+                'source' => 'gemini',
+                'category' => $category,
+                'reasoning' => $parsed['reason'] ?? 'Inferred from Gemini',
+            ];
+
+            Log::info("Inferred IUCN category for {$scientificName}: {$category}", ['reasoning' => $result['reasoning']]);
+            Cache::put($cacheKey, $result, now()->addHours(self::THREAT_CACHE_HOURS));
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error("Threat status inference failed for {$scientificName}: " . $e->getMessage());
+            return [
+                'success' => false,
+                'source' => 'gemini',
+                'category' => null,
+                'reasoning' => 'Exception during Gemini request',
+            ];
+        }
     }
 
     /**
@@ -146,7 +304,7 @@ class CareDetailsService
         return $plant;
     }
     /**
-     * Fetch care details from Trefle API
+     * Fetch care details from Trefle API using scientific name
      */
     private function fetchFromTrefle(string $scientificName): ?array
     {
@@ -156,46 +314,74 @@ class CareDetailsService
             return null;
         }
 
+        // Validate scientific name
+        $scientificName = trim($scientificName);
+        if (empty($scientificName)) {
+            Log::warning('Scientific name is empty, cannot fetch from Trefle');
+            return null;
+        }
+
         try {
-            // Search for the plant by scientific name
-            $searchResponse = Http::get(self::TREFLE_API_URL . '/plants/search', [
+            // Search for the plant by scientific name (primary identifier)
+            Log::info("Searching Trefle API for scientific name: {$scientificName}");
+            $searchResponse = Http::timeout(30)->get(self::TREFLE_API_URL . '/plants/search', [
                 'token' => $token,
                 'q' => $scientificName,
             ]);
 
             if (!$searchResponse->successful()) {
-                Log::warning('Trefle search failed for: ' . $scientificName);
+                Log::warning('Trefle search failed for: ' . $scientificName . ' (status: ' . $searchResponse->status() . ')');
                 return null;
             }
 
             $searchData = $searchResponse->json();
-            if (empty($searchData['data'])) {
+            if (empty($searchData['data']) || !is_array($searchData['data'])) {
                 Log::info('No Trefle results for: ' . $scientificName);
                 return null;
             }
 
-            // Get the first matching plant
-            $plantData = $searchData['data'][0];
-            $plantSlug = $plantData['slug'] ?? null;
+            // Get the first matching plant - prefer exact scientific name match
+            $plantData = null;
+            foreach ($searchData['data'] as $result) {
+                $resultScientificName = $result['scientific_name'] ?? '';
+                if (strcasecmp($resultScientificName, $scientificName) === 0) {
+                    $plantData = $result;
+                    Log::info("Found exact scientific name match in Trefle: {$resultScientificName}");
+                    break;
+                }
+            }
 
-            if (!$plantSlug) {
+            // If no exact match, use the first result
+            if (!$plantData) {
+                $plantData = $searchData['data'][0];
+                Log::info("Using first Trefle result (no exact match): " . ($plantData['scientific_name'] ?? 'unknown'));
+            }
+
+            $plantSlug = $plantData['slug'] ?? null;
+            if (empty($plantSlug)) {
+                Log::warning('Trefle result missing slug for: ' . $scientificName);
                 return null;
             }
 
             // Fetch detailed plant info
-            $detailResponse = Http::get(self::TREFLE_API_URL . "/plants/{$plantSlug}", [
+            $detailResponse = Http::timeout(30)->get(self::TREFLE_API_URL . "/plants/{$plantSlug}", [
                 'token' => $token,
             ]);
 
             if (!$detailResponse->successful()) {
-                Log::warning('Trefle detail fetch failed for: ' . $plantSlug);
+                Log::warning('Trefle detail fetch failed for: ' . $plantSlug . ' (status: ' . $detailResponse->status() . ')');
                 return null;
             }
 
             $detailData = $detailResponse->json();
             $data = $detailData['data'] ?? [];
 
-            return $this->parseTrefleData($data);
+            if (empty($data)) {
+                Log::warning('Trefle returned empty data for: ' . $plantSlug);
+                return null;
+            }
+
+            return $this->sanitizeCareData($this->parseTrefleData($data));
         } catch (\Exception $e) {
             Log::error('Trefle API error: ' . $e->getMessage());
             return null;
@@ -250,6 +436,7 @@ class CareDetailsService
 
     /**
      * Fetch care details from Gemini AI - returns descriptive text fields
+     * Prioritizes scientific name first, then adds common name for additional context if needed
      */
     private function fetchFromGemini(string $scientificName, ?string $commonName = null, ?string $family = null): ?array
     {
@@ -259,28 +446,119 @@ class CareDetailsService
             return null;
         }
 
-        Log::info("Fetching care details from Gemini for: {$scientificName}");
+        // Validate scientific name is not empty
+        $scientificName = trim($scientificName);
+        if (empty($scientificName)) {
+            Log::warning('Scientific name is empty, cannot fetch care details');
+            return null;
+        }
 
+        // Strategy 1: Try with scientific name only first (most accurate)
+        Log::info("Fetching care details from Gemini using scientific name: {$scientificName}");
+        $result = $this->callGeminiAPI($scientificName, null, $family, $apiKey);
+
+        if ($result && $this->hasUsefulData($result)) {
+            Log::info("✓ Gemini succeeded with scientific name only");
+            return $this->sanitizeCareData($result);
+        }
+
+        // Strategy 2: If scientific name alone failed and we have a common name, try with both
+        $commonName = $commonName ? trim($commonName) : null;
+        if (!empty($commonName)) {
+            Log::info("⚠ Scientific name only failed, retrying with common name context: {$commonName}");
+            $result = $this->callGeminiAPI($scientificName, $commonName, $family, $apiKey);
+
+            if ($result && $this->hasUsefulData($result)) {
+                Log::info("✓ Gemini succeeded with scientific name + common name context");
+                return $this->sanitizeCareData($result);
+            }
+        }
+
+        Log::info("✗ Gemini failed for: {$scientificName}");
+        return null;
+    }
+
+    /**
+     * Sanitize care data to ensure all expected fields exist with proper defaults
+     */
+    private function sanitizeCareData(array $data): array
+    {
+        $defaults = [
+            'description' => null,
+            'watering_guide' => null,
+            'sunlight_guide' => null,
+            'soil_guide' => null,
+            'temperature_guide' => null,
+            'care_summary' => null,
+            'care_tips' => null,
+            'sowing' => null,
+            'days_to_harvest' => null,
+            'row_spacing_cm' => null,
+            'spread_cm' => null,
+            'ph_minimum' => null,
+            'ph_maximum' => null,
+            'light' => null,
+            'atmospheric_humidity' => null,
+            'growth_months' => null,
+            'bloom_months' => null,
+            'fruit_months' => null,
+            'minimum_precipitation_mm' => null,
+            'maximum_precipitation_mm' => null,
+            'minimum_temperature_celsius' => null,
+            'maximum_temperature_celsius' => null,
+            'soil_nutriments' => null,
+            'soil_salinity' => null,
+            'soil_texture' => null,
+            'soil_humidity' => null,
+            'watering_frequency' => null,
+        ];
+
+        // Merge with defaults, ensuring all keys exist
+        $sanitized = array_merge($defaults, $data);
+
+        // Trim string values and convert empty strings to null
+        foreach ($sanitized as $key => $value) {
+            if (is_string($value)) {
+                $value = trim($value);
+                $sanitized[$key] = $value === '' ? null : $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Make the actual Gemini API call
+     */
+    private function callGeminiAPI(string $scientificName, ?string $commonName = null, ?string $family = null, string $apiKey): ?array
+    {
         try {
-            $plantName = $commonName ? "{$scientificName} ({$commonName})" : $scientificName;
-            $familyInfo = $family ? " from the {$family} family" : '';
+            // Build plant identification - scientific name is always primary
+            $plantIdentification = "Scientific name: {$scientificName}";
+            if (!empty($commonName)) {
+                $plantIdentification .= " (also known as: {$commonName})";
+            }
+            $familyInfo = !empty($family) ? " from the {$family} family" : '';
 
             $prompt = <<<PROMPT
-You are a botanical expert. Provide practical care guidance for the plant: {$plantName}{$familyInfo}.
+You are a botanical expert. Provide practical care guidance for the plant with the following identification:
+{$plantIdentification}{$familyInfo}.
+
+IMPORTANT: Use the scientific name "{$scientificName}" as the PRIMARY identifier for accuracy. If you cannot find information for the exact species, provide general care guidance for the genus.
 
 Return ONLY a valid JSON object with descriptive text fields. Do not include any markdown formatting, backticks, or explanations. Just the raw JSON.
 
 {
-    "description": "2-3 sentence description of the plant, its appearance, and origin",
-    "watering_guide": "Describe watering needs in detail (frequency, amount, seasonal adjustments, signs of over/under watering)",
-    "sunlight_guide": "Describe light requirements (full sun, partial shade, indoor lighting tips, ideal placement)",
-    "soil_guide": "Describe ideal soil conditions (type, pH, drainage, amendments, potting mix recommendations)",
-    "temperature_guide": "Describe temperature tolerance (ideal ranges, frost sensitivity, humidity preferences, seasonal care)",
-    "care_summary": "A brief 1-2 sentence summary of the most important care considerations for this plant",
-    "care_tips": "3-4 practical care tips for keeping this plant healthy"
+    "description": "2-3 sentence description of the plant, its appearance, and origin. If unknown, provide 'Information not available for this species.'",
+    "watering_guide": "Describe watering needs in detail (frequency, amount, seasonal adjustments, signs of over/under watering). If unknown, provide general watering advice for the plant family or genus.",
+    "sunlight_guide": "Describe light requirements (full sun, partial shade, indoor lighting tips, ideal placement). If unknown, provide general light advice for the plant family or genus.",
+    "soil_guide": "Describe ideal soil conditions (type, pH, drainage, amendments, potting mix recommendations). If unknown, provide general soil advice for the plant family or genus.",
+    "temperature_guide": "Describe temperature tolerance (ideal ranges, frost sensitivity, humidity preferences, seasonal care). If unknown, provide general temperature advice for the plant family or genus.",
+    "care_summary": "A brief 1-2 sentence summary of the most important care considerations for this plant. Always provide a helpful summary.",
+    "care_tips": "3-4 practical care tips for keeping this plant healthy. Always provide useful tips even if generic."
 }
 
-Make each field informative and practical for a home gardener. Always provide useful content even for less common plants.
+Make each field informative and practical for a home gardener. Always provide useful content - never leave fields empty or with just "unknown".
 PROMPT;
 
             // Use Saloon connector/request for Gemini instead of direct HTTP
@@ -391,8 +669,8 @@ PROMPT;
         $contents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
 
         try {
-            $connector = new \App\Http\Integrations\GeminiConnector();
-            $req = new \App\Http\Integrations\GeminiRequest('gemini-2.0-flash', $contents, null); // null for plain text
+            $connector = new GeminiConnector();
+            $req = new GeminiRequest('gemini-2.0-flash', $contents, null); // null for plain text
             $response = $connector->send($req);
             if (!$response->successful()) {
                 Log::warning('Gemini chat request failed: ' . $response->status());

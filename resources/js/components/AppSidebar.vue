@@ -25,11 +25,11 @@ const mainNavItems: NavItem[] = [
         href: '/plant-identifier',
         icon: SearchIcon,
     },
-    {
-        title: 'My Plants',
-        href: '/my-plants',
-        icon: Folder,
-    },
+    // {
+    //     title: 'My Plants',
+    //     href: '/my-plants',
+    //     icon: Folder,
+    // },
     {
         title: 'My Sightings',
         href: '/sightings',
@@ -42,7 +42,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Sightings Map',
-        href: '/plant-map',
+        href: '/sightings-map',
         icon: Map,
     },
     {

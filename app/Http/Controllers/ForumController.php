@@ -26,7 +26,7 @@ class ForumController extends Controller
                 $q->orderBy('created_at', 'asc');
             },
             'posts.replies.user',
-        ])->latest()->get();
+        ])->withCount('allPosts as posts_count')->latest()->get();
 
         $allTags = ForumTag::all();
 

@@ -1,4 +1,4 @@
-import { reactive, ref, type Ref } from 'vue';
+import { reactive, ref, computed, type Ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import type { Toast } from '@/composables/useToast';
 import type { IdentificationForm, ImageUpload } from '@/types/plant-identifier';
@@ -9,6 +9,43 @@ interface UsePlantSaveModalOptions {
   uploadedImages: Readonly<Ref<ImageUpload[]>>;
   form: IdentificationForm;
   MALAYSIAN_REGIONS: string[];
+}
+
+// IUCN Category Helper
+function getIucnWarning(category: string | undefined | null): { 
+  shouldWarnSighting: boolean; 
+  shouldDisableSighting: boolean;
+  message: string;
+} | null {
+  if (!category) return null;
+  
+  const cat = category.toUpperCase();
+  
+  if (cat === 'EX') {
+    return {
+      shouldWarnSighting: true,
+      shouldDisableSighting: true,
+      message: 'This species is extinct. Public sightings should not be reported unless this is an extraordinary rediscovery.'
+    };
+  }
+  
+  if (cat === 'EW') {
+    return {
+      shouldWarnSighting: true,
+      shouldDisableSighting: true,
+      message: 'This species is extinct in the wild and only exists in cultivation. Do not report as a wild sighting.'
+    };
+  }
+  
+  if (['CR', 'EN', 'VU'].includes(cat)) {
+    return {
+      shouldWarnSighting: false,
+      shouldDisableSighting: false,
+      message: 'This species is threatened. Reporting this sighting is valuable for conservation!'
+    };
+  }
+  
+  return null;
 }
 
 export function usePlantSaveModal({
@@ -31,9 +68,23 @@ export function usePlantSaveModal({
     notes: '',
   });
 
+  // Check IUCN category for warnings
+  const iucnWarning = computed(() => {
+    const category = selectedResult.value?.iucn?.category;
+    return getIucnWarning(category);
+  });
+
   const openSaveModal = () => {
     saveOptions.saveToCollection = true;
-    saveOptions.reportSighting = true;
+    
+    // Auto-disable sighting for extinct species
+    const warning = iucnWarning.value;
+    if (warning?.shouldDisableSighting) {
+      saveOptions.reportSighting = false;
+    } else {
+      saveOptions.reportSighting = true;
+    }
+    
     saveOptions.locationName = form.locationName || '';
     saveOptions.region = form.region || 'Peninsular Malaysia';
     saveOptions.latitude = form.latitude;
@@ -205,6 +256,7 @@ export function usePlantSaveModal({
     showSaveModal,
     submittingSave,
     saveOptions,
+    iucnWarning,
     openSaveModal,
     closeSaveModal,
     getSaveLocation,

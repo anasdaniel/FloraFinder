@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { defineProps, ref, computed, reactive } from "vue";
-import { Head, usePage, router } from "@inertiajs/vue3";
-import { Inertia } from "@inertiajs/inertia";
+import { Head, Link, usePage, router } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
 import Heading from "@/components/Heading.vue";
 import Icon from "@/components/Icon.vue";
@@ -9,7 +8,6 @@ import type { BreadcrumbItem, ForumThread } from "@/types";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import ForumCreate from "@/pages/Forum/Create.vue";
 import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus } from 'lucide-vue-next';
 
 const activeCommentThread = ref<number | null>(null);
@@ -72,7 +70,6 @@ const props = defineProps<{
 
 // Category filter state
 const selectedCategory = ref("general");
-const showNewThread = ref(false);
 
 const filteredThreads = computed(() => {
     if (selectedCategory.value === "all") {
@@ -86,7 +83,7 @@ const filteredThreads = computed(() => {
 // Delete thread
 const deleteThread = (threadId: number) => {
     if (confirm("Are you sure you want to delete this thread?")) {
-        Inertia.delete(`/forum/${threadId}`);
+        router.delete(`/forum/${threadId}`);
     }
 };
 
@@ -227,7 +224,7 @@ const postReply = async (commentId: number, threadId: number) => {
 const deleteComment = (id: number, threadId?: number) => {
     if (!confirm("Delete this comment?")) return;
 
-    Inertia.delete(`/forum/comment/${id}`, {
+    router.delete(`/forum/comment/${id}`, {
         onSuccess: () => {
             if (threadId) {
                 fetchComments(threadId);
@@ -250,30 +247,31 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                     <h1 class="text-2xl font-bold text-gray-900">Forum</h1>
                     <p class="mt-1 text-sm text-gray-500">Ask questions, share knowledge, and connect with the FloraFinder community.</p>
                 </div>
-                <!-- open modal instead of navigating -->
-                <Button type="button" variant="default" size="sm" class="gap-2 bg-gray-900 hover:bg-gray-800" @click="showNewThread = true">
-                    <Plus class="w-4 h-4" />
-                    New Post
-                </Button>
+                <Link href="/forum/new">
+                    <Button type="button" variant="default" size="sm" class="gap-2 bg-gray-900 hover:bg-gray-800">
+                        <Plus class="w-4 h-4" />
+                        New Post
+                    </Button>
+                </Link>
             </div>
 
             <!-- Category Filter Tabs -->
-            <div class="flex flex-wrap gap-2 mb-8">
+            <div class="flex flex-wrap gap-2 mb-8 p-1 bg-gray-100/50 rounded-xl w-fit">
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
                     :class="selectedCategory === 'general'
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
                     @click="selectedCategory = 'general'"
                 >
                     General
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
                     :class="selectedCategory === 'identification'
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
                     @click="selectedCategory = 'identification'"
                 >
                     <Search class="w-4 h-4" />
@@ -281,10 +279,10 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
                     :class="selectedCategory === 'care'
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
                     @click="selectedCategory = 'care'"
                 >
                     <Leaf class="w-4 h-4" />
@@ -292,10 +290,10 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border transition-all"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
                     :class="selectedCategory === 'offtopic'
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
                     @click="selectedCategory = 'offtopic'"
                 >
                     <Users class="w-4 h-4" />
@@ -304,215 +302,234 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
             </div>
 
             <!-- Threads List -->
-            <div class="space-y-4">
+            <div class="space-y-6">
                 <div
                     v-for="thread in filteredThreads"
                     :key="thread.id"
-                    class="bg-white border border-gray-100 rounded-xl p-5 hover:shadow-sm transition-shadow"
+                    class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200"
                 >
-                    <!-- Main thread row -->
-                    <div class="flex items-start gap-4">
-                        <!-- Avatar -->
-                        <Avatar class="h-10 w-10 rounded-full flex-shrink-0">
-                            <AvatarImage :src="thread.user?.avatar" />
-                            <AvatarFallback class="text-sm font-medium bg-gray-100 text-gray-600">
-                                {{ (thread.user?.name || thread.title).substring(0, 2).toUpperCase() }}
-                            </AvatarFallback>
-                        </Avatar>
-
-                        <!-- Thread content -->
-                        <div class="flex-1 min-w-0">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h3 class="font-semibold text-gray-900 text-base">{{ thread.title }}</h3>
-                                    <div class="flex items-center gap-2 mt-1 text-sm text-gray-500">
-                                        <span>By {{ thread.user?.name || 'Unknown' }}</span>
-                                        <span class="text-gray-300">•</span>
-                                        <span>{{ new Date(thread.created_at).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' }) }}</span>
-                                    </div>
-                                </div>
-
-                                <!-- Reply count + actions -->
-                                <div class="flex flex-col items-end gap-2 flex-shrink-0">
-                                    <span class="text-sm font-medium text-gray-500">{{ thread.posts_count || 0 }}</span>
-                                    <div class="flex items-center gap-2">
-                                        <button
-                                            @click="toggleCommentField(thread.id)"
-                                            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-                                            title="Comments"
-                                        >
-                                            <MessageCircle class="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            v-if="isOwner(thread)"
-                                            @click="deleteThread(thread.id)"
-                                            class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                            title="Delete Thread"
-                                        >
-                                            <Trash2 class="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
+                    <!-- Header: Author & Meta -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <Avatar class="h-10 w-10 border border-gray-100">
+                                <AvatarImage :src="thread.user?.avatar" />
+                                <AvatarFallback class="bg-primary/5 text-primary text-xs font-bold">
+                                    {{ (thread.user?.name || thread.title).substring(0, 2).toUpperCase() }}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <div class="font-semibold text-gray-900 text-sm">{{ thread.user?.name || 'Unknown' }}</div>
+                                <div class="text-xs text-gray-500">{{ new Date(thread.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</div>
                             </div>
+                        </div>
 
-                            <!-- Thread content preview -->
-                            <p v-if="thread.content" class="mt-2 text-sm text-gray-600 line-clamp-2">
-                                {{ thread.content }}
-                            </p>
+                        <!-- Actions Dropdown or Buttons -->
+                        <div class="flex items-center gap-2">
+                             <button
+                                v-if="isOwner(thread)"
+                                @click="deleteThread(thread.id)"
+                                class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                title="Delete Thread"
+                            >
+                                <Trash2 class="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
 
-                            <!-- Thread image -->
-                            <div v-if="thread.image" class="mt-3">
-                                <img
-                                    :src="`/storage/${thread.image}`"
-                                    class="w-full rounded-lg max-h-48 object-cover"
-                                />
-                            </div>
+                    <!-- Content -->
+                    <div class="mb-4">
+                        <Link :href="`/forum/${thread.id}`" class="block group/title">
+                            <h3 class="font-bold text-gray-900 text-lg mb-2 leading-tight group-hover/title:text-primary transition-colors">{{ thread.title }}</h3>
+                        </Link>
+                        <p v-if="thread.content" class="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                            {{ thread.content }}
+                        </p>
+                    </div>
 
-                            <!-- Tags -->
-                            <div v-if="thread.tags?.length" class="flex flex-wrap gap-2 mt-3">
-                                <span
-                                    v-for="tag in thread.tags"
-                                    :key="tag.id"
-                                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-full"
+                    <!-- Image -->
+                     <div v-if="thread.image" class="mb-4 rounded-xl overflow-hidden border border-gray-100">
+                        <img
+                            :src="`/storage/${thread.image}`"
+                            class="w-full h-auto max-h-[500px] object-cover"
+                        />
+                    </div>
+
+                    <!-- Tags -->
+                    <div v-if="thread.tags?.length || isOwner(thread)" class="flex flex-wrap gap-2 mb-4">
+                        <span
+                            v-for="tag in thread.tags"
+                            :key="tag.id"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-gray-50 text-gray-600 rounded-md border border-gray-100"
+                        >
+                            {{ tag.tag_name }}
+                            <button
+                                v-if="isOwner(thread)"
+                                class="text-gray-400 hover:text-red-500"
+                                @click="removeTag(thread.id, tag.id)"
+                            >
+                                ×
+                            </button>
+                        </span>
+
+                         <div v-if="isOwner(thread)" class="relative">
+                            <button
+                                class="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md border border-dashed border-gray-200 transition-colors"
+                                @click="showTagDropdown[thread.id] = !showTagDropdown[thread.id]"
+                            >
+                                + Tag
+                            </button>
+                            <div
+                                v-if="showTagDropdown[thread.id]"
+                                class="absolute left-0 mt-2 bg-white shadow-xl border rounded-lg p-3 z-50 w-48"
+                            >
+                                <select v-model="selectedTag" class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm mb-2 focus:ring-2 focus:ring-primary/20 outline-none">
+                                    <option disabled value="">Select tag</option>
+                                    <option v-for="t in allTags" :key="t.id" :value="t.id">
+                                        {{ t.tag_name }}
+                                    </option>
+                                </select>
+                                <Button
+                                    size="sm"
+                                    class="w-full"
+                                    @click="addTag(thread.id)"
                                 >
-                                    {{ tag.tag_name }}
-                                    <button
-                                        v-if="isOwner(thread)"
-                                        class="text-gray-400 hover:text-red-500 ml-1"
-                                        @click="removeTag(thread.id, tag.id)"
-                                    >
-                                        ×
-                                    </button>
-                                </span>
-
-                                <!-- Add tag button -->
-                                <div v-if="isOwner(thread)" class="relative">
-                                    <button
-                                        class="px-2 py-0.5 text-xs font-medium text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-full border border-dashed border-gray-300"
-                                        @click="showTagDropdown[thread.id] = !showTagDropdown[thread.id]"
-                                    >
-                                        + Add
-                                    </button>
-                                    <div
-                                        v-if="showTagDropdown[thread.id]"
-                                        class="absolute left-0 mt-2 bg-white shadow-lg border rounded-lg p-3 z-50"
-                                        style="min-width: 180px;"
-                                    >
-                                        <select v-model="selectedTag" class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm">
-                                            <option disabled value="">Select tag</option>
-                                            <option v-for="t in allTags" :key="t.id" :value="t.id">
-                                                {{ t.tag_name }}
-                                            </option>
-                                        </select>
-                                        <button
-                                            class="mt-2 w-full bg-gray-900 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-800"
-                                            @click="addTag(thread.id)"
-                                        >
-                                            Add Tag
-                                        </button>
-                                    </div>
-                                </div>
+                                    Add Tag
+                                </Button>
                             </div>
+                        </div>
+                    </div>
 
-                            <!-- Comment input -->
-                            <div class="mt-4 relative">
+                    <!-- Footer / Actions -->
+                    <div class="flex items-center justify-between pt-4 border-t border-gray-50">
+                        <div class="flex items-center gap-4">
+                             <button
+                                @click="toggleCommentField(thread.id)"
+                                class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                            >
+                                <MessageCircle class="w-5 h-5" />
+                                <span class="font-medium">{{ thread.posts_count || 0 }} Comments</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Comments Section -->
+                    <div v-if="activeCommentThread === thread.id" class="mt-4 pt-4 border-t border-gray-50 bg-gray-50/50 -mx-6 px-6 pb-6 rounded-b-2xl">
+                         <!-- Input -->
+                        <div class="flex gap-3 mb-6">
+                            <Avatar class="h-8 w-8 hidden sm:block">
+                                <AvatarImage :src="$page.props.auth.user.avatar" />
+                                <AvatarFallback>{{ $page.props.auth.user.name.substring(0,2).toUpperCase() }}</AvatarFallback>
+                            </Avatar>
+                            <div class="flex-1 relative">
                                 <input
                                     v-model="newComment"
                                     type="text"
                                     placeholder="Write a comment..."
-                                    class="w-full border border-gray-200 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:border-gray-400 focus:ring-0"
+                                    class="w-full border border-gray-200 rounded-full py-2.5 pl-4 pr-12 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 shadow-sm transition-all"
                                     @focus="activeCommentThread = thread.id"
+                                    @keydown.enter="postComment(thread.id)"
                                 />
                                 <button
                                     @click="postComment(thread.id)"
-                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 hover:text-blue-700"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+                                    :disabled="!newComment.trim()"
                                 >
-                                    <SendHorizontal class="w-5 h-5" />
+                                    <SendHorizontal class="w-4 h-4" />
                                 </button>
                             </div>
+                        </div>
 
-                            <!-- Display comments -->
-                            <div v-if="activeCommentThread === thread.id" class="mt-4 space-y-4">
-                                <div v-if="commentsLoading" class="text-sm text-muted-foreground">Loading comments...</div>
+                         <div v-if="commentsLoading" class="text-center py-4">
+                             <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                        </div>
 
-                                <div v-else>
-                                    <div
-                                        v-if="(commentsMap[thread.id] || []).length === 0"
-                                        class="text-sm text-muted-foreground"
-                                    >
-                                        No comments yet.
-                                    </div>
+                        <div v-else class="space-y-6">
+                             <div
+                                v-if="(commentsMap[thread.id] || []).length === 0"
+                                class="text-sm text-gray-500 text-center py-2"
+                            >
+                                Be the first to comment.
+                            </div>
 
-                                    <!-- Comments list -->
-                                    <div
-                                        v-for="comment in commentsMap[thread.id] || []"
-                                        :key="comment.id"
-                                        class="text-sm group"
-                                    >
-                                        <div class="flex justify-between items-start w-full">
-                                            <div class="flex flex-col w-full">
-                                                <div class="font-semibold text-gray-900">{{ comment.user?.name || 'Unknown' }}:</div>
-                                                <div class="text-gray-700 mt-0.5">{{ comment.content }}</div>
+                            <div
+                                v-for="comment in commentsMap[thread.id] || []"
+                                :key="comment.id"
+                                class="group"
+                            >
+                                <div class="flex gap-3">
+                                    <Avatar class="h-8 w-8 mt-1 border border-gray-200">
+                                        <AvatarImage :src="comment.user?.avatar" />
+                                        <AvatarFallback class="text-xs bg-white text-gray-700">
+                                            {{ (comment.user?.name || '?').substring(0, 2).toUpperCase() }}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div class="flex-1">
+                                        <div class="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm inline-block min-w-[200px]">
+                                             <div class="flex justify-between items-start mb-1">
+                                                <span class="font-semibold text-sm text-gray-900">{{ comment.user?.name || 'Unknown' }}</span>
+                                                <span class="text-xs text-gray-400">{{ new Date(comment.created_at).toLocaleDateString() }}</span>
+                                             </div>
+                                            <p class="text-sm text-gray-700 leading-relaxed">{{ comment.content }}</p>
+                                        </div>
 
-                                                <!-- Timestamp + Reply link inline -->
-                                                <div class="text-xs text-gray-400 flex items-center gap-3 mt-1">
-                                                    <span>{{ new Date(comment.created_at).toLocaleString() }}</span>
-
-                                                    <!-- Reply link beside timestamp -->
-                                                    <span
-                                                        class="text-blue-600 cursor-pointer hover:underline"
-                                                        @click="activeReplyComment = (activeReplyComment === comment.id ? null : comment.id)"
-                                                    >
-                                                        Reply
-                                                    </span>
-                                                </div>
-
-                                                <!-- Reply input (only when active) -->
-                                                <div v-if="activeReplyComment === comment.id" class="mt-2 flex items-center gap-2">
-                                                    <input
-                                                        v-model="newReplies[comment.id]"
-                                                        type="text"
-                                                        placeholder="Write a reply..."
-                                                        class="border rounded p-2 w-full text-xs"
-                                                    />
-
-                                                    <SendHorizontal
-                                                        class="w-4 h-4 text-blue-600 hover:text-blue-800 cursor-pointer"
-                                                        title="Post Reply"
-                                                        @click="postReply(comment.id, thread.id)"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <!-- Delete comment icon -->
-                                            <Trash2
+                                        <div class="flex items-center gap-4 mt-1 ml-2">
+                                            <button
+                                                class="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                                                @click="activeReplyComment = (activeReplyComment === comment.id ? null : comment.id)"
+                                            >
+                                                Reply
+                                            </button>
+                                             <button
                                                 v-if="comment.user_id === $page.props.auth.user.id"
-                                                class="w-4 h-4 text-red-400 hover:text-red-600 cursor-pointer ml-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                title="Delete Comment"
+                                                class="text-xs font-medium text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
                                                 @click="deleteComment(comment.id, thread.id)"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+
+                                        <!-- Reply Input -->
+                                         <div v-if="activeReplyComment === comment.id" class="mt-3 flex gap-2 items-center">
+                                            <div class="h-8 w-0.5 bg-gray-200"></div>
+                                            <input
+                                                v-model="newReplies[comment.id]"
+                                                type="text"
+                                                placeholder="Write a reply..."
+                                                class="flex-1 border border-gray-200 rounded-full py-2 px-4 text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                                                @keydown.enter="postReply(comment.id, thread.id)"
                                             />
                                         </div>
 
-
-                                        <!-- Replies for this comment -->
-                                        <div v-if="comment.replies && comment.replies.length" class="ml-4 mt-2 text-sm border-l-2 border-gray-100 pl-3">
+                                        <!-- Replies -->
+                                        <div v-if="comment.replies && comment.replies.length" class="mt-3 space-y-3 pl-4 border-l-2 border-gray-200/50">
                                             <div
                                                 v-for="reply in comment.replies"
                                                 :key="reply.id"
-                                                class="mb-2 flex justify-between items-start group/reply"
+                                                class="flex gap-3 group/reply"
                                             >
+                                                 <Avatar class="h-6 w-6 mt-1 border border-gray-200">
+                                                    <AvatarImage :src="reply.user?.avatar" />
+                                                    <AvatarFallback class="text-[10px] bg-white text-gray-700">
+                                                        {{ (reply.user?.name || '?').substring(0, 2).toUpperCase() }}
+                                                    </AvatarFallback>
+                                                </Avatar>
                                                 <div>
-                                                    <div class="text-xs font-semibold text-gray-900">{{ reply.user?.name || 'Unknown' }}:</div>
-                                                    <div class="text-xs text-gray-600">{{ reply.content }}</div>
+                                                    <div class="bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
+                                                        <div class="flex items-center gap-2 mb-0.5">
+                                                            <span class="font-semibold text-xs text-gray-900">{{ reply.user?.name }}</span>
+                                                        </div>
+                                                        <p class="text-xs text-gray-700">{{ reply.content }}</p>
+                                                    </div>
+                                                     <div class="flex items-center gap-4 mt-1 ml-2">
+                                                         <button
+                                                            v-if="reply.user_id === $page.props.auth.user.id"
+                                                            class="text-[10px] font-medium text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover/reply:opacity-100"
+                                                            @click="deleteComment(reply.id, thread.id)"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
                                                 </div>
-
-                                                <!-- Delete reply icon -->
-                                                <Trash2
-                                                    v-if="reply.user_id === $page.props.auth.user.id"
-                                                    class="w-3 h-3 text-red-400 hover:text-red-600 cursor-pointer ml-3 opacity-0 group-hover/reply:opacity-100 transition-opacity"
-                                                    title="Delete Reply"
-                                                    @click="deleteComment(reply.id, thread.id)"
-                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -523,17 +540,6 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </div>
             </div>
 
-            <!-- Modal: embedded ForumCreate -->
-            <div v-if="showNewThread" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                <div class="bg-white dark:bg-slate-800 rounded-lg shadow-lg w-full max-w-2xl overflow-auto">
-                    <div class="flex justify-end p-2">
-                        <button class="text-sm px-3 py-1" @click="showNewThread = false">Close</button>
-                    </div>
-                    <div class="p-4">
-                        <ForumCreate embedded @close="showNewThread = false" />
-                    </div>
-                </div>
-            </div>
 
             <div class="mt-10 text-xs text-center text-muted-foreground">
                 <span>Powered by FloraFinder Community</span>

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import BotanistChat from "@/components/identifier/BotanistChat.vue";
 import IdentifierResultCard from "@/components/identifier/IdentifierResultCard.vue";
 import UploadPanel from "@/components/identifier/UploadPanel.vue";
 import Icon from "@/components/Icon.vue";
@@ -11,6 +10,7 @@ import { usePlantIdentification } from "@/composables/usePlantIdentification";
 import { usePlantSaveModal } from "@/composables/usePlantSaveModal";
 import AppLayout from "@/layouts/AppLayout.vue";
 import type { PlantResult } from "@/types/plant-identifier";
+import { computed } from "vue";
 
 const props = defineProps<{
   plantData?: PlantResult;
@@ -67,6 +67,7 @@ const {
   activeImageIndex,
   careDetails,
   careSource,
+  preferredProvider,
   fetchingCareDetails,
   plantDescription,
   descriptionLoading,
@@ -85,6 +86,7 @@ const {
   formatCareValue,
   formatRange,
   fetchCareDetails,
+  switchProvider,
   toggleBookmark,
   handleChatSend,
   setActiveImage,
@@ -96,6 +98,7 @@ const {
   showSaveModal,
   submittingSave,
   saveOptions,
+  iucnWarning,
   openSaveModal,
   closeSaveModal,
   getSaveLocation,
@@ -123,14 +126,47 @@ const resetIdentifier = () => {
 
 const getOrganLabel = (organ: string) => {
   const labels: Record<string, string> = {
-    flower: '🌸 Flower',
-    leaf: '🍃 Leaf',
-    fruit: '🍎 Fruit',
-    bark: '🪵 Bark',
-    auto: '✨ Auto',
+    flower: "🌸 Flower",
+    leaf: "🍃 Leaf",
+    fruit: "🍎 Fruit",
+    bark: "🪵 Bark",
+    auto: "✨ Auto",
   };
   return labels[organ] || organ;
 };
+
+// Check if the identified plant is threatened (CR, EN, VU and named variants)
+const isThreatenedSpecies = computed(() => {
+  const rawCategory = selectedResult.value?.iucn?.category;
+
+  console.log('[Index.vue] Checking isThreatenedSpecies:', {
+    rawCategory,
+    hasSelectedResult: !!selectedResult.value,
+    iucn: selectedResult.value?.iucn
+  });
+
+  if (!rawCategory) {
+    console.log('[Index.vue] No IUCN category, returning false');
+    return false;
+  }
+
+  const normalized = rawCategory.trim().toUpperCase();
+  const threatenedCategories = new Set([
+    "CR",
+    "CRITICALLY ENDANGERED",
+    "EN",
+    "ENDANGERED",
+    "VU",
+    "VULNERABLE",
+    "NT",
+    "NEAR THREATENED",
+  ]);
+
+  const isThreatened = threatenedCategories.has(normalized);
+  console.log(`[Index.vue] Category '${normalized}' is ${isThreatened ? 'THREATENED' : 'NOT threatened'}`);
+
+  return isThreatened;
+});
 </script>
 
 <template>
@@ -229,30 +265,28 @@ const getOrganLabel = (organ: string) => {
                 :active-image-index="activeImageIndex"
                 :care-details="careDetails"
                 :care-source="careSource"
+                :preferred-provider="preferredProvider"
                 :fetching-care-details="fetchingCareDetails"
                 :plant-description="plantDescription"
                 :description-loading="descriptionLoading"
                 :is-current-result-bookmarked="isCurrentResultBookmarked"
                 :is-gemini-care="isGeminiCare"
                 :has-care-data="hasCareData"
+                :is-threatened-species="isThreatenedSpecies"
                 :format-care-value="formatCareValue"
                 :format-range="formatRange"
                 :set-active-image="setActiveImage"
                 :toggle-bookmark="toggleBookmark"
                 :fetch-care-details="fetchCareDetails"
+                :switch-provider="switchProvider"
                 :open-save-modal="openSaveModal"
+                :chat-messages="chatMessages"
+                :chat-input="chatInput"
+                :is-chat-loading="isChatLoading"
+                :update-chat-input="(val: string) => chatInput = val"
+                :handle-chat-send="handleChatSend"
               />
             </Transition>
-
-            <!-- Botanist Chat -->
-            <BotanistChat
-              :plant-name="selectedResult.species.commonNames?.[0] || 'plant'"
-              :chat-messages="chatMessages"
-              :chat-input="chatInput"
-              :is-chat-loading="isChatLoading"
-              @update:chat-input="chatInput = $event"
-              @send="handleChatSend"
-            />
           </template>
 
           <!-- Error State -->
@@ -309,7 +343,8 @@ const getOrganLabel = (organ: string) => {
               </h3>
               <p class="max-w-md mt-3 text-sm text-gray-600 dark:text-gray-300">
                 We couldn't find a confident match for this photo. Try a clearer image,
-                zoom in on the most distinctive plant part, or choose a different organ, or select Auto to let AI detect the organ.
+                zoom in on the most distinctive plant part, or choose a different organ,
+                or select Auto to let AI detect the organ.
               </p>
               <ul
                 class="mt-4 text-sm text-gray-500 list-disc list-inside dark:text-gray-400"
@@ -393,6 +428,37 @@ const getOrganLabel = (organ: string) => {
             </div>
           </div>
 
+          <!-- IUCN Warning Banner -->
+          <div
+            v-if="iucnWarning"
+            class="p-4 rounded-xl border-2"
+            :class="iucnWarning.shouldDisableSighting ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'"
+          >
+            <div class="flex items-start gap-3">
+              <div class="flex-shrink-0 mt-0.5">
+                <Icon
+                  name="alert-triangle"
+                  class="w-5 h-5"
+                  :class="iucnWarning.shouldDisableSighting ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'"
+                />
+              </div>
+              <div>
+                <h4
+                  class="font-semibold text-sm mb-1"
+                  :class="iucnWarning.shouldDisableSighting ? 'text-red-900 dark:text-red-200' : 'text-amber-900 dark:text-amber-200'"
+                >
+                  Conservation Alert
+                </h4>
+                <p
+                  class="text-sm leading-relaxed"
+                  :class="iucnWarning.shouldDisableSighting ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'"
+                >
+                  {{ iucnWarning.message }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Save Options -->
           <div class="space-y-3">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -433,6 +499,7 @@ const getOrganLabel = (organ: string) => {
             <!-- Report Sighting Toggle -->
             <div
               class="flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50"
+              :class="iucnWarning?.shouldDisableSighting ? 'opacity-50' : ''"
             >
               <div class="flex items-center gap-3">
                 <div
@@ -443,20 +510,22 @@ const getOrganLabel = (organ: string) => {
                 <div>
                   <p class="text-sm font-medium text-gray-900 dark:text-white">
                     Report Public Sighting
+                    <span v-if="iucnWarning?.shouldDisableSighting" class="ml-1 text-xs text-red-600">(Disabled)</span>
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    Contribute to biodiversity mapping
+                    {{ iucnWarning?.shouldDisableSighting ? 'Not applicable for extinct species' : 'Contribute to biodiversity mapping' }}
                   </p>
                 </div>
               </div>
-              <label class="relative inline-flex items-center cursor-pointer">
+              <label class="relative inline-flex items-center" :class="iucnWarning?.shouldDisableSighting ? 'cursor-not-allowed' : 'cursor-pointer'">
                 <input
                   type="checkbox"
                   v-model="saveOptions.reportSighting"
+                  :disabled="iucnWarning?.shouldDisableSighting"
                   class="sr-only peer"
                 />
                 <div
-                  class="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"
+                  class="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-disabled:opacity-50 peer-disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700"
                 ></div>
               </label>
             </div>

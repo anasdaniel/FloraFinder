@@ -22,13 +22,13 @@ return new class extends Migration {
             $table->string('common_name')->nullable();
             $table->string('family');
             $table->string('genus');
-            $table->string('confidence');
+            $table->decimal('confidence', 5, 2);
             $table->string('gbif_id')->nullable();
             $table->string('powo_id')->nullable();
             $table->string('iucn_category')->nullable();
             $table->string('region')->nullable();
-            $table->string('latitude')->nullable();
-            $table->string('longitude')->nullable();
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
             $table->timestamps();
         });
     }

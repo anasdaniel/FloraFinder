@@ -60,6 +60,6 @@ class ForumTagSeeder extends Seeder
             ['tag_name' => 'Troubleshooting',        'tag_category' => 'Support'],
         ];
 
-        DB::table('forum_tags')->insert($tags);
+        DB::table('forum_tags')->insertOrIgnore($tags);
     }
 }

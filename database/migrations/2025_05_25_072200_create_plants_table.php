@@ -13,15 +13,14 @@ return new class extends Migration
     {
         Schema::create('plants', function (Blueprint $table) {
             $table->id();
-//            $table->foreignIdFor(\App\Models\PlantCategory::class)->constrained()->cascadeOnDelete();
-//            $table->foreignIdFor(\App\Models\ConservationStatus::class)->constrained()->cascadeOnDelete();
-
-            $table->foreignIdFor(\App\Models\PlantingRecommendation::class)->constrained()->cascadeOnDelete();
-            $table->string('common_name', 100);
+            $table->foreignIdFor(\App\Models\PlantCategory::class)->nullable()->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(\App\Models\ConservationStatus::class)->nullable()->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(\App\Models\PlantingRecommendation::class)->nullable()->constrained()->cascadeOnDelete();
+            $table->string('common_name', 100)->nullable();
             $table->string('scientific_name', 150)->unique();
-            $table->string('family', 100);
-            $table->string('habitat', 100);
-            $table->string('lifespan',50);
+            $table->string('family', 100)->nullable();
+            $table->string('habitat', 100)->nullable();
+            $table->string('lifespan', 50)->nullable();
             $table->timestamps();
         });
     }
