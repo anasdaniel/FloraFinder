@@ -27,6 +27,10 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
+Route::get('/dashboard-preview', function () {
+    return Inertia::render('Dashboard/Guest');
+})->name('dashboard.preview');
+
 
 Route::get('/login', function () {
     return Inertia::render('Auth/Login');
@@ -54,6 +58,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/forum', [ForumController::class, 'index'])
         ->name('forum');
 
+    // Create Thread
+    Route::get('/forum/new', [ForumController::class, 'create'])->name('forum.create');
+    Route::post('/forum', [ForumController::class, 'store'])->name('forum.store');
+
 
     //welcome plant
     Route::get('welcome-plant', function () {
@@ -80,12 +88,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('forum.show');
 
-    // Show "Create Thread" page
-    // Submit new thread
-    Route::middleware(['auth'])->group(function () {
-        Route::get('/forum/new', [ForumController::class, 'create'])->name('forum.create');
-        Route::post('/forum', [ForumController::class, 'store'])->name('forum.store');
-    });
 
     //delete a thread
     Route::delete('/forum/{thread}', [ForumController::class, 'destroy'])->name('forum.destroy');
@@ -158,7 +160,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         );
     })->name('plant-search');
 
-    // Plant Map route
+    // My Plants Map - User's personal plant collection on a map
+    // Component: resources/js/pages/MyPlants/Map.vue
+    // Filtering: Client-side (Vue computed properties)
     Route::get('plant-map', function () {
         // Fetch actual sightings from database
         $sightings = \App\Models\Sighting::with(['images', 'user', 'plant'])
@@ -195,14 +199,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
 
         return Inertia::render(
-            'Map/Index',
+            'MyPlants/Map',
             props: [
                 'plants' => $sightings
             ]
         );
     })->name('plant-map');
 
-    // Public Sightings Map (all users' sightings)
+    // Public Sightings Map - Shows all users' plant sightings
+    // Component: resources/js/pages/Sightings/PublicMap.vue
+    // Controller: SightingController@publicMap
+    // Filtering: Server-side (Laravel with pagination)
     Route::get('sightings-map', [SightingController::class, 'publicMap'])->name('sightings.map');
 
     // Sighting routes

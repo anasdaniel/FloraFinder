@@ -23,6 +23,11 @@ class ForumThread extends Model
         return $this->hasMany(ForumPost::class)->whereNull('parent_post_id')->orderBy('created_at', 'asc');
     }
 
+    public function allPosts()
+    {
+        return $this->hasMany(ForumPost::class);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

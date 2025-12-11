@@ -394,8 +394,6 @@ class SightingController extends Controller
             ['code' => 'VU', 'label' => 'Vulnerable'],
             ['code' => 'EN', 'label' => 'Endangered'],
             ['code' => 'CR', 'label' => 'Critically Endangered'],
-            ['code' => 'EW', 'label' => 'Extinct in the Wild'],
-            ['code' => 'EX', 'label' => 'Extinct'],
         ];
 
         // Calculate statistics
@@ -407,7 +405,7 @@ class SightingController extends Controller
             'unique_regions' => $allSightings->pluck('region')->filter()->unique()->count(),
         ];
 
-        return Inertia::render('Sightings/Map', [
+        return Inertia::render('Sightings/PublicMap', [
             'sightings' => $sightings,
             'regions' => $regions,
             'families' => $families,
