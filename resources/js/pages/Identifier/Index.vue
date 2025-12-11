@@ -136,10 +136,37 @@ const getOrganLabel = (organ: string) => {
   return labels[organ] || organ;
 };
 
-// Check if the identified plant is threatened (CR, EN, VU)
+// Check if the identified plant is threatened (CR, EN, VU and named variants)
 const isThreatenedSpecies = computed(() => {
-  const category = selectedResult.value?.iucn?.category?.toUpperCase();
-  return category === 'CR' || category === 'EN' || category === 'VU';
+  const rawCategory = selectedResult.value?.iucn?.category;
+
+  console.log('[Index.vue] Checking isThreatenedSpecies:', {
+    rawCategory,
+    hasSelectedResult: !!selectedResult.value,
+    iucn: selectedResult.value?.iucn
+  });
+
+  if (!rawCategory) {
+    console.log('[Index.vue] No IUCN category, returning false');
+    return false;
+  }
+
+  const normalized = rawCategory.trim().toUpperCase();
+  const threatenedCategories = new Set([
+    "CR",
+    "CRITICALLY ENDANGERED",
+    "EN",
+    "ENDANGERED",
+    "VU",
+    "VULNERABLE",
+    "NT",
+    "NEAR THREATENED",
+  ]);
+
+  const isThreatened = threatenedCategories.has(normalized);
+  console.log(`[Index.vue] Category '${normalized}' is ${isThreatened ? 'THREATENED' : 'NOT threatened'}`);
+
+  return isThreatened;
 });
 </script>
 
@@ -246,6 +273,7 @@ const isThreatenedSpecies = computed(() => {
                 :is-current-result-bookmarked="isCurrentResultBookmarked"
                 :is-gemini-care="isGeminiCare"
                 :has-care-data="hasCareData"
+                :is-threatened-species="isThreatenedSpecies"
                 :format-care-value="formatCareValue"
                 :format-range="formatRange"
                 :set-active-image="setActiveImage"

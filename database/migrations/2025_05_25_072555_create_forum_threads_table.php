@@ -29,8 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('forum_threads', function (Blueprint $table) {
-            $table->dropColumn(['content', 'image']);
-        });
+        Schema::dropIfExists('forum_threads');
     }
 };

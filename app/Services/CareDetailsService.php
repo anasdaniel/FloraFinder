@@ -16,6 +16,7 @@ class CareDetailsService
     private const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
     private const CACHE_DURATION_HOURS = 24;
     private const DB_CACHE_DAYS = 7;
+    private const THREAT_CACHE_HOURS = 24;
 
     /**
      * Get care details for a plant, checking DB first, then preferred provider, then fallback.
@@ -147,6 +148,103 @@ class CareDetailsService
             'data' => [],
             'message' => 'Care details not available from any provider',
         ];
+    }
+
+    public function inferThreatStatus(string $scientificName): array
+    {
+        $scientificName = trim($scientificName);
+        if ($scientificName === '') {
+            return [
+                'success' => false,
+                'source' => 'gemini',
+                'category' => null,
+                'reasoning' => 'Scientific name is required',
+            ];
+        }
+
+        $cacheKey = 'threat_status_' . md5($scientificName);
+        if ($cached = Cache::get($cacheKey)) {
+            return $cached;
+        }
+
+        try {
+            $prompt = <<<EOT
+You are a botanist consultant. Given a plant scientific name, determine its IUCN Red List conservation status category.
+
+Plant: {$scientificName}
+
+Return ONLY valid JSON in this exact format:
+{"category":"<IUCN_CODE>","reason":"<brief explanation>"}
+
+Valid IUCN codes:
+- EX (Extinct)
+- EW (Extinct in the Wild)
+- CR (Critically Endangered)
+- EN (Endangered)
+- VU (Vulnerable)
+- NT (Near Threatened)
+- LC (Least Concern)
+- DD (Data Deficient)
+- NE (Not Evaluated)
+
+IMPORTANT: For Rafflesia species and other rare endemic species, use CR, EN, or VU as appropriate based on their known conservation status. Do NOT guess LC unless you're confident the species is common.
+EOT;
+
+            $connector = new GeminiConnector();
+            $request = new GeminiRequest('gemini-2.5-flash', [
+                ['parts' => [['text' => $prompt]]],
+            ]);
+
+            $response = $connector->send($request);
+
+            if (!$response->successful()) {
+                Log::warning("Gemini threat status request failed for {$scientificName}", ['status' => $response->status(), 'body' => $response->body()]);
+                return [
+                    'success' => false,
+                    'source' => 'gemini',
+                    'category' => null,
+                    'reasoning' => 'Gemini request failed',
+                ];
+            }
+
+            $json = $response->json();
+            $text = $json['candidates'][0]['content']['parts'][0]['text'] ?? null;
+
+            // Clean markdown formatting if present
+            $text = preg_replace('/^```json\s*/i', '', $text ?? '');
+            $text = preg_replace('/^```\s*/i', '', $text ?? '');
+            $text = preg_replace('/\s*```$/', '', $text ?? '');
+            $text = trim($text);
+
+            $parsed = $text ? json_decode($text, true) : null;
+            $category = strtoupper(trim($parsed['category'] ?? ''));
+
+            $allowed = ['EX', 'EW', 'CR', 'EN', 'VU', 'NT', 'LC', 'DD', 'NE'];
+            if (!in_array($category, $allowed, true)) {
+                Log::warning("Invalid IUCN category '{$category}' returned for {$scientificName}, defaulting to NE");
+                $category = 'NE';
+            }
+
+            $result = [
+                'success' => true,
+                'source' => 'gemini',
+                'category' => $category,
+                'reasoning' => $parsed['reason'] ?? 'Inferred from Gemini',
+            ];
+
+            Log::info("Inferred IUCN category for {$scientificName}: {$category}", ['reasoning' => $result['reasoning']]);
+            Cache::put($cacheKey, $result, now()->addHours(self::THREAT_CACHE_HOURS));
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error("Threat status inference failed for {$scientificName}: " . $e->getMessage());
+            return [
+                'success' => false,
+                'source' => 'gemini',
+                'category' => null,
+                'reasoning' => 'Exception during Gemini request',
+            ];
+        }
     }
 
     /**

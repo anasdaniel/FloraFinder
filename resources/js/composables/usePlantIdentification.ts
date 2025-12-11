@@ -32,6 +32,7 @@ export function usePlantIdentification({
   const careSource = ref<CareSource>(null);
   const preferredProvider = ref<'gemini' | 'trefle'>('gemini'); // Default to Gemini
   const fetchingCareDetails = ref(false);
+  const fetchingThreatStatus = ref(false);
   const plantDescription = ref('');
   const descriptionLoading = ref(false);
   const chatMessages = ref<ChatMessage[]>([]);
@@ -194,6 +195,9 @@ export function usePlantIdentification({
           selectedResultIndex.value = 0;
           activeImageIndex.value = 0;
           const topResult = matches[0];
+
+          // Fetch threat status first, passing the index for easier updates
+          fetchThreatStatus(topResult.species.scientificName, 0);
           fetchCareDetails(topResult.species.scientificName);
 
           toast({
@@ -245,6 +249,80 @@ export function usePlantIdentification({
       careSource.value = 'none';
     } finally {
       fetchingCareDetails.value = false;
+    }
+  };
+
+  const fetchThreatStatus = async (
+    scientificName: string,
+    resultIndex: number = 0,
+  ) => {
+    console.log(`[fetchThreatStatus] Called for: ${scientificName} at index ${resultIndex}`);
+
+    if (!scientificName || fetchingThreatStatus.value) {
+      console.log('[fetchThreatStatus] Skipping: no name or already fetching');
+      return;
+    }
+
+    if (!results.value?.data?.results?.[resultIndex]) {
+      console.log('[fetchThreatStatus] No result at index', resultIndex);
+      return;
+    }
+
+    const targetResult = results.value.data.results[resultIndex];
+    console.log('[fetchThreatStatus] Existing IUCN:', targetResult.iucn);
+
+    // Skip if already have valid IUCN data (non-empty, non-null category)
+    const existingCategory = targetResult.iucn?.category?.trim();
+    if (existingCategory && existingCategory.length > 0) {
+      console.log(`[fetchThreatStatus] Skipping: already have category '${existingCategory}'`);
+      return;
+    }
+
+    console.log('[fetchThreatStatus] Fetching threat status from API...');
+    fetchingThreatStatus.value = true;
+    try {
+      const url = new URL(route('plant-identifier.threat-status'));
+      url.searchParams.append('scientificName', scientificName);
+      const res = await fetch(url.toString());
+      const data = await res.json();
+
+      console.log('[fetchThreatStatus] API response:', data);
+
+      if (data?.success && data?.category) {
+        console.log(`[fetchThreatStatus] Updating with category: ${data.category}`);
+
+        // Update the results ref to ensure reactivity
+        if (results.value?.data?.results) {
+          // Create a new results array with the updated result
+          const updatedResults = [...results.value.data.results];
+          updatedResults[resultIndex] = {
+            ...updatedResults[resultIndex],
+            iucn: { category: data.category }
+          };
+
+          // Update the results ref
+          results.value = {
+            ...results.value,
+            data: {
+              ...results.value.data,
+              results: updatedResults
+            }
+          };
+
+          console.log(`[fetchThreatStatus] ✓ Successfully updated IUCN category for ${scientificName}: ${data.category}`, {
+            reasoning: data.reasoning,
+            updatedResult: updatedResults[resultIndex]
+          });
+        } else {
+          console.error('[fetchThreatStatus] No results.value.data.results available');
+        }
+      } else {
+        console.log('[fetchThreatStatus] No valid category in response');
+      }
+    } catch (error) {
+      console.error('[fetchThreatStatus] Threat status error:', error);
+    } finally {
+      fetchingThreatStatus.value = false;
     }
   };
 

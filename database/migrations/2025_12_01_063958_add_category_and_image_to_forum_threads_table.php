@@ -11,9 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('forum_threads', function (Blueprint $table) {
-            //
-        });
+        // No-op: fields already present in the create migration.
     }
 
     /**
@@ -21,8 +19,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('forum_threads', function (Blueprint $table) {
-            //
-        });
+        // No-op to avoid removing existing columns.
     }
 };

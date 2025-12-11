@@ -12,10 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('plants', function (Blueprint $table) {
+            $table->dropForeign(['planting_recommendation_id']);
+
             // Make existing required columns nullable for API-sourced plants
             $table->foreignId('planting_recommendation_id')->nullable()->change();
             $table->string('habitat', 100)->nullable()->change();
             $table->string('lifespan', 50)->nullable()->change();
+
+            $table->foreign('planting_recommendation_id')->references('id')->on('planting_recommendations')->cascadeOnDelete();
 
             // Add genus column
             $table->string('genus', 100)->nullable()->after('family');
@@ -58,6 +62,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('plants', function (Blueprint $table) {
+            $table->dropForeign(['planting_recommendation_id']);
             $table->dropColumn([
                 'genus',
                 'gbif_id',
@@ -85,6 +90,12 @@ return new class extends Migration
                 'soil_humidity',
                 'care_cached_at',
             ]);
+
+            $table->foreignId('planting_recommendation_id')->nullable(false)->change();
+            $table->string('habitat', 100)->nullable(false)->change();
+            $table->string('lifespan', 50)->nullable(false)->change();
+
+            $table->foreign('planting_recommendation_id')->references('id')->on('planting_recommendations')->cascadeOnDelete();
         });
     }
 };

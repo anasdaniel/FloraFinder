@@ -16,12 +16,14 @@ return new class extends Migration
             $table->string('zone_name', 100)->unique();
             $table->string('zone_type', 100);
             $table->string('location_description', 255);
+            $table->timestamps();
         });
 
         Schema::create('plant_zone', function (Blueprint $table) {
             $table->id();
             $table->foreignIdFor(\App\Models\Plant::class)->constrained()->cascadeOnDelete();
             $table->foreignIdFor(\App\Models\Zone::class)->constrained()->cascadeOnDelete();
+            $table->unique(['plant_id', 'zone_id']);
             $table->timestamps();
         });
     }
@@ -31,7 +33,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('zones');
         Schema::dropIfExists('plant_zone');
+        Schema::dropIfExists('zones');
     }
 };

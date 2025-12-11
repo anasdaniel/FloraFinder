@@ -30,6 +30,7 @@ const props = defineProps<{
   isCurrentResultBookmarked: boolean;
   isGeminiCare: boolean;
   hasCareData: boolean;
+  isThreatenedSpecies?: boolean;
   formatCareValue: FormatCareValue;
   formatRange: FormatRange;
   setActiveImage: (index: number) => void;
@@ -148,10 +149,38 @@ const getIucnInfo = computed(() => {
   return categoryMap[category] || null;
 });
 
-// Check if species is threatened (CR, EN, VU) - should NOT show care details
+// Check if species is threatened (CR, EN, VU and named variants) - should NOT show care details
 const isThreatenedSpecies = computed(() => {
-  const category = props.selectedResult.iucn?.category?.toUpperCase();
-  return category === "CR" || category === "EN" || category === "VU";
+  // First check if parent explicitly passed the prop
+  if (typeof props.isThreatenedSpecies === "boolean") {
+    console.log('Using parent isThreatenedSpecies prop:', props.isThreatenedSpecies);
+    return props.isThreatenedSpecies;
+  }
+
+  const rawCategory = props.selectedResult.iucn?.category;
+  console.log('Checking IUCN category:', rawCategory);
+
+  if (!rawCategory) {
+    console.log('No IUCN category found, returning false');
+    return false;
+  }
+
+  const normalized = rawCategory.trim().toUpperCase();
+  const threatenedCategories = new Set([
+    "CR",
+    "CRITICALLY ENDANGERED",
+    "EN",
+    "ENDANGERED",
+    "VU",
+    "VULNERABLE",
+    "NT",
+    "NEAR THREATENED",
+  ]);
+
+  const isThreatened = threatenedCategories.has(normalized);
+  console.log(`IUCN category '${normalized}' is ${isThreatened ? 'THREATENED' : 'NOT threatened'}`);
+
+  return isThreatened;
 });
 
 // Conservation authority contacts for threatened species
@@ -444,6 +473,7 @@ const isDisplayingScientificName = computed(() => {
             </h3>
             <!-- Provider Toggle -->
             <div
+              v-if="!isThreatenedSpecies"
               class="flex items-center gap-1 p-1 bg-gray-100 rounded-lg dark:bg-gray-800"
             >
               <button
@@ -752,7 +782,7 @@ const isDisplayingScientificName = computed(() => {
                       <p
                         class="text-sm leading-relaxed text-justify text-gray-600 dark:text-gray-300"
                       >
-                        {{ props.careDetails.watering_guide as string }}
+                        {{ props.careDetails.soil_guide as string }}
                       </p>
                     </div>
                   </li>

@@ -245,6 +245,11 @@ Route::get(
     [PlantIdentifierController::class, 'getCareDetails']
 )->name('plant-identifier.care-details');
 
+Route::get(
+    '/plant-identifier/threat-status',
+    [PlantIdentifierController::class, 'getThreatStatus']
+)->name('plant-identifier.threat-status');
+
 Route::get('/plant-identifier/description', [PlantIdentifierController::class, 'generateDescription'])->name('plant-identifier.description');
 Route::post('/plant-identifier/chat', [PlantIdentifierController::class, 'botanistChat'])->name('plant-identifier.chat');
 

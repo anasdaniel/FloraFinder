@@ -160,7 +160,7 @@ class PlantIdentifierController extends Controller
                     'region' => $request->input('region'),
                     'latitude' => $request->input('latitude'),
                     'longitude' => $request->input('longitude'),
-                    'user_id' => auth()->id(),
+                    'user_id' => \Illuminate\Support\Facades\Auth::id(),
                 ]
             );
 
@@ -219,6 +219,30 @@ class PlantIdentifierController extends Controller
                 'source' => 'none',
                 'message' => 'Failed to fetch care details',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getThreatStatus(Request $request)
+    {
+        $request->validate([
+            'scientificName' => 'required|string|max:255',
+        ]);
+
+        try {
+            $scientificName = $request->input('scientificName');
+            $result = $this->careDetailsService->inferThreatStatus($scientificName);
+
+            return response()->json($result, $result['success'] ? 200 : 422);
+        } catch (\Exception $e) {
+            Log::error('Threat status error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            return response()->json([
+                'success' => false,
+                'source' => 'gemini',
+                'message' => 'Failed to infer threat status',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

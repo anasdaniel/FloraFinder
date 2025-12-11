@@ -12,9 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sightings', function (Blueprint $table) {
+            // Drop FKs so we can alter nullability safely
+            $table->dropForeign(['plant_id']);
+            $table->dropForeign(['zone_id']);
+
             // Make existing foreign keys nullable
             $table->foreignId('plant_id')->nullable()->change();
             $table->foreignId('zone_id')->nullable()->change();
+
+            // Restore FKs with cascade behavior
+            $table->foreign('plant_id')->references('id')->on('plants')->cascadeOnDelete();
+            $table->foreign('zone_id')->references('id')->on('zones')->cascadeOnDelete();
 
             // Add new columns for denormalized plant data
             $table->string('scientific_name')->nullable()->after('zone_id');
@@ -37,6 +45,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('sightings', function (Blueprint $table) {
+            $table->dropForeign(['plant_id']);
+            $table->dropForeign(['zone_id']);
+
             $table->dropColumn([
                 'scientific_name',
                 'common_name',
@@ -46,6 +57,12 @@ return new class extends Migration
                 'region',
                 'sighted_at',
             ]);
+
+            $table->foreignId('plant_id')->nullable(false)->change();
+            $table->foreignId('zone_id')->nullable(false)->change();
+
+            $table->foreign('plant_id')->references('id')->on('plants')->cascadeOnDelete();
+            $table->foreign('zone_id')->references('id')->on('zones')->cascadeOnDelete();
         });
     }
 };

@@ -182,11 +182,11 @@ const hasGeminiCare = computed(() => {
 // Check if we have Trefle numeric care
 const hasTrefleCare = computed(() => {
   return (
-    props.plant.care_source === "trefle" ||
-    props.plant.light !== null ||
+    props.plant.care_source === "trefle" &&
+    (props.plant.light !== null ||
     props.plant.minimum_temperature_celsius !== null ||
     props.plant.minimum_precipitation_mm !== null ||
-    props.plant.soil_texture !== null
+    props.plant.soil_texture !== null)
   );
 });
 

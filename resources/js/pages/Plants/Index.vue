@@ -162,7 +162,7 @@ const hasCareDetails = (plant: Plant): boolean => {
     );
 
     // Check for Trefle numeric care
-    const hasTrefleCare = plant.care_source === 'trefle' || (
+    const hasTrefleCare = plant.care_source === 'trefle' && (
         plant.light !== null ||
         plant.minimum_temperature_celsius !== null ||
         plant.minimum_precipitation_mm !== null ||
@@ -421,7 +421,7 @@ const goToPage = (url: string | null) => {
                                 <!-- Quick Care Stats -->
                                 <div v-if="hasCareDetails(plant)" class="pt-3 border-t border-gray-100">
                                     <!-- Trefle Numeric Stats -->
-                                    <div v-if="plant.care_source === 'trefle' || plant.light !== null" class="grid grid-cols-2 gap-2">
+                                    <div v-if="plant.care_source === 'trefle' && plant.light !== null" class="grid grid-cols-2 gap-2">
                                         <div class="flex items-center gap-1.5 text-xs text-gray-500">
                                             <Sun class="w-3.5 h-3.5 text-yellow-500" />
                                             <span>{{ getLightLabel(plant.light) }}</span>
@@ -499,7 +499,7 @@ const goToPage = (url: string | null) => {
 
                                 <!-- Care Stats -->
                                 <div v-if="hasCareDetails(plant)" class="flex items-center gap-6 text-sm text-gray-500">
-                                    <template v-if="plant.care_source === 'trefle' || plant.light !== null">
+                                    <template v-if="plant.care_source === 'trefle' && plant.light !== null">
                                         <div class="flex items-center gap-1.5">
                                             <Sun class="w-4 h-4 text-yellow-500" />
                                             <span>{{ getLightLabel(plant.light) }}</span>

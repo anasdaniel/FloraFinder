@@ -11,11 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('forum_tags', function (Blueprint $table) {
-            if (!Schema::hasColumn('forum_tags', 'tag_category')) {
-                $table->string('tag_category', 100)->after('tag_name');
-            }
-        });
+        // No-op: column already exists in the original create migration.
     }
 
     /**
@@ -23,8 +19,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('forum_tags', function (Blueprint $table) {
-            $table->dropColumn('tag_category');
-        });
+        // No-op to avoid dropping an existing column.
     }
 };
