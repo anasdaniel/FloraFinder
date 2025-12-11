@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from "vue";
+import { ref, watch, nextTick, computed } from "vue";
 import Icon from "@/components/Icon.vue";
 import type { ChatMessage } from "@/types/plant-identifier";
 
@@ -8,6 +8,9 @@ const props = defineProps<{
   chatMessages: ChatMessage[];
   chatInput: string;
   isChatLoading: boolean;
+  isThreatenedSpecies?: boolean;
+  iucnCategory?: string | null;
+  hasCareData?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -17,13 +20,70 @@ const emit = defineEmits<{
 
 const chatEndRef = ref<HTMLElement | null>(null);
 
-// Suggested questions for the empty state
-const suggestedQuestions = [
+// Default care-focused questions
+const careQuestions = [
   "How often should I water this?",
   "Does it need direct sunlight?",
   "Is this plant toxic to pets?",
   "What type of soil is best?",
 ];
+
+// Conservation-focused questions for threatened species
+const conservationQuestions = [
+  "Why is this species endangered?",
+  "Where is its natural habitat?",
+  "What conservation efforts exist?",
+  "How can I help protect it?",
+];
+
+// Questions for species with no care data (rare/uncultivatable)
+const ecologyQuestions = [
+  "What makes this species unique?",
+  "Where can I see this in the wild?",
+  "What is its ecological role?",
+  "Is this plant edible or medicinal?",
+];
+
+// Dynamically select questions based on species status
+const suggestedQuestions = computed(() => {
+  if (props.isThreatenedSpecies) {
+    return conservationQuestions;
+  }
+  if (props.hasCareData === false) {
+    return ecologyQuestions;
+  }
+  return careQuestions;
+});
+
+// Dynamic header text based on species status
+const headerText = computed(() => {
+  if (props.isThreatenedSpecies) {
+    return `Learn about ${props.plantName}'s conservation`;
+  }
+  return `Curious about ${props.plantName}?`;
+});
+
+// Dynamic subtitle based on species status
+const subtitleText = computed(() => {
+  if (props.isThreatenedSpecies) {
+    return 'Ask about conservation status, habitat, or protection efforts.';
+  }
+  if (props.hasCareData === false) {
+    return 'Ask about this species\' ecology, habitat, or unique characteristics.';
+  }
+  return 'Select a question below or type your own.';
+});
+
+// Dynamic placeholder text
+const placeholderText = computed(() => {
+  if (props.isThreatenedSpecies) {
+    return 'Ask about conservation, habitat, threats...';
+  }
+  if (props.hasCareData === false) {
+    return 'Ask about ecology, habitat, characteristics...';
+  }
+  return 'Ask about care tips, origin, etc...';
+});
 
 const handleSuggestionClick = (question: string) => {
   emit('update:chatInput', question);
@@ -61,11 +121,14 @@ const handleKeydown = (event: KeyboardEvent) => {
     <div class="flex items-center justify-between mb-4">
       <h3 class="flex items-center text-lg font-bold text-gray-900 dark:text-white">
         <div
-          class="mr-3 rounded-full bg-indigo-100 p-2 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300"
+          class="mr-3 rounded-full p-2"
+          :class="props.isThreatenedSpecies
+            ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300'
+            : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300'"
         >
-          <Icon name="message-circle" class="w-5 h-5" />
+          <Icon :name="props.isThreatenedSpecies ? 'shield-question' : 'message-circle'" class="w-5 h-5" />
         </div>
-        Ask the AI Botanist
+        {{ props.isThreatenedSpecies ? 'Ask About Conservation' : 'Ask the AI Botanist' }}
       </h3>
       <span class="flex items-center gap-2 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 rounded-full border border-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">
         <span class="relative flex w-2 h-2">
@@ -86,15 +149,25 @@ const handleKeydown = (event: KeyboardEvent) => {
           v-if="props.chatMessages.length === 0"
           class="flex flex-col items-center justify-center h-full space-y-6"
         >
-          <div class="p-4 bg-white rounded-full shadow-sm dark:bg-gray-800">
-            <Icon name="sprout" class="w-10 h-10 text-indigo-500" />
+          <div
+            class="p-4 rounded-full shadow-sm"
+            :class="props.isThreatenedSpecies
+              ? 'bg-amber-100 dark:bg-amber-900/30'
+              : 'bg-white dark:bg-gray-800'"
+          >
+            <Icon
+              :name="props.isThreatenedSpecies ? 'shield-alert' : 'sprout'"
+              :class="props.isThreatenedSpecies
+                ? 'w-10 h-10 text-amber-600 dark:text-amber-400'
+                : 'w-10 h-10 text-indigo-500'"
+            />
           </div>
           <div class="text-center">
             <h4 class="text-base font-semibold text-gray-900 dark:text-white">
-              Curious about {{ props.plantName }}?
+              {{ headerText }}
             </h4>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Select a question below or type your own.
+              {{ subtitleText }}
             </p>
           </div>
           <div class="grid grid-cols-1 gap-2 w-full max-w-sm sm:grid-cols-2">
@@ -102,7 +175,10 @@ const handleKeydown = (event: KeyboardEvent) => {
               v-for="question in suggestedQuestions"
               :key="question"
               @click="handleSuggestionClick(question)"
-              class="px-4 py-3 text-sm text-left text-gray-700 transition-all bg-white border border-gray-200 shadow-sm rounded-xl hover:border-indigo-300 hover:shadow-md hover:text-indigo-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
+              class="px-4 py-3 text-sm text-left transition-all border shadow-sm rounded-xl hover:shadow-md"
+              :class="props.isThreatenedSpecies
+                ? 'text-amber-800 bg-amber-50 border-amber-200 hover:border-amber-400 hover:text-amber-900 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200 dark:hover:border-amber-600'
+                : 'text-gray-700 bg-white border-gray-200 hover:border-indigo-300 hover:text-indigo-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:border-indigo-500 dark:hover:text-indigo-400'"
             >
               {{ question }}
             </button>
@@ -179,7 +255,7 @@ const handleKeydown = (event: KeyboardEvent) => {
             :value="props.chatInput"
             @input="handleInputUpdate"
             @keydown="handleKeydown"
-            placeholder="Ask about care tips, origin, etc..."
+            :placeholder="placeholderText"
             class="flex-1 rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-12 text-sm transition-shadow focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
           <button

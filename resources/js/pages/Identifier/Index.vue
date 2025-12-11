@@ -256,13 +256,15 @@ const isThreatenedSpecies = computed(() => {
               />
             </Transition>
 
-            <!-- Botanist Chat (Hidden for Threatened Species) -->
+            <!-- Botanist Chat -->
             <BotanistChat
-              v-if="!isThreatenedSpecies"
-              :plant-name="selectedResult.species.commonNames?.[0] || 'plant'"
+              :plant-name="selectedResult.species.commonNames?.[0] || selectedResult.species.scientificNameWithoutAuthor || 'plant'"
               :chat-messages="chatMessages"
               :chat-input="chatInput"
               :is-chat-loading="isChatLoading"
+              :is-threatened-species="isThreatenedSpecies"
+              :iucn-category="selectedResult.iucn?.category"
+              :has-care-data="hasCareData"
               @update:chat-input="chatInput = $event"
               @send="handleChatSend"
             />
