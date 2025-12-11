@@ -55,7 +55,11 @@ class SightingController extends Controller
         $plant = $this->plantCacheService->findOrCreateWithCare(
             $validated['scientific_name'],
             $validated['common_name'] ?? null,
-            $validated['family'] ?? null
+            $validated['family'] ?? null,
+            $validated['genus'] ?? null,
+            $validated['gbif_id'] ?? null,
+            $validated['powo_id'] ?? null,
+            $validated['iucn_category'] ?? null
         );
 
         $images = $request->file('images');

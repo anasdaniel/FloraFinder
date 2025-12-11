@@ -6,6 +6,8 @@ use App\Models\Plant;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use App\Http\Integrations\GeminiConnector;
+use App\Http\Integrations\GeminiRequest;
 
 class CareDetailsService
 {
@@ -17,7 +19,7 @@ class CareDetailsService
 
     /**
      * Get care details for a plant, checking DB first, then preferred provider, then fallback.
-     * 
+     *
      * @param string $scientificName
      * @param string|null $commonName
      * @param string|null $family
@@ -35,34 +37,51 @@ class CareDetailsService
 
         $cacheKey = 'care_details_' . md5($scientificName . '_' . $preferredProvider);
 
-        // Check Redis cache first (short-term) unless forcing refresh
-        if (!$forceRefresh) {
-            $cached = Cache::get($cacheKey);
-            if ($cached) {
-                Log::info("Returning cached care details for {$scientificName} (source: {$cached['source']})");
-                return $cached;
-            }
+        // Check Redis cache first (short-term)
+        $cached = Cache::get($cacheKey);
+        if ($cached) {
+            Log::info("Returning Redis cached care details for {$scientificName} (source: {$cached['source']})");
+            return $cached;
+        }
 
-            // Check database for existing plant with care details from preferred provider
-            $plant = Plant::where('scientific_name', $scientificName)->first();
+        // Check database for existing plant with care details
+        $plant = Plant::where('scientific_name', $scientificName)->first();
 
-            if ($plant && $plant->hasCareDetails() && !$plant->needsCareRefresh() && $plant->getCareSource() === $preferredProvider) {
-                Log::info("Returning DB cached care details for {$scientificName} (source: {$plant->getCareSource()})");
+        // If we have DB cache from the requested provider and it's not stale, use it
+        if ($plant && $plant->hasCareDetails() && !$plant->needsCareRefresh()) {
+            // Check if we have data from the requested provider
+            $currentSource = $plant->getCareSource();
+
+            // If the plant has data from the requested provider, return it immediately
+            if ($currentSource === $preferredProvider) {
+                Log::info("Returning DB cached care details for {$scientificName} (source: {$currentSource})");
                 $result = [
                     'success' => true,
-                    'source' => $plant->getCareSource(),
+                    'source' => $currentSource,
                     'data' => $plant->getCareDetails(),
                 ];
                 Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
                 return $result;
             }
+
+            // If forceRefresh is false and we have ANY recent care data,
+            // we can try to fetch from the new provider without marking as "forced"
+            if (!$forceRefresh) {
+                Log::info("Plant has {$currentSource} data, attempting to fetch {$preferredProvider} data...");
+            }
         }
 
-        Log::info("Fetching fresh care details for {$scientificName} from {$preferredProvider}");
+        // Only make API call if forced or we don't have data from this provider
+        if ($forceRefresh || !$plant || !$plant->hasCareDetails() || $plant->getCareSource() !== $preferredProvider) {
+            Log::info("Fetching fresh care details for {$scientificName} from {$preferredProvider}");
+        } else {
+            // We have data but it's stale, so we'll try to refresh
+            Log::info("Refreshing stale care details for {$scientificName}");
+        }
 
         // Determine provider order based on preference
-        $providers = $preferredProvider === 'trefle' 
-            ? ['trefle', 'gemini'] 
+        $providers = $preferredProvider === 'trefle'
+            ? ['trefle', 'gemini']
             : ['gemini', 'trefle'];
 
         foreach ($providers as $provider) {
@@ -71,15 +90,32 @@ class CareDetailsService
                 : $this->fetchFromTrefle($scientificName);
 
             if ($providerResult && $this->hasUsefulData($providerResult)) {
-                // Store in database
-                $this->storeCareDetails($scientificName, $commonName, $family, $providerResult, $provider);
-
                 $result = [
                     'success' => true,
                     'source' => $provider,
                     'data' => $providerResult,
                 ];
+
+                // Store in Redis cache for fast access (24 hours)
                 Cache::put($cacheKey, $result, now()->addHours(self::CACHE_DURATION_HOURS));
+
+                // Only store in database if:
+                // 1. We're forcing a refresh (user explicitly requested new data)
+                // 2. OR we don't have any plant record yet
+                // 3. OR the plant's current source matches the provider we just fetched
+                // This prevents overwriting good DB data when just switching providers temporarily
+                $shouldStoreInDb = $forceRefresh ||
+                    !$plant ||
+                    !$plant->hasCareDetails() ||
+                    $plant->getCareSource() === $provider;
+
+                if ($shouldStoreInDb) {
+                    $this->storeCareDetails($scientificName, $commonName, $family, $providerResult, $provider);
+                    Log::info("Stored {$provider} care details in database for {$scientificName}");
+                } else {
+                    Log::info("Cached {$provider} care details in Redis (not overwriting DB with {$plant->getCareSource()} data)");
+                }
+
                 return $result;
             }
 
@@ -256,6 +292,7 @@ class CareDetailsService
 
     /**
      * Fetch care details from Gemini AI - returns descriptive text fields
+     * Tries with common name first, then retries with scientific name only if needed
      */
     private function fetchFromGemini(string $scientificName, ?string $commonName = null, ?string $family = null): ?array
     {
@@ -265,16 +302,46 @@ class CareDetailsService
             return null;
         }
 
-        Log::info("Fetching care details from Gemini for: {$scientificName}");
+        // Strategy 1: Try with common name if available (more context for AI)
+        if ($commonName) {
+            Log::info("Fetching care details from Gemini for: {$scientificName} (with common name: {$commonName})");
+            $result = $this->callGeminiAPI($scientificName, $commonName, $family, $apiKey);
 
+            if ($result && $this->hasUsefulData($result)) {
+                Log::info("✓ Gemini succeeded with common name + scientific name");
+                return $result;
+            }
+
+            Log::info("⚠ Gemini failed with common name, retrying with scientific name only...");
+        }
+
+        // Strategy 2: Try with scientific name only (backup plan)
+        Log::info("Fetching care details from Gemini using scientific name only: {$scientificName}");
+        $result = $this->callGeminiAPI($scientificName, null, $family, $apiKey);
+
+        if ($result && $this->hasUsefulData($result)) {
+            Log::info("✓ Gemini succeeded with scientific name only");
+            return $result;
+        }
+
+        Log::info("✗ Gemini failed for: {$scientificName}");
+        return null;
+    }
+
+    /**
+     * Make the actual Gemini API call
+     */
+    private function callGeminiAPI(string $scientificName, ?string $commonName = null, ?string $family = null, string $apiKey): ?array
+    {
         try {
+            // Build plant name for prompt
             $plantName = $commonName ? "{$scientificName} ({$commonName})" : $scientificName;
             $familyInfo = $family ? " from the {$family} family" : '';
 
             $prompt = <<<PROMPT
 You are a botanical expert. Provide practical care guidance for the plant: {$plantName}{$familyInfo}.
 
-Return ONLY a valid JSON object with descriptive text fields. Do not include any markdown formatting, backticks, or explanations. Just the raw JSON.
+Use the scientific name as the primary identifier for accuracy. Return ONLY a valid JSON object with descriptive text fields. Do not include any markdown formatting, backticks, or explanations. Just the raw JSON.
 
 {
     "description": "2-3 sentence description of the plant, its appearance, and origin",
@@ -286,7 +353,7 @@ Return ONLY a valid JSON object with descriptive text fields. Do not include any
     "care_tips": "3-4 practical care tips for keeping this plant healthy"
 }
 
-Make each field informative and practical for a home gardener. Always provide useful content even for less common plants.
+Make each field informative and practical for a home gardener. Always provide useful content even for less common plants. If you're unsure about the exact species, provide general care for the genus.
 PROMPT;
 
             // Use Saloon connector/request for Gemini instead of direct HTTP
@@ -397,8 +464,8 @@ PROMPT;
         $contents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
 
         try {
-            $connector = new \App\Http\Integrations\GeminiConnector();
-            $req = new \App\Http\Integrations\GeminiRequest('gemini-2.0-flash', $contents, null); // null for plain text
+            $connector = new GeminiConnector();
+            $req = new GeminiRequest('gemini-2.0-flash', $contents, null); // null for plain text
             $response = $connector->send($req);
             if (!$response->successful()) {
                 Log::warning('Gemini chat request failed: ' . $response->status());

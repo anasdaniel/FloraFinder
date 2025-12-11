@@ -2,6 +2,7 @@
 import Icon from "@/components/Icon.vue";
 import { Button } from "@/components/ui/button";
 import type { CareSource, PlantResult } from "@/types/plant-identifier";
+import { computed } from "vue";
 
 type PlantMatch = NonNullable<NonNullable<PlantResult["data"]>["results"]>[number];
 
@@ -37,6 +38,112 @@ const props = defineProps<{
   switchProvider: (provider: 'gemini' | 'trefle') => void;
   openSaveModal: () => void;
 }>();
+
+// IUCN Category helpers
+const getIucnInfo = computed(() => {
+  const category = props.selectedResult.iucn?.category?.toUpperCase();
+  if (!category) return null;
+
+  const categoryMap: Record<string, { 
+    label: string; 
+    color: string; 
+    bgColor: string;
+    textColor: string;
+    critical: boolean;
+    allowSighting: boolean;
+    message: string;
+  }> = {
+    'EX': { 
+      label: 'Extinct', 
+      color: 'bg-gray-900', 
+      bgColor: 'bg-gray-100',
+      textColor: 'text-gray-900',
+      critical: true,
+      allowSighting: false,
+      message: 'This species is extinct. No living individuals remain. If you believe this identification is correct, please verify carefully as it would be an extraordinary discovery.'
+    },
+    'EW': { 
+      label: 'Extinct in Wild', 
+      color: 'bg-gray-800', 
+      bgColor: 'bg-gray-100',
+      textColor: 'text-gray-800',
+      critical: true,
+      allowSighting: false,
+      message: 'This species only exists in cultivation. Wild sightings should not be reported unless you are absolutely certain this is a wild population.'
+    },
+    'CR': { 
+      label: 'Critically Endangered', 
+      color: 'bg-red-600', 
+      bgColor: 'bg-red-50',
+      textColor: 'text-red-800',
+      critical: true,
+      allowSighting: true,
+      message: 'This species is critically endangered. Please report this sighting - your data is valuable for conservation efforts!'
+    },
+    'EN': { 
+      label: 'Endangered', 
+      color: 'bg-orange-600', 
+      bgColor: 'bg-orange-50',
+      textColor: 'text-orange-800',
+      critical: false,
+      allowSighting: true,
+      message: 'This species is endangered. Reporting this sighting helps conservation efforts.'
+    },
+    'VU': { 
+      label: 'Vulnerable', 
+      color: 'bg-amber-500', 
+      bgColor: 'bg-amber-50',
+      textColor: 'text-amber-800',
+      critical: false,
+      allowSighting: true,
+      message: 'This species is vulnerable. Your sighting data contributes to monitoring its status.'
+    },
+    'NT': { 
+      label: 'Near Threatened', 
+      color: 'bg-yellow-500', 
+      bgColor: 'bg-yellow-50',
+      textColor: 'text-yellow-800',
+      critical: false,
+      allowSighting: true,
+      message: ''
+    },
+    'LC': { 
+      label: 'Least Concern', 
+      color: 'bg-green-500', 
+      bgColor: 'bg-green-50',
+      textColor: 'text-green-800',
+      critical: false,
+      allowSighting: true,
+      message: ''
+    },
+    'DD': { 
+      label: 'Data Deficient', 
+      color: 'bg-blue-500', 
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-800',
+      critical: false,
+      allowSighting: true,
+      message: 'Data on this species is limited. Your sighting helps build our knowledge!'
+    },
+    'NE': { 
+      label: 'Not Evaluated', 
+      color: 'bg-gray-500', 
+      bgColor: 'bg-gray-50',
+      textColor: 'text-gray-700',
+      critical: false,
+      allowSighting: true,
+      message: ''
+    },
+  };
+
+  return categoryMap[category] || null;
+});
+
+// Check if species is threatened (CR, EN, VU) - should NOT show care details
+const isThreatenedSpecies = computed(() => {
+  const category = props.selectedResult.iucn?.category?.toUpperCase();
+  return category === 'CR' || category === 'EN' || category === 'VU';
+});
 </script>
 
 <template>
@@ -57,17 +164,19 @@ const props = defineProps<{
       ></div>
       <div class="absolute bottom-0 left-0 w-full p-6 text-white md:p-8">
         <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <span
               class="px-3 py-1 text-xs font-bold rounded-full shadow-sm bg-green-500/90 backdrop-blur-md"
             >
               {{ Math.round((props.selectedResult.score || 0) * 100) }}% Match
             </span>
             <span
-              v-if="props.selectedResult.iucn?.category"
-              class="px-3 py-1 text-xs font-bold rounded-full shadow-sm bg-amber-500/90 backdrop-blur-md"
+              v-if="getIucnInfo"
+              class="px-3 py-1 text-xs font-bold rounded-full shadow-sm backdrop-blur-md flex items-center gap-1"
+              :class="getIucnInfo.color"
             >
-              IUCN: {{ props.selectedResult.iucn.category }}
+              <Icon v-if="getIucnInfo.critical" name="alert-triangle" class="w-3 h-3" />
+              {{ getIucnInfo.label }}
             </span>
           </div>
           <button
@@ -94,6 +203,32 @@ const props = defineProps<{
         </p>
       </div>
     </div>
+
+    <!-- Conservation Warning Banner -->
+    <div
+      v-if="getIucnInfo && getIucnInfo.message"
+      class="px-6 py-4 border-b dark:border-gray-800"
+      :class="getIucnInfo.bgColor"
+    >
+      <div class="flex items-start gap-3">
+        <div class="flex-shrink-0 mt-0.5">
+          <Icon 
+            :name="getIucnInfo.critical ? 'alert-triangle' : 'info'" 
+            class="w-5 h-5"
+            :class="getIucnInfo.textColor"
+          />
+        </div>
+        <div class="flex-1">
+          <h4 class="font-semibold mb-1" :class="getIucnInfo.textColor">
+            Conservation Status: {{ getIucnInfo.label }}
+          </h4>
+          <p class="text-sm leading-relaxed" :class="getIucnInfo.textColor">
+            {{ getIucnInfo.message }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <div
       class="grid grid-cols-1 gap-0 divide-y dark:divide-gray-800 md:grid-cols-12 md:divide-x md:divide-y-0"
     >
@@ -212,7 +347,7 @@ const props = defineProps<{
           </div>
         </div>
         <div>
-          <div class="flex items-center justify-between mb-4">
+          <div v-if="!isThreatenedSpecies" class="flex items-center justify-between mb-4">
             <h3
               class="flex items-center text-lg font-normal text-gray-900 dark:text-white"
             >
@@ -265,15 +400,100 @@ const props = defineProps<{
               </button>
             </div>
           </div>
+          <div v-else class="flex items-center mb-4">
+            <h3 class="flex items-center text-lg font-normal text-gray-900 dark:text-white">
+              <div
+                class="mr-3 rounded-lg p-1.5"
+                :class="[
+                  getIucnInfo?.bgColor,
+                  getIucnInfo?.textColor
+                ]"
+              >
+                <Icon name="shield-alert" class="w-5 h-5" />
+              </div>
+              Conservation Notice
+            </h3>
+          </div>
           <div class="overflow-hidden rounded-2xl dark:border-gray-700 dark:bg-gray-800">
+            <!-- Conservation Warning for Threatened Species -->
             <div
-              v-if="props.fetchingCareDetails"
+              v-if="isThreatenedSpecies"
+              class="p-6 border rounded-2xl"
+              :class="[
+                getIucnInfo?.bgColor,
+                'border-2',
+                getIucnInfo?.critical ? 'border-red-300 dark:border-red-800' : 'border-orange-300 dark:border-orange-800'
+              ]"
+            >
+              <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 p-3 bg-white rounded-full dark:bg-gray-800">
+                  <Icon name="shield-alert" class="w-6 h-6" :class="getIucnInfo?.textColor" />
+                </div>
+                <div class="flex-1">
+                  <h4 class="text-lg font-bold mb-2" :class="getIucnInfo?.textColor">
+                    Threatened Species - No Care Information Available
+                  </h4>
+                  <p class="text-sm leading-relaxed mb-3" :class="getIucnInfo?.textColor">
+                    This plant is classified as <strong>{{ getIucnInfo?.label }}</strong> by the IUCN. 
+                    We do not provide cultivation information for threatened species to:
+                  </p>
+                  <ul class="space-y-1.5 text-sm mb-4" :class="getIucnInfo?.textColor">
+                    <li class="flex items-start gap-2">
+                      <Icon name="check-circle" class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>Prevent illegal collection from wild populations</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <Icon name="check-circle" class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>Discourage unauthorized cultivation</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <Icon name="check-circle" class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>Support conservation efforts</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <Icon name="check-circle" class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>Comply with international conservation protocols</span>
+                    </li>
+                  </ul>
+                  <div class="p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-white/50 dark:border-gray-700/50">
+                    <p class="text-xs leading-relaxed" :class="getIucnInfo?.textColor">
+                      <strong>⚠️ Important:</strong> If you have observed this species in the wild, please report your sighting to local conservation authorities. 
+                      Cultivation of threatened species typically requires special permits and should only be done through authorized conservation programs.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 pt-4 border-t" :class="getIucnInfo?.critical ? 'border-red-200 dark:border-red-900' : 'border-orange-200 dark:border-orange-900'">
+                <a
+                  href="https://www.iucnredlist.org/"
+                  target="_blank"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-white dark:bg-gray-800 rounded-lg hover:shadow transition"
+                  :class="getIucnInfo?.textColor"
+                >
+                  <Icon name="external-link" class="w-3 h-3" />
+                  IUCN Red List
+                </a>
+                <a
+                  href="https://www.cites.org/"
+                  target="_blank"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-white dark:bg-gray-800 rounded-lg hover:shadow transition"
+                  :class="getIucnInfo?.textColor"
+                >
+                  <Icon name="external-link" class="w-3 h-3" />
+                  CITES
+                </a>
+              </div>
+            </div>
+
+            <!-- Regular Care Details for Non-Threatened Species -->
+            <div
+              v-else-if="props.fetchingCareDetails"
               class="flex flex-col items-center justify-center p-8 text-gray-400"
             >
               <Icon name="loader-2" class="w-6 h-6 mb-2 animate-spin" />
               <span class="text-xs">Consulting botanist notes...</span>
             </div>
-            <template v-else-if="props.careDetails">
+            <template v-else-if="!isThreatenedSpecies && props.careDetails">
               <div
                 v-if="props.isGeminiCare && props.hasCareData"
                 class="p-5 border rounded-2xl border-gray-200 bg-gradient-to-br from-gray-50 to-white dark:border-gray-700 dark:from-gray-800/50 dark:to-gray-900"

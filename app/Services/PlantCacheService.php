@@ -22,26 +22,61 @@ class PlantCacheService
     /**
      * Find or create a plant by scientific name and ensure care details are cached
      */
-    public function findOrCreateWithCare(string $scientificName, ?string $commonName = null, ?string $family = null): Plant
-    {
+    public function findOrCreateWithCare(
+        string $scientificName,
+        ?string $commonName = null,
+        ?string $family = null,
+        ?string $genus = null,
+        ?string $gbifId = null,
+        ?string $powoId = null,
+        ?string $iucnCategory = null
+    ): Plant {
         // Try to find existing plant
         $plant = Plant::where('scientific_name', $scientificName)->first();
 
         if (!$plant) {
-            // Create new plant record
+            // Create new plant record with all available data
             $plant = Plant::create([
                 'scientific_name' => $scientificName,
                 'common_name' => $commonName,
                 'family' => $family,
+                'genus' => $genus,
+                'gbif_id' => $gbifId,
+                'powo_id' => $powoId,
+                'iucn_category' => $iucnCategory,
             ]);
-        }
+        } else {
+            // Update fields if provided and currently missing
+            $updated = false;
 
-        // Update common name and family if provided and missing
-        if ($commonName && !$plant->common_name) {
-            $plant->common_name = $commonName;
-        }
-        if ($family && !$plant->family) {
-            $plant->family = $family;
+            if ($commonName && !$plant->common_name) {
+                $plant->common_name = $commonName;
+                $updated = true;
+            }
+            if ($family && !$plant->family) {
+                $plant->family = $family;
+                $updated = true;
+            }
+            if ($genus && !$plant->genus) {
+                $plant->genus = $genus;
+                $updated = true;
+            }
+            if ($gbifId && !$plant->gbif_id) {
+                $plant->gbif_id = $gbifId;
+                $updated = true;
+            }
+            if ($powoId && !$plant->powo_id) {
+                $plant->powo_id = $powoId;
+                $updated = true;
+            }
+            if ($iucnCategory && !$plant->iucn_category) {
+                $plant->iucn_category = $iucnCategory;
+                $updated = true;
+            }
+
+            if ($updated) {
+                $plant->save();
+            }
         }
 
         // Refresh care details if needed
@@ -49,16 +84,12 @@ class PlantCacheService
             $this->refreshCareDetails($plant);
         }
 
-        if ($plant->isDirty()) {
-            $plant->save();
-        }
-
         return $plant;
     }
 
     /**
      * Fetch and cache care details using CareDetailsService (supports Gemini/Trefle)
-     * 
+     *
      * @param Plant $plant The plant to refresh
      * @param string $preferredProvider 'gemini' (default) or 'trefle'
      */
@@ -92,15 +123,30 @@ class PlantCacheService
     /**
      * Get care details for a plant, fetching from API if not cached
      */
-    public function getCareDetails(string $scientificName, ?string $commonName = null, ?string $family = null): array
-    {
-        $plant = $this->findOrCreateWithCare($scientificName, $commonName, $family);
+    public function getCareDetails(
+        string $scientificName,
+        ?string $commonName = null,
+        ?string $family = null,
+        ?string $genus = null,
+        ?string $gbifId = null,
+        ?string $powoId = null,
+        ?string $iucnCategory = null
+    ): array {
+        $plant = $this->findOrCreateWithCare(
+            $scientificName,
+            $commonName,
+            $family,
+            $genus,
+            $gbifId,
+            $powoId,
+            $iucnCategory
+        );
         return $plant->getCareDetails();
     }
 
     /**
      * Force refresh care details for a plant
-     * 
+     *
      * @param Plant $plant The plant to refresh
      * @param string $preferredProvider 'gemini' (default) or 'trefle'
      */

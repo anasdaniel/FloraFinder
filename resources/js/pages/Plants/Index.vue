@@ -14,6 +14,7 @@ import {
     RefreshCw,
     Search,
     SearchX,
+    ShieldAlert,
     Sparkles,
     Sun,
     Thermometer,
@@ -45,6 +46,7 @@ interface Plant {
     care_summary: string | null;
     care_source: 'gemini' | 'trefle' | null;
     care_cached_at: string | null;
+    iucn_category: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -151,7 +153,7 @@ const formatTemperature = (min: number | null, max: number | null): string => {
 
 const hasCareDetails = (plant: Plant): boolean => {
     // Check for Gemini text-based care
-    const hasGeminiCare = plant.care_source === 'gemini' && (
+    const hasGeminiCare = plant.care_source === 'gemini' && !!(
         plant.watering_guide ||
         plant.sunlight_guide ||
         plant.soil_guide ||
@@ -168,6 +170,24 @@ const hasCareDetails = (plant: Plant): boolean => {
     );
 
     return hasGeminiCare || hasTrefleCare;
+};
+
+const getIucnCategoryInfo = (category: string | null): { label: string; color: string; bgColor: string } | null => {
+    if (!category) return null;
+
+    const categoryMap: Record<string, { label: string; color: string; bgColor: string }> = {
+        'EX': { label: 'Extinct', color: 'text-gray-900', bgColor: 'bg-gray-200' },
+        'EW': { label: 'Extinct in Wild', color: 'text-gray-800', bgColor: 'bg-gray-300' },
+        'CR': { label: 'Critically Endangered', color: 'text-red-800', bgColor: 'bg-red-100' },
+        'EN': { label: 'Endangered', color: 'text-orange-800', bgColor: 'bg-orange-100' },
+        'VU': { label: 'Vulnerable', color: 'text-amber-800', bgColor: 'bg-amber-100' },
+        'NT': { label: 'Near Threatened', color: 'text-yellow-800', bgColor: 'bg-yellow-100' },
+        'LC': { label: 'Least Concern', color: 'text-green-800', bgColor: 'bg-green-100' },
+        'DD': { label: 'Data Deficient', color: 'text-blue-800', bgColor: 'bg-blue-100' },
+        'NE': { label: 'Not Evaluated', color: 'text-gray-700', bgColor: 'bg-gray-100' },
+    };
+
+    return categoryMap[category.toUpperCase()] || { label: category, color: 'text-gray-700', bgColor: 'bg-gray-100' };
 };
 
 const goToPage = (url: string | null) => {
@@ -379,9 +399,23 @@ const goToPage = (url: string | null) => {
 
                             <!-- Plant Info -->
                             <div class="p-4">
-                                <div v-if="plant.family" class="flex items-center gap-2 mb-3 text-sm text-gray-600">
-                                    <TreeDeciduous class="w-4 h-4 text-gray-400" />
-                                    <span>{{ plant.family }}</span>
+                                <div class="space-y-2 mb-3">
+                                    <div v-if="plant.family" class="flex items-center gap-2 text-sm text-gray-600">
+                                        <TreeDeciduous class="w-4 h-4 text-gray-400" />
+                                        <span>{{ plant.family }}</span>
+                                    </div>
+                                    <div v-if="plant.iucn_category" class="flex items-center gap-2">
+                                        <ShieldAlert class="w-4 h-4 text-gray-400" />
+                                        <span
+                                            class="px-2 py-0.5 text-xs font-medium rounded-full"
+                                            :class="[
+                                                getIucnCategoryInfo(plant.iucn_category)?.color,
+                                                getIucnCategoryInfo(plant.iucn_category)?.bgColor
+                                            ]"
+                                        >
+                                            {{ getIucnCategoryInfo(plant.iucn_category)?.label }}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <!-- Quick Care Stats -->
@@ -437,7 +471,7 @@ const goToPage = (url: string | null) => {
 
                                 <!-- Info -->
                                 <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-2 flex-wrap">
                                         <h3 class="font-semibold text-gray-900">
                                             {{ plant.common_name || plant.scientific_name }}
                                         </h3>
@@ -446,6 +480,17 @@ const goToPage = (url: string | null) => {
                                             class="px-2 py-0.5 text-xs font-medium text-gray-700 bg-gray-200 rounded-full"
                                         >
                                             Care Info
+                                        </span>
+                                        <span
+                                            v-if="plant.iucn_category"
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full"
+                                            :class="[
+                                                getIucnCategoryInfo(plant.iucn_category)?.color,
+                                                getIucnCategoryInfo(plant.iucn_category)?.bgColor
+                                            ]"
+                                        >
+                                            <ShieldAlert class="w-3 h-3" />
+                                            {{ getIucnCategoryInfo(plant.iucn_category)?.label }}
                                         </span>
                                     </div>
                                     <p class="text-sm italic text-gray-500">{{ plant.scientific_name }}</p>

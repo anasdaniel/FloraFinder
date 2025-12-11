@@ -11,6 +11,7 @@ import {
   Leaf,
   MapPin,
   RefreshCw,
+  ShieldAlert,
   Sparkles,
   Sprout,
   Sun,
@@ -227,6 +228,24 @@ const mainImage = computed(() => {
   const sightingWithImage = props.recentSightings.find((s) => s.image_url);
   return sightingWithImage?.image_url || null;
 });
+
+const getIucnCategoryInfo = (category: string | null): { label: string; color: string; bgColor: string } | null => {
+  if (!category) return null;
+
+  const categoryMap: Record<string, { label: string; color: string; bgColor: string }> = {
+    'EX': { label: 'Extinct', color: 'text-white', bgColor: 'bg-gray-800' },
+    'EW': { label: 'Extinct in Wild', color: 'text-white', bgColor: 'bg-gray-700' },
+    'CR': { label: 'Critically Endangered', color: 'text-white', bgColor: 'bg-red-600' },
+    'EN': { label: 'Endangered', color: 'text-white', bgColor: 'bg-orange-600' },
+    'VU': { label: 'Vulnerable', color: 'text-white', bgColor: 'bg-amber-600' },
+    'NT': { label: 'Near Threatened', color: 'text-white', bgColor: 'bg-yellow-600' },
+    'LC': { label: 'Least Concern', color: 'text-white', bgColor: 'bg-green-600' },
+    'DD': { label: 'Data Deficient', color: 'text-white', bgColor: 'bg-blue-600' },
+    'NE': { label: 'Not Evaluated', color: 'text-white', bgColor: 'bg-gray-600' },
+  };
+
+  return categoryMap[category.toUpperCase()] || { label: category, color: 'text-white', bgColor: 'bg-gray-600' };
+};
 </script>
 
 <template>
@@ -268,6 +287,18 @@ const mainImage = computed(() => {
                 >
                   <TreeDeciduous class="w-3.5 h-3.5" />
                   {{ plant.family }}
+                </span>
+                <span
+                  v-if="plant.iucn_category"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm backdrop-blur-sm border font-medium"
+                  :class="[
+                    getIucnCategoryInfo(plant.iucn_category)?.color,
+                    getIucnCategoryInfo(plant.iucn_category)?.bgColor,
+                    'border-white/20'
+                  ]"
+                >
+                  <ShieldAlert class="w-3.5 h-3.5" />
+                  {{ getIucnCategoryInfo(plant.iucn_category)?.label }}
                 </span>
                 <span
                   v-if="hasCareDetails"

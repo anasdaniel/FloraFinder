@@ -252,8 +252,9 @@ export function usePlantIdentification({
     if (provider !== preferredProvider.value) {
       preferredProvider.value = provider;
       // Re-fetch care details with new provider if we have a selected result
+      // Use cached data if available (false = don't force refresh)
       if (selectedResult.value?.species?.scientificName) {
-        fetchCareDetails(selectedResult.value.species.scientificName, true);
+        fetchCareDetails(selectedResult.value.species.scientificName, false);
       }
     }
   };

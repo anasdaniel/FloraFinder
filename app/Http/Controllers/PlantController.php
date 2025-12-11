@@ -90,7 +90,7 @@ class PlantController extends Controller
     public function refreshCare(Request $request, Plant $plant)
     {
         $provider = $request->input('provider', 'gemini'); // Default to gemini
-        
+
         $success = $this->plantCacheService->forceRefresh($plant, $provider);
 
         if ($success) {
