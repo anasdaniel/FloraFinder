@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { defineProps, ref, computed, reactive } from "vue";
 import { Head, usePage, router } from "@inertiajs/vue3";
-import { Inertia } from "@inertiajs/inertia";
 import AppLayout from "@/layouts/AppLayout.vue";
 import Heading from "@/components/Heading.vue";
 import Icon from "@/components/Icon.vue";
@@ -86,7 +85,7 @@ const filteredThreads = computed(() => {
 // Delete thread
 const deleteThread = (threadId: number) => {
     if (confirm("Are you sure you want to delete this thread?")) {
-        Inertia.delete(`/forum/${threadId}`);
+        router.delete(`/forum/${threadId}`);
     }
 };
 
@@ -224,7 +223,7 @@ const postReply = async (commentId: number, threadId: number) => {
 const deleteComment = (id: number, threadId?: number) => {
     if (!confirm("Delete this comment?")) return;
 
-    Inertia.delete(`/forum/comment/${id}`, {
+    router.delete(`/forum/comment/${id}`, {
         onSuccess: () => {
             if (threadId) {
                 fetchComments(threadId);
