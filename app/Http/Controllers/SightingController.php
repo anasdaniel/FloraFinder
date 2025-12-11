@@ -231,6 +231,14 @@ class SightingController extends Controller
             $query->where('region', $request->input('region'));
         }
 
+        // Apply conservation status filter
+        if ($request->filled('status')) {
+            $status = $request->input('status');
+            $query->whereHas('plant', function ($q) use ($status) {
+                $q->where('iucn_category', $status);
+            });
+        }
+
         // Apply date filters
         if ($request->filled('date_from')) {
             $query->whereDate('sighted_at', '>=', $request->input('date_from'));
@@ -250,10 +258,22 @@ class SightingController extends Controller
             ->values()
             ->toArray();
 
+        // Get unique IUCN categories for filter dropdown
+        $statuses = Sighting::where('user_id', Auth::id())
+            ->with('plant') // Eager load to access plant relationship
+            ->get()
+            ->pluck('plant.iucn_category')
+            ->filter() // Remove nulls
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
         return Inertia::render('Sightings/Index', [
             'sightings' => $sightings,
             'regions' => $regions,
-            'filters' => $request->only(['search', 'region', 'date_from', 'date_to']),
+            'statuses' => $statuses,
+            'filters' => $request->only(['search', 'region', 'status', 'date_from', 'date_to']),
         ]);
     }
 
@@ -294,5 +314,106 @@ class SightingController extends Controller
         $sighting->delete();
 
         return redirect()->route('sightings.index')->with('success', 'Sighting deleted successfully.');
+    }
+
+    /**
+     * Public map view showing all sightings (not just current user's).
+     */
+    public function publicMap(Request $request)
+    {
+        $query = Sighting::with(['user', 'images', 'zone', 'plant'])
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude');
+
+        // Apply search filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('scientific_name', 'like', "%{$search}%")
+                    ->orWhere('common_name', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply region filter
+        if ($request->filled('region')) {
+            $query->where('region', $request->input('region'));
+        }
+
+        // Apply family filter
+        if ($request->filled('family')) {
+            $family = $request->input('family');
+            $query->whereHas('plant', function ($q) use ($family) {
+                $q->where('family', $family);
+            });
+        }
+
+        // Apply conservation status filter (multiple)
+        if ($request->filled('statuses')) {
+            $statuses = $request->input('statuses');
+            if (is_array($statuses) && count($statuses) > 0) {
+                $query->whereHas('plant', function ($q) use ($statuses) {
+                    $q->whereIn('iucn_category', $statuses);
+                });
+            }
+        }
+
+        // Apply date filters
+        if ($request->filled('date_from')) {
+            $query->whereDate('sighted_at', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('sighted_at', '<=', $request->input('date_to'));
+        }
+
+        $sightings = $query->latest('sighted_at')->paginate(12)->withQueryString();
+
+        // Get unique regions for filter dropdown
+        $regions = Sighting::whereNotNull('region')
+            ->distinct()
+            ->pluck('region')
+            ->sort()
+            ->values()
+            ->toArray();
+
+        // Get unique plant families for filter dropdown
+        $families = Sighting::with('plant')
+            ->get()
+            ->pluck('plant.family')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        // Conservation status options
+        $conservationStatuses = [
+            ['code' => 'NE', 'label' => 'Not Evaluated'],
+            ['code' => 'DD', 'label' => 'Data Deficient'],
+            ['code' => 'LC', 'label' => 'Least Concern'],
+            ['code' => 'NT', 'label' => 'Near Threatened'],
+            ['code' => 'VU', 'label' => 'Vulnerable'],
+            ['code' => 'EN', 'label' => 'Endangered'],
+            ['code' => 'CR', 'label' => 'Critically Endangered'],
+            ['code' => 'EW', 'label' => 'Extinct in the Wild'],
+            ['code' => 'EX', 'label' => 'Extinct'],
+        ];
+
+        // Calculate statistics
+        $allSightings = Sighting::with('plant')->get();
+        $stats = [
+            'total_sightings' => $allSightings->count(),
+            'unique_species' => $allSightings->pluck('scientific_name')->unique()->count(),
+            'unique_families' => $allSightings->pluck('plant.family')->filter()->unique()->count(),
+            'unique_regions' => $allSightings->pluck('region')->filter()->unique()->count(),
+        ];
+
+        return Inertia::render('Sightings/Map', [
+            'sightings' => $sightings,
+            'regions' => $regions,
+            'families' => $families,
+            'conservationStatuses' => $conservationStatuses,
+            'filters' => $request->only(['search', 'region', 'family', 'statuses', 'date_from', 'date_to']),
+            'stats' => $stats,
+        ]);
     }
 }

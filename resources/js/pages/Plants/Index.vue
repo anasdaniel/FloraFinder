@@ -47,6 +47,7 @@ interface Plant {
     care_source: 'gemini' | 'trefle' | null;
     care_cached_at: string | null;
     iucn_category: string | null;
+    latest_image: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -66,14 +67,14 @@ const props = defineProps<{
     filters: {
         search?: string;
         family?: string;
-        has_care?: boolean;
+        is_endangered?: boolean;
     };
 }>();
 
 // Reactive state
 const searchQuery = ref(props.filters.search || '');
 const selectedFamily = ref(props.filters.family || '');
-const hasCareOnly = ref(props.filters.has_care || false);
+const isEndangeredOnly = ref(props.filters.is_endangered || false);
 const viewMode = ref<'grid' | 'list'>('grid');
 const isLoading = ref(false);
 
@@ -86,7 +87,7 @@ watch(searchQuery, () => {
     }, 300);
 });
 
-watch([selectedFamily, hasCareOnly], () => {
+watch([selectedFamily, isEndangeredOnly], () => {
     applyFilters();
 });
 
@@ -97,7 +98,7 @@ const applyFilters = () => {
         {
             search: searchQuery.value || undefined,
             family: selectedFamily.value || undefined,
-            has_care: hasCareOnly.value || undefined,
+            is_endangered: isEndangeredOnly.value || undefined,
         },
         {
             preserveState: true,
@@ -112,11 +113,11 @@ const applyFilters = () => {
 const clearFilters = () => {
     searchQuery.value = '';
     selectedFamily.value = '';
-    hasCareOnly.value = false;
+    isEndangeredOnly.value = false;
 };
 
 const hasActiveFilters = computed(() => {
-    return searchQuery.value || selectedFamily.value || hasCareOnly.value;
+    return searchQuery.value || selectedFamily.value || isEndangeredOnly.value;
 });
 
 // Compute stats
@@ -190,6 +191,12 @@ const getIucnCategoryInfo = (category: string | null): { label: string; color: s
     return categoryMap[category.toUpperCase()] || { label: category, color: 'text-gray-700', bgColor: 'bg-gray-100' };
 };
 
+const isThreatened = (plant: Plant): boolean => {
+    if (!plant.iucn_category) return false;
+    const threatenedCategories = ['EX', 'EW', 'CR', 'EN', 'VU', 'NT'];
+    return threatenedCategories.includes(plant.iucn_category.toUpperCase());
+};
+
 const goToPage = (url: string | null) => {
     if (url) {
         router.get(url, {}, { preserveState: true, preserveScroll: true });
@@ -203,163 +210,137 @@ const goToPage = (url: string | null) => {
     <AppLayout>
         <div class="min-h-screen py-8 bg-gray-50">
             <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <!-- Header -->
-                <div class="mb-8">
+                <!-- Header & Stats Combined -->
+                <div class="mb-8 space-y-6">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <h1 class="text-3xl font-bold text-gray-900">Plant Library</h1>
+                            <h1 class="text-3xl font-bold tracking-tight text-gray-900">Plant Library</h1>
                             <p class="mt-1 text-gray-600">
                                 Browse our collection of plants with detailed care information
                             </p>
                         </div>
                         <Link
                             :href="route('plant-identifier')"
-                            class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors bg-gray-900 rounded-lg hover:bg-black"
+                            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white transition-all bg-gray-900 rounded-xl hover:bg-black shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20"
                         >
                             <Leaf class="w-4 h-4" />
                             Identify Plant
                         </Link>
                     </div>
-                </div>
 
-                <!-- Stats Cards -->
-                <div class="grid grid-cols-2 gap-4 mb-8 md:grid-cols-4">
-                    <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 rounded-lg bg-gray-100">
-                                <BookOpen class="w-5 h-5 text-gray-600" />
+                    <!-- Modern Stats Strip -->
+                    <div class="grid grid-cols-2 gap-px overflow-hidden bg-gray-200 border border-gray-200 shadow-sm rounded-2xl md:grid-cols-4">
+                        <div class="flex items-center gap-4 p-6 bg-white">
+                            <div class="p-3 bg-gray-50 rounded-xl">
+                                <BookOpen class="w-6 h-6 text-gray-600" />
                             </div>
                             <div>
                                 <p class="text-2xl font-bold text-gray-900">{{ plants.total }}</p>
-                                <p class="text-sm text-gray-500">Total Plants</p>
+                                <p class="text-xs font-medium tracking-wide text-gray-500 uppercase">Total Plants</p>
                             </div>
                         </div>
-                    </div>
-                    <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 rounded-lg bg-blue-50">
-                                <Leaf class="w-5 h-5 text-blue-600" />
+                        <div class="flex items-center gap-4 p-6 bg-white">
+                            <div class="p-3 bg-blue-50 rounded-xl">
+                                <Leaf class="w-6 h-6 text-blue-600" />
                             </div>
                             <div>
                                 <p class="text-2xl font-bold text-gray-900">{{ stats.withCare }}</p>
-                                <p class="text-sm text-gray-500">With Care Info</p>
+                                <p class="text-xs font-medium tracking-wide text-gray-500 uppercase">Care Guides</p>
                             </div>
                         </div>
-                    </div>
-                    <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 rounded-lg bg-purple-50">
-                                <TreeDeciduous class="w-5 h-5 text-purple-600" />
+                        <div class="flex items-center gap-4 p-6 bg-white">
+                            <div class="p-3 bg-purple-50 rounded-xl">
+                                <TreeDeciduous class="w-6 h-6 text-purple-600" />
                             </div>
                             <div>
                                 <p class="text-2xl font-bold text-gray-900">{{ families.length }}</p>
-                                <p class="text-sm text-gray-500">Families</p>
+                                <p class="text-xs font-medium tracking-wide text-gray-500 uppercase">Families</p>
                             </div>
                         </div>
-                    </div>
-                    <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 rounded-lg bg-amber-50">
-                                <Sun class="w-5 h-5 text-amber-600" />
+                        <div class="flex items-center gap-4 p-6 bg-white">
+                            <div class="p-3 bg-amber-50 rounded-xl">
+                                <Sun class="w-6 h-6 text-amber-600" />
                             </div>
                             <div>
                                 <p class="text-2xl font-bold text-gray-900">{{ stats.families }}</p>
-                                <p class="text-sm text-gray-500">On This Page</p>
+                                <p class="text-xs font-medium tracking-wide text-gray-500 uppercase">On Page</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Search and Filter Section -->
-                <div class="p-6 mb-6 bg-white shadow-sm rounded-xl">
-                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                        <!-- Search Bar -->
-                        <div class="lg:col-span-5">
-                            <label class="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                Search
-                            </label>
-                            <div class="relative group">
+                <!-- Floating Toolbar (Search & Filter) -->
+                <div class="sticky top-4 z-20 mb-8">
+                    <div class="p-2 bg-white/80 backdrop-blur-xl border border-gray-200/60 shadow-lg shadow-gray-200/20 rounded-2xl">
+                        <div class="grid grid-cols-1 gap-2 lg:grid-cols-12">
+                            <!-- Search -->
+                            <div class="lg:col-span-5 relative group">
+                                <Search class="absolute left-3.5 top-3 h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors" />
                                 <input
                                     v-model="searchQuery"
                                     type="text"
-                                    placeholder="Search by name, family..."
-                                    class="w-full rounded-lg border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm transition-all focus:border-gray-400 focus:bg-white focus:ring-gray-400"
+                                    placeholder="Search by name, scientific name, or family..."
+                                    class="w-full h-11 pl-11 pr-4 bg-gray-50/50 hover:bg-gray-100/50 focus:bg-white border-transparent focus:border-gray-200 rounded-xl text-sm transition-all focus:ring-2 focus:ring-gray-900/5"
                                 />
-                                <Search class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                             </div>
-                        </div>
 
-                        <!-- Family Filter -->
-                        <div class="lg:col-span-4">
-                            <label class="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                Family
-                            </label>
-                            <div class="relative">
+                            <!-- Family Select -->
+                            <div class="lg:col-span-3 relative">
+                                <Leaf class="absolute left-3.5 top-3 h-5 w-5 text-gray-400 pointer-events-none" />
                                 <select
                                     v-model="selectedFamily"
-                                    class="w-full appearance-none rounded-lg border-gray-200 bg-gray-50 py-2.5 pl-10 pr-8 text-sm focus:border-gray-400 focus:ring-gray-400"
+                                    class="w-full h-11 pl-11 pr-8 bg-gray-50/50 hover:bg-gray-100/50 focus:bg-white border-transparent focus:border-gray-200 rounded-xl text-sm appearance-none transition-all focus:ring-2 focus:ring-gray-900/5 cursor-pointer"
                                 >
                                     <option value="">All Families</option>
                                     <option v-for="family in families" :key="family" :value="family">
                                         {{ family }}
                                     </option>
                                 </select>
-                                <Leaf class="pointer-events-none absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                <ChevronDown class="pointer-events-none absolute right-3 top-3 h-4 w-4 text-gray-400" />
+                                <ChevronDown class="absolute right-3.5 top-3.5 h-4 w-4 text-gray-400 pointer-events-none" />
                             </div>
-                        </div>
 
-                        <!-- Has Care Filter -->
-                        <div class="lg:col-span-2">
-                            <label class="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                Filter
-                            </label>
-                            <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 cursor-pointer hover:bg-white transition-all">
-                                <input
-                                    v-model="hasCareOnly"
-                                    type="checkbox"
-                                    class="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-400"
-                                />
-                                <span class="text-sm text-gray-700">With care</span>
-                            </label>
-                        </div>
+                            <!-- Endangered Filter -->
+                            <div class="lg:col-span-3">
+                                <label class="flex items-center justify-center h-11 w-full gap-2.5 bg-gray-50/50 hover:bg-gray-100/50 cursor-pointer rounded-xl border border-transparent transition-all has-[:checked]:bg-red-600 has-[:checked]:text-white">
+                                    <input
+                                        v-model="isEndangeredOnly"
+                                        type="checkbox"
+                                        class="rounded border-gray-300 text-gray-900 focus:ring-offset-red-600 focus:ring-white/20"
+                                    />
+                                    <ShieldAlert class="w-4 h-4" />
+                                    <span class="text-sm font-medium">Endangered Only</span>
+                                </label>
+                            </div>
 
-                        <!-- View Toggle -->
-                        <div class="lg:col-span-1">
-                            <label class="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                View
-                            </label>
-                            <div class="flex p-1 border border-gray-200 rounded-lg bg-gray-50">
+                            <!-- View Toggle -->
+                            <div class="lg:col-span-1 flex bg-gray-100 p-1 rounded-xl">
                                 <button
                                     @click="viewMode = 'grid'"
-                                    class="flex-1 p-2 transition-all rounded-md"
-                                    :class="viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'"
+                                    class="flex-1 flex items-center justify-center rounded-lg transition-all"
+                                    :class="viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'"
                                 >
-                                    <Grid3X3 class="w-4 h-4 mx-auto" />
+                                    <Grid3X3 class="w-5 h-5" />
                                 </button>
                                 <button
                                     @click="viewMode = 'list'"
-                                    class="flex-1 p-2 transition-all rounded-md"
-                                    :class="viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'"
+                                    class="flex-1 flex items-center justify-center rounded-lg transition-all"
+                                    :class="viewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'"
                                 >
-                                    <List class="w-4 h-4 mx-auto" />
+                                    <List class="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Active Filters -->
-                    <div v-if="hasActiveFilters" class="flex items-center justify-between pt-4 mt-4 border-t border-gray-100">
-                        <div class="flex items-center gap-2 text-sm text-gray-500">
-                            <Filter class="w-4 h-4" />
-                            <span>Showing filtered results</span>
+                        <!-- Active Filters Indicator -->
+                        <div v-if="hasActiveFilters" class="flex items-center justify-between px-2 pt-2 mt-2 border-t border-gray-100">
+                            <span class="text-xs font-medium text-gray-500">Active filters applied</span>
+                            <button
+                                @click="clearFilters"
+                                class="text-xs font-medium text-red-600 hover:text-red-700 hover:underline"
+                            >
+                                Clear all
+                            </button>
                         </div>
-                        <button
-                            @click="clearFilters"
-                            class="text-xs font-medium text-red-500 hover:text-red-700"
-                        >
-                            Clear filters
-                        </button>
                     </div>
                 </div>
 
@@ -378,36 +359,66 @@ const goToPage = (url: string | null) => {
                             :href="route('plants.show', plant.id)"
                             class="overflow-hidden transition-all duration-300 bg-white border border-gray-100 shadow-sm group rounded-xl hover:shadow-lg"
                         >
-                            <!-- Plant Header with gradient -->
-                            <div class="relative p-5 bg-gradient-to-br from-gray-50 to-gray-100">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="p-2 rounded-lg bg-white/80">
-                                        <Leaf class="w-6 h-6 text-gray-600" />
-                                    </div>
-                                    <span
-                                        v-if="hasCareDetails(plant)"
-                                        class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-200 rounded-full"
-                                    >
-                                        Care Info
-                                    </span>
+                            <!-- Plant Header with Full Image -->
+                            <div class="relative w-full h-48 overflow-hidden bg-gray-100 border-b border-gray-100">
+                                <!-- Full Background Image -->
+                                <img
+                                    v-if="plant.latest_image"
+                                    :src="plant.latest_image"
+                                    :alt="plant.common_name || plant.scientific_name"
+                                    class="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
+                                />
+                                <div v-else class="flex items-center justify-center w-full h-full bg-gradient-to-br from-green-50 to-emerald-100">
+                                    <Leaf class="w-12 h-12 text-emerald-200" />
                                 </div>
-                                <h3 class="font-semibold text-gray-900 transition-colors group-hover:text-gray-600">
-                                    {{ plant.common_name || plant.scientific_name }}
-                                </h3>
-                                <p class="text-sm italic text-gray-500">{{ plant.scientific_name }}</p>
+
+                                <!-- Overlay Badges -->
+                                <div class="absolute inset-0 p-4 pointer-events-none">
+                                    <div class="flex items-start justify-between">
+                                        <!-- Left Badge (Status) -->
+                                        <div v-if="isThreatened(plant)" class="inline-flex">
+                                            <span class="px-2.5 py-1 text-xs font-semibold text-white bg-red-500/90 backdrop-blur-md rounded-lg shadow-sm border border-red-400/50">
+                                                Conservation
+                                            </span>
+                                        </div>
+                                        <div v-else class="inline-flex">
+                                            <!-- Empty placeholder to push right badge -->
+                                        </div>
+
+                                        <!-- Right Badge (Care) -->
+                                        <div v-if="!isThreatened(plant) && hasCareDetails(plant)" class="inline-flex">
+                                            <span class="px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-white/90 backdrop-blur-md rounded-lg shadow-sm border border-white/50">
+                                                Care Info
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
+                            <!-- Plant Content -->
+                            <div class="p-5">
+                                <div class="mb-4">
+                                    <h3 class="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors line-clamp-1">
+                                        {{ plant.common_name || plant.scientific_name }}
+                                    </h3>
+                                    <p class="text-sm font-medium italic text-gray-500 font-serif mt-0.5 line-clamp-1">
+                                        {{ plant.scientific_name }}
+                                    </p>
+                                </div>
+
                             <!-- Plant Info -->
-                            <div class="p-4">
-                                <div class="space-y-2 mb-3">
-                                    <div v-if="plant.family" class="flex items-center gap-2 text-sm text-gray-600">
-                                        <TreeDeciduous class="w-4 h-4 text-gray-400" />
-                                        <span>{{ plant.family }}</span>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between text-sm">
+                                        <div v-if="plant.family" class="flex items-center gap-2 text-gray-600">
+                                            <TreeDeciduous class="w-4 h-4 text-gray-400" />
+                                            <span class="font-medium">{{ plant.family }}</span>
+                                        </div>
                                     </div>
+
                                     <div v-if="plant.iucn_category" class="flex items-center gap-2">
                                         <ShieldAlert class="w-4 h-4 text-gray-400" />
                                         <span
-                                            class="px-2 py-0.5 text-xs font-medium rounded-full"
+                                            class="px-2.5 py-0.5 text-xs font-semibold rounded-full border border-transparent"
                                             :class="[
                                                 getIucnCategoryInfo(plant.iucn_category)?.color,
                                                 getIucnCategoryInfo(plant.iucn_category)?.bgColor
@@ -418,12 +429,25 @@ const goToPage = (url: string | null) => {
                                     </div>
                                 </div>
 
-                                <!-- Quick Care Stats -->
-                                <div v-if="hasCareDetails(plant)" class="pt-3 border-t border-gray-100">
+                                <!-- Conservation Notice for Threatened Plants -->
+                                <div v-if="isThreatened(plant)" class="mt-4 pt-3 border-t border-gray-100">
+                                    <div class="p-3 bg-red-50 border border-red-100 rounded-lg">
+                                        <div class="flex items-start gap-2 mb-1">
+                                            <ShieldAlert class="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                                            <p class="text-xs font-bold text-red-800">Protected Species</p>
+                                        </div>
+                                        <p class="text-xs text-red-600/90 leading-relaxed">
+                                            Requires strict conservation measures.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Quick Care Stats (Non-Threatened Plants Only) -->
+                                <div v-else-if="hasCareDetails(plant)" class="mt-4 pt-3 border-t border-gray-100">
                                     <!-- Trefle Numeric Stats -->
                                     <div v-if="plant.care_source === 'trefle' && plant.light !== null" class="grid grid-cols-2 gap-2">
                                         <div class="flex items-center gap-1.5 text-xs text-gray-500">
-                                            <Sun class="w-3.5 h-3.5 text-yellow-500" />
+                                            <Sun class="w-3.5 h-3.5 text-amber-500" />
                                             <span>{{ getLightLabel(plant.light) }}</span>
                                         </div>
                                         <div class="flex items-center gap-1.5 text-xs text-gray-500">
@@ -438,9 +462,9 @@ const goToPage = (url: string | null) => {
 
                                     <!-- Gemini Text Stats Summary -->
                                     <div v-else-if="plant.care_source === 'gemini'" class="space-y-2">
-                                        <div class="flex items-center gap-2 text-xs text-purple-600">
+                                        <div class="flex items-center gap-2 text-xs text-purple-700 font-medium">
                                             <Sparkles class="w-3.5 h-3.5" />
-                                            <span class="font-medium">AI Care Guide Available</span>
+                                            <span>AI Care Guide Available</span>
                                         </div>
                                         <p v-if="plant.care_summary" class="text-xs text-gray-500 line-clamp-2 leading-relaxed">
                                             {{ plant.care_summary }}
@@ -448,7 +472,7 @@ const goToPage = (url: string | null) => {
                                     </div>
                                 </div>
 
-                                <div v-else class="pt-3 text-xs italic text-gray-400 border-t border-gray-100">
+                                <div v-else class="mt-4 pt-3 text-xs italic text-gray-400 border-t border-gray-100">
                                     Care details not yet loaded
                                 </div>
                             </div>
@@ -464,9 +488,15 @@ const goToPage = (url: string | null) => {
                                 :href="route('plants.show', plant.id)"
                                 class="flex items-center gap-4 p-4 transition-colors hover:bg-gray-50"
                             >
-                                <!-- Icon -->
-                                <div class="flex items-center justify-center flex-shrink-0 w-12 h-12 rounded-lg bg-gray-100">
-                                    <Leaf class="w-6 h-6 text-gray-600" />
+                                <!-- Icon/Image -->
+                                <div class="relative flex items-center justify-center flex-shrink-0 w-12 h-12 overflow-hidden rounded-lg bg-gray-100">
+                                    <img
+                                        v-if="plant.latest_image"
+                                        :src="plant.latest_image"
+                                        :alt="plant.common_name || plant.scientific_name"
+                                        class="object-cover w-full h-full"
+                                    />
+                                    <Leaf v-else class="w-6 h-6 text-gray-600" />
                                 </div>
 
                                 <!-- Info -->
@@ -476,7 +506,13 @@ const goToPage = (url: string | null) => {
                                             {{ plant.common_name || plant.scientific_name }}
                                         </h3>
                                         <span
-                                            v-if="hasCareDetails(plant)"
+                                            v-if="isThreatened(plant)"
+                                            class="px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded-full"
+                                        >
+                                            Conservation
+                                        </span>
+                                        <span
+                                            v-else-if="hasCareDetails(plant)"
                                             class="px-2 py-0.5 text-xs font-medium text-gray-700 bg-gray-200 rounded-full"
                                         >
                                             Care Info
@@ -497,8 +533,16 @@ const goToPage = (url: string | null) => {
                                     <p v-if="plant.family" class="mt-1 text-sm text-gray-500">Family: {{ plant.family }}</p>
                                 </div>
 
-                                <!-- Care Stats -->
-                                <div v-if="hasCareDetails(plant)" class="flex items-center gap-6 text-sm text-gray-500">
+                                <!-- Conservation Notice for Threatened Plants -->
+                                <div v-if="isThreatened(plant)" class="flex items-center gap-2 text-sm">
+                                    <div class="flex items-center gap-1.5 text-red-600 bg-red-50 px-3 py-1.5 rounded-full border border-red-200">
+                                        <ShieldAlert class="w-4 h-4" />
+                                        <span class="font-medium">Protected Species</span>
+                                    </div>
+                                </div>
+
+                                <!-- Care Stats (Non-Threatened Plants Only) -->
+                                <div v-else-if="hasCareDetails(plant)" class="flex items-center gap-6 text-sm text-gray-500">
                                     <template v-if="plant.care_source === 'trefle' && plant.light !== null">
                                         <div class="flex items-center gap-1.5">
                                             <Sun class="w-4 h-4 text-yellow-500" />

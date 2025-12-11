@@ -42,7 +42,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Sightings Map',
-        href: '/plant-map',
+        href: '/sightings-map',
         icon: Map,
     },
     {

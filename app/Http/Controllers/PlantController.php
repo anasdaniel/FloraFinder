@@ -35,12 +35,23 @@ class PlantController extends Controller
             $query->where('family', $request->input('family'));
         }
 
-        // Has care details filter
-        if ($request->boolean('has_care')) {
-            $query->whereNotNull('care_cached_at');
+        // Endangered/threatened species filter
+        if ($request->boolean('is_endangered')) {
+            $query->whereIn('iucn_category', ['EX', 'EW', 'CR', 'EN', 'VU', 'NT']);
         }
 
         $plants = $query->orderBy('scientific_name')->paginate(20);
+
+        // Load the latest sighting image for each plant
+        $plants->getCollection()->transform(function ($plant) {
+            $latestSighting = $plant->sightings()
+                ->whereNotNull('image_url')
+                ->latest('sighted_at')
+                ->first();
+
+            $plant->latest_image = $latestSighting?->image_url;
+            return $plant;
+        });
 
         // Get unique families for filter dropdown
         $families = Plant::whereNotNull('family')
@@ -52,7 +63,7 @@ class PlantController extends Controller
         return Inertia::render('Plants/Index', [
             'plants' => $plants,
             'families' => $families,
-            'filters' => $request->only(['search', 'family', 'has_care']),
+            'filters' => $request->only(['search', 'family', 'is_endangered']),
         ]);
     }
 

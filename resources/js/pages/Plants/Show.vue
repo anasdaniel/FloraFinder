@@ -246,6 +246,29 @@ const getIucnCategoryInfo = (category: string | null): { label: string; color: s
 
   return categoryMap[category.toUpperCase()] || { label: category, color: 'text-white', bgColor: 'bg-gray-600' };
 };
+
+// Check if plant is threatened and should not have care guide
+const isThreatened = computed(() => {
+  if (!props.plant.iucn_category) return false;
+  const threatenedCategories = ['EX', 'EW', 'CR', 'EN', 'VU', 'NT'];
+  return threatenedCategories.includes(props.plant.iucn_category.toUpperCase());
+});
+
+// Get conservation message based on status
+const getConservationMessage = (category: string | null): string => {
+  if (!category) return '';
+
+  const messages: Record<string, string> = {
+    'EX': 'This species is extinct with no known individuals remaining. Conservation efforts focus on understanding what led to its extinction and preventing similar outcomes for other species.',
+    'EW': 'This species is extinct in the wild and only survives in captivity or as naturalized populations. Conservation efforts aim to reintroduce individuals to their native habitat when conditions permit.',
+    'CR': 'This species is critically endangered and faces an extremely high risk of extinction in the wild. Immediate conservation action is essential for its survival.',
+    'EN': 'This species is endangered and faces a very high risk of extinction in the wild. Active conservation measures are needed to protect remaining populations.',
+    'VU': 'This species is vulnerable to extinction and faces a high risk in the wild. Conservation efforts focus on protecting habitats and monitoring populations.',
+    'NT': 'This species is near threatened and may qualify for a threatened category in the near future. Preventive conservation measures can help ensure its survival.',
+  };
+
+  return messages[category.toUpperCase()] || 'This species requires conservation attention. Please consult local wildlife authorities before any cultivation attempts.';
+};
 </script>
 
 <template>
@@ -301,7 +324,14 @@ const getIucnCategoryInfo = (category: string | null): { label: string; color: s
                   {{ getIucnCategoryInfo(plant.iucn_category)?.label }}
                 </span>
                 <span
-                  v-if="hasCareDetails"
+                  v-if="isThreatened"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 text-red-100 text-sm backdrop-blur-sm border border-red-500/20"
+                >
+                  <ShieldAlert class="w-3.5 h-3.5" />
+                  Conservation Notice
+                </span>
+                <span
+                  v-else-if="hasCareDetails"
                   class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/20 text-green-100 text-sm backdrop-blur-sm border border-green-500/20"
                 >
                   <Leaf class="w-3.5 h-3.5" />
@@ -384,8 +414,157 @@ const getIucnCategoryInfo = (category: string | null): { label: string; color: s
               <p class="text-lg leading-relaxed text-gray-600">{{ plant.description }}</p>
             </div>
 
-            <!-- Care Guide -->
-            <div v-if="hasCareDetails" class="space-y-6">
+            <!-- Conservation Notice for Threatened Plants -->
+            <div v-if="isThreatened" class="space-y-6">
+              <div class="p-8 border-2 border-red-200 bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl">
+                <div class="flex items-start gap-4 mb-6">
+                  <div class="p-3 text-red-600 bg-white border-2 border-red-200 shadow-sm rounded-xl">
+                    <ShieldAlert class="w-8 h-8" />
+                  </div>
+                  <div class="flex-1">
+                    <h2 class="mb-2 text-2xl font-bold text-red-900">Conservation Notice</h2>
+                    <p class="text-lg font-medium text-red-800">
+                      {{ getIucnCategoryInfo(plant.iucn_category)?.label }} Species
+                    </p>
+                  </div>
+                </div>
+
+                <div class="p-6 mb-6 bg-white border border-red-100 rounded-xl">
+                  <p class="text-base leading-relaxed text-gray-700">
+                    {{ getConservationMessage(plant.iucn_category) }}
+                  </p>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div class="p-5 bg-white border border-red-100 rounded-xl">
+                    <h3 class="mb-3 font-semibold text-gray-900">Why This Matters</h3>
+                    <ul class="space-y-2 text-sm text-gray-700">
+                      <li class="flex items-start gap-2">
+                        <span class="flex-shrink-0 w-1.5 h-1.5 mt-1.5 bg-red-500 rounded-full"></span>
+                        <span>Threatened species should not be removed from wild habitats</span>
+                      </li>
+                      <li class="flex items-start gap-2">
+                        <span class="flex-shrink-0 w-1.5 h-1.5 mt-1.5 bg-red-500 rounded-full"></span>
+                        <span>Collection may be illegal without proper permits</span>
+                      </li>
+                      <li class="flex items-start gap-2">
+                        <span class="flex-shrink-0 w-1.5 h-1.5 mt-1.5 bg-red-500 rounded-full"></span>
+                        <span>Every individual is crucial for species survival</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="p-5 bg-white border border-red-100 rounded-xl">
+                    <h3 class="mb-3 font-semibold text-gray-900">How You Can Help</h3>
+                    <ul class="space-y-2 text-sm text-gray-700">
+                      <li class="flex items-start gap-2">
+                        <span class="flex-shrink-0 w-1.5 h-1.5 mt-1.5 bg-green-600 rounded-full"></span>
+                        <span>Report sightings to conservation organizations</span>
+                      </li>
+                      <li class="flex items-start gap-2">
+                        <span class="flex-shrink-0 w-1.5 h-1.5 mt-1.5 bg-green-600 rounded-full"></span>
+                        <span>Support habitat protection initiatives</span>
+                      </li>
+                      <li class="flex items-start gap-2">
+                        <span class="flex-shrink-0 w-1.5 h-1.5 mt-1.5 bg-green-600 rounded-full"></span>
+                        <span>Educate others about conservation needs</span>
+                      </li>
+                      <li class="flex items-start gap-2">
+                        <span class="flex-shrink-0 w-1.5 h-1.5 mt-1.5 bg-green-600 rounded-full"></span>
+                        <span>Avoid disturbing plants in their natural habitat</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div class="p-4 mt-4 border-l-4 border-red-600 bg-white/80 rounded-r-xl">
+                  <p class="text-sm font-medium text-gray-800">
+                    <strong>Important:</strong> This plant should not be cultivated without proper authorization from conservation authorities. Contact local wildlife agencies for guidance on legal conservation efforts.
+                  </p>
+                </div>
+
+                <!-- Conservation Resources & Contacts -->
+                <div class="p-6 mt-4 bg-white border border-gray-200 rounded-xl">
+                  <h3 class="flex items-center gap-2 mb-4 text-lg font-semibold text-gray-900">
+                    <span class="w-1 h-5 bg-green-600 rounded-full"></span>
+                    Conservation Resources & Contacts
+                  </h3>
+
+                  <div class="space-y-4">
+                    <div class="p-4 transition-colors border border-gray-100 rounded-lg hover:bg-gray-50">
+                      <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 p-2 rounded-lg bg-green-100">
+                          <ShieldAlert class="w-5 h-5 text-green-700" />
+                        </div>
+                        <div class="flex-1">
+                          <h4 class="mb-1 font-semibold text-gray-900">IUCN Red List</h4>
+                          <p class="mb-2 text-sm text-gray-600">International Union for Conservation of Nature</p>
+                          <div class="space-y-1 text-sm">
+                            <a href="https://www.iucnredlist.org" target="_blank" class="block text-blue-600 hover:text-blue-800 hover:underline">
+                              Website: www.iucnredlist.org
+                            </a>
+                            <p class="text-gray-600">Email: redlist@iucn.org</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="p-4 transition-colors border border-gray-100 rounded-lg hover:bg-gray-50">
+                      <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 p-2 rounded-lg bg-blue-100">
+                          <TreeDeciduous class="w-5 h-5 text-blue-700" />
+                        </div>
+                        <div class="flex-1">
+                          <h4 class="mb-1 font-semibold text-gray-900">Botanic Gardens Conservation International (BGCI)</h4>
+                          <p class="mb-2 text-sm text-gray-600">Global network for plant conservation</p>
+                          <div class="space-y-1 text-sm">
+                            <a href="https://www.bgci.org" target="_blank" class="block text-blue-600 hover:text-blue-800 hover:underline">
+                              Website: www.bgci.org
+                            </a>
+                            <p class="text-gray-600">Email: info@bgci.org</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="p-4 transition-colors border border-gray-100 rounded-lg hover:bg-gray-50">
+                      <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 p-2 rounded-lg bg-purple-100">
+                          <Leaf class="w-5 h-5 text-purple-700" />
+                        </div>
+                        <div class="flex-1">
+                          <h4 class="mb-1 font-semibold text-gray-900">Local Wildlife & Conservation Agencies</h4>
+                          <p class="mb-2 text-sm text-gray-600">Contact your regional authorities for local guidance</p>
+                          <ul class="space-y-1 text-sm text-gray-600">
+                            <li class="flex items-start gap-1.5">
+                              <span class="flex-shrink-0 w-1 h-1 mt-2 bg-gray-400 rounded-full"></span>
+                              <span>Department of Environment & Natural Resources</span>
+                            </li>
+                            <li class="flex items-start gap-1.5">
+                              <span class="flex-shrink-0 w-1 h-1 mt-2 bg-gray-400 rounded-full"></span>
+                              <span>National Parks & Wildlife Services</span>
+                            </li>
+                            <li class="flex items-start gap-1.5">
+                              <span class="flex-shrink-0 w-1 h-1 mt-2 bg-gray-400 rounded-full"></span>
+                              <span>Botanical Research Institutions</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="p-4 border border-amber-200 rounded-lg bg-amber-50">
+                      <p class="text-sm text-amber-900">
+                        <strong>Note:</strong> If you encounter this species in the wild, please report your sighting to help conservation efforts. Document the location, date, and habitat conditions without disturbing the plant.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Care Guide (Only for Non-Threatened Plants) -->
+            <div v-else-if="hasCareDetails" class="space-y-6">
               <div class="flex items-center justify-between">
                 <h2 class="text-2xl font-bold text-gray-900">Care Guide</h2>
                 <div class="flex items-center gap-3">
@@ -588,9 +767,9 @@ const getIucnCategoryInfo = (category: string | null): { label: string; color: s
               </div>
             </div>
 
-            <!-- Empty State for Care -->
+            <!-- Empty State for Care (Non-Threatened Plants Only) -->
             <div
-              v-else
+              v-else-if="!isThreatened"
               class="p-12 text-center bg-white border border-gray-100 shadow-sm rounded-2xl"
             >
               <div

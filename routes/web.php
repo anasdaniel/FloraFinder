@@ -202,9 +202,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         );
     })->name('plant-map');
 
-    Route::get('sighting-map', function () {
-        return Inertia::render(component: 'SightingMap');
-    })->name('sighting-map');
+    // Public Sightings Map (all users' sightings)
+    Route::get('sightings-map', [SightingController::class, 'publicMap'])->name('sightings.map');
 
     // Sighting routes
     Route::post('/sightings', [SightingController::class, 'store'])->name('sightings.store');
