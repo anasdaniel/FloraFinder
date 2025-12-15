@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlantIdentifierController;
 use App\Http\Controllers\ForumController;
 use App\Http\Controllers\PlantController;
@@ -64,9 +65,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
     //welcome plant
-    Route::get('welcome-plant', function () {
-        return Inertia::render('Dashboard/Index');
-    })->name('welcome-plant');
+    Route::get('welcome-plant', [DashboardController::class, 'index'])->name('welcome-plant');
 
     //view a post
     Route::get('/forum/{id}', function ($id) {
