@@ -9,7 +9,7 @@ import type { BreadcrumbItem, ForumThread } from "@/types";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus } from 'lucide-vue-next';
+import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus, Heart, Share2 } from 'lucide-vue-next';
 
 const activeCommentThread = ref<number | null>(null);
 const newComment = ref("");
@@ -29,6 +29,9 @@ const allTags = ref<{ id: number; tag_name: string }[]>([]);
 allTags.value = page.props.allTags || []; // if passed from backend
 
 const isOwner = (thread) => authUser && authUser.id === thread.user_id;
+
+// Visible threads count for "Load more" functionality
+const visibleThreadsCount = ref(10);
 
 const addTag = (threadId) => {
     if (!selectedTag.value) return;
@@ -73,13 +76,24 @@ const props = defineProps<{
 const selectedCategory = ref("general");
 
 const filteredThreads = computed(() => {
-    if (selectedCategory.value === "all") {
-        return props.threads;
-    }
-    return props.threads.filter(
-        t => t.category.toLowerCase() === selectedCategory.value.toLowerCase()
-    );
+    const filtered = selectedCategory.value === "all"
+        ? props.threads
+        : props.threads.filter(t => t.category.toLowerCase() === selectedCategory.value.toLowerCase());
+
+    return filtered.slice(0, visibleThreadsCount.value);
 });
+
+const hasMoreThreads = computed(() => {
+    const totalFiltered = selectedCategory.value === "all"
+        ? props.threads.length
+        : props.threads.filter(t => t.category.toLowerCase() === selectedCategory.value.toLowerCase()).length;
+
+    return visibleThreadsCount.value < totalFiltered;
+});
+
+const loadMore = () => {
+    visibleThreadsCount.value += 10;
+};
 
 // Delete thread
 const deleteThread = (threadId: number) => {
@@ -234,6 +248,65 @@ const deleteComment = (id: number, threadId?: number) => {
     });
 };
 
+// Like/Unlike thread
+const toggleLike = async (thread: ForumThread) => {
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${thread.id}/like`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (!res.ok) {
+            console.error('Failed to toggle like');
+            return;
+        }
+
+        const json = await res.json();
+        thread.is_liked_by_user = json.is_liked;
+        thread.likes_count = json.likes_count;
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+// Share thread
+const shareThread = async (thread: ForumThread) => {
+    try {
+        // Copy thread URL to clipboard
+        const url = `${window.location.origin}/forum/${thread.id}`;
+        await navigator.clipboard.writeText(url);
+
+        // Increment share counter
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${thread.id}/share`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (res.ok) {
+            const json = await res.json();
+            thread.shares_count = json.shares_count;
+        }
+
+        // Optional: Show a toast notification
+        alert('Link copied to clipboard!');
+    } catch (e) {
+        console.error(e);
+        alert('Failed to copy link');
+    }
+};
+
 // Breadcrumbs
 const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 </script>
@@ -245,11 +318,11 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
             <!-- Header -->
             <div class="flex flex-col items-start justify-between gap-4 mb-6 sm:flex-row sm:items-center">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Forum</h1>
-                    <p class="mt-1 text-sm text-gray-500">Ask questions, share knowledge, and connect with the FloraFinder community.</p>
+                    <h1 class="text-3xl font-bold text-gray-900">Forum</h1>
+                    <p class="mt-1 text-sm text-gray-600">Ask questions, share knowledge, and connect with the FloraFinder community.</p>
                 </div>
                 <Link href="/forum/new">
-                    <Button type="button" variant="default" size="sm" class="gap-2 bg-gray-900 hover:bg-gray-800">
+                    <Button type="button" variant="default" size="default" class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-6">
                         <Plus class="w-4 h-4" />
                         New Post
                     </Button>
@@ -257,22 +330,22 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
             </div>
 
             <!-- Category Filter Tabs -->
-            <div class="flex flex-wrap gap-2 mb-8 p-1 bg-gray-100/50 rounded-xl w-fit">
+            <div class="flex flex-wrap gap-2 mb-8">
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all border"
                     :class="selectedCategory === 'general'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'general'"
                 >
                     General
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all border"
                     :class="selectedCategory === 'identification'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'identification'"
                 >
                     <Search class="w-4 h-4" />
@@ -280,10 +353,10 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all border"
                     :class="selectedCategory === 'care'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'care'"
                 >
                     <Leaf class="w-4 h-4" />
@@ -291,10 +364,10 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all border"
                     :class="selectedCategory === 'offtopic'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'offtopic'"
                 >
                     <Users class="w-4 h-4" />
@@ -360,12 +433,12 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                         <span
                             v-for="tag in thread.tags"
                             :key="tag.id"
-                            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-gray-50 text-gray-600 rounded-md border border-gray-100"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200"
                         >
                             {{ tag.tag_name }}
                             <button
                                 v-if="isOwner(thread)"
-                                class="text-gray-400 hover:text-red-500"
+                                class="text-emerald-400 hover:text-red-500 ml-1"
                                 @click="removeTag(thread.id, tag.id)"
                             >
                                 ×
@@ -374,7 +447,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 
                          <div v-if="isOwner(thread)" class="relative">
                             <button
-                                class="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md border border-dashed border-gray-200 transition-colors"
+                                class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 rounded-full border border-gray-200 transition-colors"
                                 @click="showTagDropdown[thread.id] = !showTagDropdown[thread.id]"
                             >
                                 + Tag
@@ -402,13 +475,30 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 
                     <!-- Footer / Actions -->
                     <div class="flex items-center justify-between pt-4 border-t border-gray-50">
-                        <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-5">
                              <button
                                 @click="toggleCommentField(thread.id)"
                                 class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
                             >
-                                <MessageCircle class="w-5 h-5" />
+                                <MessageCircle class="w-4 h-4" />
                                 <span class="font-medium">{{ thread.posts_count || 0 }} Comments</span>
+                            </button>
+
+                            <button
+                                @click="toggleLike(thread)"
+                                class="flex items-center gap-2 text-sm transition-colors"
+                                :class="thread.is_liked_by_user ? 'text-red-500 hover:text-red-600' : 'text-gray-500 hover:text-red-500'"
+                            >
+                                <Heart class="w-4 h-4" :class="{ 'fill-red-500': thread.is_liked_by_user }" />
+                                <span class="font-medium">{{ thread.likes_count || 0 }} Likes</span>
+                            </button>
+
+                            <button
+                                @click="shareThread(thread)"
+                                class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                            >
+                                <Share2 class="w-4 h-4" />
+                                <span class="font-medium">Share</span>
                             </button>
                         </div>
                     </div>
@@ -541,6 +631,19 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </div>
             </div>
 
+            <!-- Load More Button -->
+            <div v-if="hasMoreThreads" class="flex justify-center mt-8">
+                <Button
+                    variant="outline"
+                    @click="loadMore"
+                    class="gap-2 px-6"
+                >
+                    Load more posts
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </Button>
+            </div>
 
             <div class="mt-10 text-xs text-center text-muted-foreground">
                 <span>Powered by FloraFinder Community</span>

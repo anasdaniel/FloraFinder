@@ -116,6 +116,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/forum/{thread}/tags/{forumTag}', [ForumController::class, 'removeTag'])
         ->name('forum.tags.remove');
 
+    // Like/Unlike thread
+    Route::post('/forum/{thread}/like', [ForumController::class, 'toggleLike'])
+        ->name('forum.like');
+
+    // Share thread (increment counter)
+    Route::post('/forum/{thread}/share', [ForumController::class, 'incrementShare'])
+        ->name('forum.share');
+
 
     // Plant search route
     Route::get('plant-search', function () {

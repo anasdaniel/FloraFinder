@@ -196,4 +196,37 @@ class ForumController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    public function toggleLike(ForumThread $thread)
+    {
+        $user = auth()->user();
+
+        if ($thread->likes()->where('user_id', $user->id)->exists()) {
+            // Unlike
+            $thread->likes()->detach($user->id);
+            $thread->decrement('likes_count');
+            $isLiked = false;
+        } else {
+            // Like
+            $thread->likes()->attach($user->id);
+            $thread->increment('likes_count');
+            $isLiked = true;
+        }
+
+        return response()->json([
+            'success' => true,
+            'is_liked' => $isLiked,
+            'likes_count' => $thread->fresh()->likes_count
+        ]);
+    }
+
+    public function incrementShare(ForumThread $thread)
+    {
+        $thread->increment('shares_count');
+
+        return response()->json([
+            'success' => true,
+            'shares_count' => $thread->fresh()->shares_count
+        ]);
+    }
 }
