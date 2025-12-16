@@ -196,9 +196,12 @@ export function usePlantIdentification({
           activeImageIndex.value = 0;
           const topResult = matches[0];
 
-          // Fetch threat status first, passing the index for easier updates
+          // Fetch threat status first, then care details (both fire async, care waits slightly)
           fetchThreatStatus(topResult.species.scientificName, 0);
-          fetchCareDetails(topResult.species.scientificName);
+          // Small delay to avoid simultaneous Gemini API calls (rate limiting)
+          setTimeout(() => {
+            fetchCareDetails(topResult.species.scientificName);
+          }, 500);
 
           toast({
             title: 'Identification Complete',
@@ -369,15 +372,50 @@ export function usePlantIdentification({
     // The backend constructs the system prompt for the Gemini model
     // Message history sent to backend will be serialized directly
     try {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      // Get CSRF token from meta tag (preferred) or XSRF cookie (fallback)
+      let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+      if (!csrfToken) {
+        // Fallback: get XSRF-TOKEN from cookies (Laravel sets this)
+        const xsrfCookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('XSRF-TOKEN='));
+        if (xsrfCookie) {
+          csrfToken = decodeURIComponent(xsrfCookie.split('=')[1]);
+        }
+      }
+
+      if (!csrfToken) {
+        console.error('No CSRF token found in meta tag or cookies');
+        return "Session expired. Please refresh the page and try again.";
+      }
+
       const response = await fetch(route('plant-identifier.chat'), {
         method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken || '' },
+        credentials: 'include', // Include cookies for session
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+          'X-XSRF-TOKEN': csrfToken, // Laravel accepts both
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ plantName, message, history }),
       });
+
+      // Check if response is OK (status 200-299)
+      if (!response.ok) {
+        console.error('Chat API returned error status:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
+
+        if (response.status === 419) {
+          return "Session expired. Please refresh the page and try again.";
+        }
+        return "I'm having trouble checking my botanical reference books right now.";
+      }
+
       const data = await response.json();
-      return data.reply ?? "I'm having trouble checking my botanical reference books right now.";
+      return data.reply ?? "I couldn't get a response. Please try again.";
     } catch (error) {
       console.error('Chat API Error:', error);
       return "I'm having trouble checking my botanical reference books right now.";
@@ -390,11 +428,14 @@ export function usePlantIdentification({
     const plantName =
       selectedResult.value.species.commonNames?.[0] || selectedResult.value.species.scientificName;
 
+    // Add user message to UI immediately
     chatMessages.value.push({ text: userText, role: 'user' });
     chatInput.value = '';
     isChatLoading.value = true;
 
-    const responseText = await callGeminiChat(plantName, chatMessages.value, userText);
+    // Send history WITHOUT the just-added user message (API will add it)
+    const historyWithoutLast = chatMessages.value.slice(0, -1);
+    const responseText = await callGeminiChat(plantName, historyWithoutLast, userText);
 
     chatMessages.value.push({ text: responseText, role: 'model' });
     isChatLoading.value = false;

@@ -107,12 +107,28 @@ class PlantIdentifierController extends Controller
             'message' => 'required|string',
             'history' => 'nullable|array',
         ]);
+
         $plantName = $request->input('plantName');
         $message = $request->input('message');
         $history = $request->input('history', []);
 
-        $reply = $this->careDetailsService->generateBotReply($plantName, $history, $message);
-        return response()->json(['success' => true, 'reply' => $reply]);
+        Log::info('Botanist chat request', [
+            'plantName' => $plantName,
+            'message' => substr($message, 0, 100),
+            'historyCount' => count($history),
+        ]);
+
+        try {
+            $reply = $this->careDetailsService->generateBotReply($plantName, $history, $message);
+            Log::info('Botanist chat reply generated', ['replyLength' => strlen($reply)]);
+            return response()->json(['success' => true, 'reply' => $reply]);
+        } catch (\Exception $e) {
+            Log::error('Botanist chat exception: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'reply' => "I'm having trouble checking my botanical reference books right now."
+            ], 500);
+        }
     }
 
     public function save(Request $request)

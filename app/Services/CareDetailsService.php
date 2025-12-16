@@ -436,7 +436,7 @@ EOT;
 
     /**
      * Fetch care details from Gemini AI - returns descriptive text fields
-     * Prioritizes scientific name first, then adds common name for additional context if needed
+     * Uses scientific name with common name context in a single optimized call
      */
     private function fetchFromGemini(string $scientificName, ?string $commonName = null, ?string $family = null): ?array
     {
@@ -453,25 +453,15 @@ EOT;
             return null;
         }
 
-        // Strategy 1: Try with scientific name only first (most accurate)
-        Log::info("Fetching care details from Gemini using scientific name: {$scientificName}");
-        $result = $this->callGeminiAPI($scientificName, null, $family, $apiKey);
+        // Single optimized call - include common name context if available
+        $commonName = $commonName ? trim($commonName) : null;
+        Log::info("Fetching care details from Gemini for: {$scientificName}" . ($commonName ? " ({$commonName})" : ''));
+
+        $result = $this->callGeminiAPI($scientificName, $commonName, $family, $apiKey);
 
         if ($result && $this->hasUsefulData($result)) {
-            Log::info("✓ Gemini succeeded with scientific name only");
+            Log::info("✓ Gemini care details fetched successfully");
             return $this->sanitizeCareData($result);
-        }
-
-        // Strategy 2: If scientific name alone failed and we have a common name, try with both
-        $commonName = $commonName ? trim($commonName) : null;
-        if (!empty($commonName)) {
-            Log::info("⚠ Scientific name only failed, retrying with common name context: {$commonName}");
-            $result = $this->callGeminiAPI($scientificName, $commonName, $family, $apiKey);
-
-            if ($result && $this->hasUsefulData($result)) {
-                Log::info("✓ Gemini succeeded with scientific name + common name context");
-                return $this->sanitizeCareData($result);
-            }
         }
 
         Log::info("✗ Gemini failed for: {$scientificName}");
@@ -528,9 +518,33 @@ EOT;
     }
 
     /**
-     * Make the actual Gemini API call
+     * Make the actual Gemini API call with retry logic for transient failures
      */
     private function callGeminiAPI(string $scientificName, ?string $commonName = null, ?string $family = null, string $apiKey): ?array
+    {
+        $maxRetries = 2;
+        $retryDelayMs = 300; // milliseconds - faster retry
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $result = $this->attemptGeminiAPICall($scientificName, $commonName, $family, $apiKey, $attempt, $maxRetries);
+
+            if ($result !== null || $attempt === $maxRetries) {
+                return $result;
+            }
+
+            // Short delay before retry (300ms, then 600ms)
+            Log::info("Gemini API attempt {$attempt} failed, retrying in {$retryDelayMs}ms...");
+            usleep($retryDelayMs * 1000);
+            $retryDelayMs *= 2;
+        }
+
+        return null;
+    }
+
+    /**
+     * Single attempt to call Gemini API
+     */
+    private function attemptGeminiAPICall(string $scientificName, ?string $commonName, ?string $family, string $apiKey, int $attempt, int $maxRetries): ?array
     {
         try {
             // Build plant identification - scientific name is always primary
@@ -541,24 +555,12 @@ EOT;
             $familyInfo = !empty($family) ? " from the {$family} family" : '';
 
             $prompt = <<<PROMPT
-You are a botanical expert. Provide practical care guidance for the plant with the following identification:
-{$plantIdentification}{$familyInfo}.
+You are a botanical expert. Provide care guidance for: {$plantIdentification}{$familyInfo}.
 
-IMPORTANT: Use the scientific name "{$scientificName}" as the PRIMARY identifier for accuracy. If you cannot find information for the exact species, provide general care guidance for the genus.
+Return ONLY valid JSON (no markdown, no backticks):
+{"description":"1-2 sentences about the plant","watering_guide":"watering frequency and tips","sunlight_guide":"light requirements","soil_guide":"soil type and pH","temperature_guide":"temperature range and humidity","care_summary":"key care point in 1 sentence","care_tips":"2-3 practical tips"}
 
-Return ONLY a valid JSON object with descriptive text fields. Do not include any markdown formatting, backticks, or explanations. Just the raw JSON.
-
-{
-    "description": "2-3 sentence description of the plant, its appearance, and origin. If unknown, provide 'Information not available for this species.'",
-    "watering_guide": "Describe watering needs in detail (frequency, amount, seasonal adjustments, signs of over/under watering). If unknown, provide general watering advice for the plant family or genus.",
-    "sunlight_guide": "Describe light requirements (full sun, partial shade, indoor lighting tips, ideal placement). If unknown, provide general light advice for the plant family or genus.",
-    "soil_guide": "Describe ideal soil conditions (type, pH, drainage, amendments, potting mix recommendations). If unknown, provide general soil advice for the plant family or genus.",
-    "temperature_guide": "Describe temperature tolerance (ideal ranges, frost sensitivity, humidity preferences, seasonal care). If unknown, provide general temperature advice for the plant family or genus.",
-    "care_summary": "A brief 1-2 sentence summary of the most important care considerations for this plant. Always provide a helpful summary.",
-    "care_tips": "3-4 practical care tips for keeping this plant healthy. Always provide useful tips even if generic."
-}
-
-Make each field informative and practical for a home gardener. Always provide useful content - never leave fields empty or with just "unknown".
+Be concise but informative. Never leave fields empty.
 PROMPT;
 
             // Use Saloon connector/request for Gemini instead of direct HTTP
@@ -613,6 +615,16 @@ PROMPT;
 
             return $careData;
         } catch (\Exception $e) {
+            $isRetryable = str_contains($e->getMessage(), 'timeout')
+                || str_contains($e->getMessage(), '429')
+                || str_contains($e->getMessage(), '503')
+                || str_contains($e->getMessage(), 'rate limit');
+
+            if ($isRetryable && $attempt < $maxRetries) {
+                Log::warning("Gemini API transient error (attempt {$attempt}): " . $e->getMessage());
+                return null; // Will trigger retry
+            }
+
             Log::error('Gemini API error: ' . $e->getMessage());
             return null;
         }
@@ -651,7 +663,7 @@ PROMPT;
     }
 
     /**
-     * Generate a bot reply (chat) for a plant via Gemini
+     * Generate a bot reply (chat) for a plant via Gemini with retry logic
      */
     public function generateBotReply(string $plantName, array $history, string $message): string
     {
@@ -661,28 +673,80 @@ PROMPT;
             return "I'm having trouble checking my botanical reference books right now.";
         }
 
-        $systemPrompt = "You are a helpful botanist assistant. The user has just identified a plant: \"{$plantName}\". Answer their questions specifically about this plant. Keep answers concise, friendly, and practical. Do not use markdown formatting.";
-        $contents = [['role' => 'model', 'parts' => [['text' => $systemPrompt]]]];
-        foreach ($history as $msg) {
-            $contents[] = ['role' => $msg['role'], 'parts' => [['text' => $msg['text']]]];
+        // Validate and sanitize inputs
+        $plantName = trim($plantName);
+        $message = trim($message);
+        if (empty($plantName) || empty($message)) {
+            return "I need to know which plant you're asking about.";
         }
+
+        // Build contents array with proper Gemini format
+        // System instruction as first user message (Gemini doesn't have a system role)
+        $systemPrompt = "You are a friendly botanist assistant helping with the plant: \"{$plantName}\". Be concise, practical, and helpful. No markdown.";
+        $contents = [
+            ['role' => 'user', 'parts' => [['text' => $systemPrompt]]],
+            ['role' => 'model', 'parts' => [['text' => "I'd be happy to help you with {$plantName}! What would you like to know?"]]],
+        ];
+
+        // Add validated history
+        foreach ($history as $msg) {
+            if (!isset($msg['role'], $msg['text']) || !is_string($msg['text'])) {
+                continue; // Skip malformed entries
+            }
+            $role = $msg['role'] === 'user' ? 'user' : 'model';
+            $text = trim($msg['text']);
+            if (!empty($text)) {
+                $contents[] = ['role' => $role, 'parts' => [['text' => $text]]];
+            }
+        }
+
+        // Add current user message
         $contents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
 
-        try {
-            $connector = new GeminiConnector();
-            $req = new GeminiRequest('gemini-2.0-flash', $contents, null); // null for plain text
-            $response = $connector->send($req);
-            if (!$response->successful()) {
-                Log::warning('Gemini chat request failed: ' . $response->status());
-                return "I'm having trouble checking my botanical reference books right now.";
+        // Retry logic for transient failures
+        $maxRetries = 2;
+        $retryDelayMs = 300;
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $connector = new GeminiConnector();
+                $req = new GeminiRequest('gemini-2.0-flash', $contents, null);
+                $response = $connector->send($req);
+
+                if (!$response->successful()) {
+                    $status = $response->status();
+                    Log::warning("Gemini chat request failed (attempt {$attempt}): status {$status}");
+
+                    // Retry on rate limit or server errors
+                    if (($status === 429 || $status >= 500) && $attempt < $maxRetries) {
+                        usleep($retryDelayMs * 1000);
+                        $retryDelayMs *= 2;
+                        continue;
+                    }
+                    return "I'm having trouble checking my botanical reference books right now.";
+                }
+
+                $data = $response->json();
+                $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? null;
+
+                if ($text) {
+                    return trim($text);
+                }
+
+                Log::warning('Gemini chat returned empty text');
+                return "I couldn't find specific information about that. Try asking differently!";
+            } catch (\Exception $e) {
+                Log::error("Gemini chat error (attempt {$attempt}): " . $e->getMessage());
+
+                if ($attempt < $maxRetries) {
+                    usleep($retryDelayMs * 1000);
+                    $retryDelayMs *= 2;
+                    continue;
+                }
             }
-            $data = $response->json();
-            $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? null;
-            return $text ?? "I'm having trouble checking my botanical reference books right now.";
-        } catch (\Exception $e) {
-            Log::error('Gemini chat error: ' . $e->getMessage());
-            return "I'm having trouble checking my botanical reference books right now.";
         }
+
+        return "I'm having trouble checking my botanical reference books right now.";
     }
     /**
      * Check if the care details have useful data
