@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Icon from '@/components/Icon.vue';
-import { Trash2, MessageCircle, SendHorizontal } from 'lucide-vue-next';
+import { Trash2, MessageCircle, SendHorizontal, Heart, Share2 } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
 // Props from Inertia page
@@ -65,6 +65,62 @@ function deleteThread() {
         router.delete(`/forum/${thread.value.id}`);
     }
 }
+
+// Like/Unlike thread
+const toggleLike = async () => {
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${thread.value.id}/like`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (!res.ok) {
+            console.error('Failed to toggle like');
+            return;
+        }
+
+        const json = await res.json();
+        thread.value.is_liked_by_user = json.is_liked;
+        thread.value.likes_count = json.likes_count;
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+// Share thread
+const shareThread = async () => {
+    try {
+        const url = window.location.href;
+        await navigator.clipboard.writeText(url);
+
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${thread.value.id}/share`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (res.ok) {
+            const json = await res.json();
+            thread.value.shares_count = json.shares_count;
+        }
+
+        alert('Link copied to clipboard!');
+    } catch (e) {
+        console.error(e);
+        alert('Failed to copy link');
+    }
+};
 </script>
 
 <template>
@@ -125,9 +181,28 @@ function deleteThread() {
                 </div>
 
                 <!-- Footer Stats -->
-                <div class="flex items-center gap-2 pb-5 border-b border-gray-100 mb-5">
-                    <MessageCircle class="w-4 h-4 text-gray-400" />
-                    <span class="font-medium text-xs text-gray-600">{{ thread.posts?.length || 0 }} Comments</span>
+                <div class="flex items-center gap-6 pb-5 border-b border-gray-100 mb-5">
+                    <div class="flex items-center gap-2">
+                        <MessageCircle class="w-4 h-4 text-gray-400" />
+                        <span class="font-medium text-xs text-gray-600">{{ thread.posts?.length || 0 }} Comments</span>
+                    </div>
+                    
+                    <button
+                        @click="toggleLike"
+                        class="flex items-center gap-2 transition-colors"
+                        :class="thread.is_liked_by_user ? 'text-red-500 hover:text-red-600' : 'text-gray-400 hover:text-red-500'"
+                    >
+                        <Heart class="w-4 h-4" :class="{ 'fill-red-500': thread.is_liked_by_user }" />
+                        <span class="font-medium text-xs">{{ thread.likes_count || 0 }} Likes</span>
+                    </button>
+
+                    <button
+                        @click="shareThread"
+                        class="flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors ml-auto"
+                    >
+                        <Share2 class="w-4 h-4" />
+                        <span class="font-medium text-xs">Share</span>
+                    </button>
                 </div>
 
 

@@ -7,6 +7,9 @@ use App\Models\ForumThread;
 use App\Models\ForumTag;
 use App\Models\ForumPost;
 use App\Services\SeasonalAlertService;
+use App\Notifications\ThreadLikedNotification;
+use App\Notifications\CommentCreatedNotification;
+use App\Notifications\ReplyCreatedNotification;
 use Inertia\Inertia;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
@@ -122,6 +125,12 @@ class ForumController extends Controller
 
         $post->load('user');
 
+        // Notify thread owner
+        $thread = ForumThread::find($threadId);
+        if ($thread && $thread->user_id !== auth()->id()) {
+            $thread->user->notify(new CommentCreatedNotification($thread, $post, auth()->user()));
+        }
+
         return response()->json(['post' => $post], 201);
     }
 
@@ -173,6 +182,11 @@ class ForumController extends Controller
 
         // load user relation for frontend display
         $post->load('user');
+
+        // Notify comment owner
+        if ($comment->user_id !== auth()->id()) {
+            $comment->user->notify(new ReplyCreatedNotification($comment->thread, $post, auth()->user()));
+        }
 
         return response()->json(['post' => $post], 201);
     }
@@ -238,6 +252,11 @@ class ForumController extends Controller
             $thread->likes()->attach($user->id);
             $thread->increment('likes_count');
             $isLiked = true;
+
+            // Notify thread owner
+            if ($thread->user_id !== $user->id) {
+                $thread->user->notify(new ThreadLikedNotification($thread, $user));
+            }
         }
 
         return response()->json([

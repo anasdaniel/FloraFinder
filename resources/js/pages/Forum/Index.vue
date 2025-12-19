@@ -625,7 +625,6 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                         </div>
 
                                         <div class="flex items-center gap-3 mt-1 ml-2.5">
-                                            <button class="text-[9px] font-bold text-gray-400 hover:text-gray-900 transition-colors">Like</button>
                                             <button
                                                 class="text-[9px] font-bold text-gray-400 hover:text-gray-900 transition-colors"
                                                 @click="activeReplyComment = (activeReplyComment === comment.id ? null : comment.id)"

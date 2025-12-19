@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import NotificationBell from '@/components/NotificationBell.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 defineProps<{
@@ -17,6 +18,9 @@ defineProps<{
             <template v-if="breadcrumbs.length > 0">
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </template>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <NotificationBell />
         </div>
     </header>
 </template>
