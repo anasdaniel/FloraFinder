@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\AdminPlantController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlantIdentifierController;
 use App\Http\Controllers\ForumController;
@@ -131,6 +133,30 @@ Route::get(
 
 Route::get('/plant-identifier/description', [PlantIdentifierController::class, 'generateDescription'])->name('plant-identifier.description');
 Route::post('/plant-identifier/chat', [PlantIdentifierController::class, 'botanistChat'])->name('plant-identifier.chat');
+
+// Admin Routes
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
+    Route::get('/users', [AdminController::class, 'users'])->name('users.index');
+    Route::patch('/users/{user}/toggle-admin', [AdminController::class, 'toggleAdmin'])->name('users.toggle-admin');
+    Route::delete('/users/{user}', [AdminController::class, 'deleteUser'])->name('users.destroy');
+
+    // Plant Management
+    Route::get('/plants', [AdminPlantController::class, 'index'])->name('plants.index');
+    Route::get('/plants/{plant}/edit', [AdminPlantController::class, 'edit'])->name('plants.edit');
+    Route::patch('/plants/{plant}', [AdminPlantController::class, 'update'])->name('plants.update');
+    Route::delete('/plants/{plant}', [AdminPlantController::class, 'destroy'])->name('plants.destroy');
+
+    // Forum Moderation
+    Route::get('/forum', [\App\Http\Controllers\Admin\AdminForumController::class, 'index'])->name('forum.index');
+    Route::get('/forum/threads/{thread}', [\App\Http\Controllers\Admin\AdminForumController::class, 'show'])->name('forum.threads.show');
+    Route::delete('/forum/threads/{thread}', [\App\Http\Controllers\Admin\AdminForumController::class, 'destroyThread'])->name('forum.threads.destroy');
+    Route::delete('/forum/posts/{post}', [\App\Http\Controllers\Admin\AdminForumController::class, 'destroyPost'])->name('forum.posts.destroy');
+
+    // Sighting Management
+    Route::get('/sightings', [\App\Http\Controllers\Admin\AdminSightingController::class, 'index'])->name('sightings.index');
+    Route::delete('/sightings/{sighting}', [\App\Http\Controllers\Admin\AdminSightingController::class, 'destroy'])->name('sightings.destroy');
+});
 
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
