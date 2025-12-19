@@ -299,14 +299,14 @@ const chartMonths = computed(() => {
 // Static alerts data (could be made dynamic in the future)
 const alerts: Alert[] = [
   {
-    title: "Rafflesia Season Ending",
-    description: "Sightings in Perak region are decreasing as the blooming season ends.",
+    title: "Durian Season Peak",
+    description: "Musang King and D24 availability is at its highest in the Pahang region.",
     time: "2 hours ago",
     type: "warning",
   },
   {
-    title: "New Data Available",
-    description: "Scientific names updated for the Dipterocarpaceae family.",
+    title: "Rambutan Season Starting",
+    description: "Early harvests of Anak Sekolah varieties are appearing in northern states.",
     time: "1 day ago",
     type: "info",
   },
@@ -655,11 +655,11 @@ const quickActions: QuickAction[] = [
 
         <!-- Bottom Section: Alerts & Actions -->
         <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-          <!-- Conservation Alerts -->
+          <!-- Seasonal Alerts -->
           <div class="p-6 bg-white border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700 rounded-2xl">
             <h2 class="flex items-center gap-2 mb-4 text-lg font-bold text-gray-900 dark:text-white">
               <Icon name="alert-triangle" class="w-5 h-5 text-orange-500" />
-              Conservation Alerts
+              Seasonal Alerts
             </h2>
             <div class="space-y-3">
               <div

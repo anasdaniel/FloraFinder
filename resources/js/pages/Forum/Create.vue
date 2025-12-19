@@ -184,7 +184,7 @@ const submitForm = () => {
         <div v-if="!props.embedded" class="mb-8">
             <Link
                 href="/forum"
-                class="inline-flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors group"
+                class="inline-flex items-center gap-2 text-sm font-bold text-gray-400 transition-colors hover:text-gray-900 group"
             >
                 <ArrowLeft class="w-4 h-4 transition-transform group-hover:-translate-x-1" />
                 Back to Forum
@@ -194,7 +194,7 @@ const submitForm = () => {
         <div class="bg-white rounded-[2.5rem] border border-gray-200 shadow-xl shadow-gray-200/50 overflow-hidden">
           <div class="px-8 pt-10 pb-6 border-b border-gray-100">
             <h1 class="text-3xl font-extrabold text-[#0f172a] tracking-tight">Create New Post</h1>
-            <p class="mt-2 text-gray-500 font-medium">Share your thoughts or ask a question to the community.</p>
+            <p class="mt-2 font-medium text-gray-500">Share your thoughts or ask a question to the community.</p>
           </div>
 
           <div class="p-8">
@@ -203,22 +203,22 @@ const submitForm = () => {
               <!-- Global Error Message -->
               <div
                 v-if="formError"
-                class="p-4 rounded-2xl bg-red-50 text-red-600 text-sm font-bold flex items-center gap-3 border border-red-100"
+                class="flex items-center gap-3 p-4 text-sm font-bold text-red-600 border border-red-100 rounded-2xl bg-red-50"
               >
-                <AlertCircle class="w-5 h-5 flex-shrink-0" />
+                <AlertCircle class="flex-shrink-0 w-5 h-5" />
                 <span>{{ formError }}</span>
               </div>
 
               <!-- Title Input -->
               <div class="space-y-3">
-                <Label for="title" class="text-sm font-bold text-gray-700 ml-1">Title</Label>
+                <Label for="title" class="ml-1 text-sm font-bold text-gray-700">Title</Label>
                 <Input
                   id="title"
                   v-model="form.title"
                   placeholder="What's on your mind?"
                   required
                   :disabled="form.processing"
-                  class="h-14 text-base rounded-2xl bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all shadow-inner"
+                  class="text-base transition-all border-gray-200 shadow-inner h-14 rounded-2xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20"
                 />
                 <p v-if="form.errors.title" class="text-xs text-red-500 mt-1.5 ml-1 flex items-center gap-1 font-bold">
                   <AlertCircle class="w-3.5 h-3.5" /> {{ form.errors.title }}
@@ -227,17 +227,17 @@ const submitForm = () => {
 
               <!-- Category Select -->
               <div class="space-y-3">
-                <Label for="category" class="text-sm font-bold text-gray-700 ml-1">Category</Label>
+                <Label for="category" class="ml-1 text-sm font-bold text-gray-700">Category</Label>
                 <Select v-model="form.category" :disabled="form.processing">
-                  <SelectTrigger class="w-full h-14 rounded-2xl bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all shadow-inner text-base">
+                  <SelectTrigger class="w-full text-base transition-all border-gray-200 shadow-inner h-14 rounded-2xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20">
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
-                  <SelectContent class="rounded-2xl border-gray-200 shadow-2xl">
+                  <SelectContent class="border-gray-200 shadow-2xl rounded-2xl">
                     <SelectItem
                       v-for="category in categories"
                       :key="category.key"
                       :value="category.key"
-                      class="rounded-xl my-1"
+                      class="my-1 rounded-xl"
                     >
                       {{ category.name }}
                     </SelectItem>
@@ -250,7 +250,7 @@ const submitForm = () => {
 
               <!-- Content Textarea -->
               <div class="space-y-3">
-                <Label for="content" class="text-sm font-bold text-gray-700 ml-1">Content</Label>
+                <Label for="content" class="ml-1 text-sm font-bold text-gray-700">Content</Label>
                 <Textarea
                   id="content"
                   v-model="form.content"
@@ -267,7 +267,7 @@ const submitForm = () => {
 
               <!-- Image Upload -->
               <div class="space-y-3">
-                <Label class="text-sm font-bold text-gray-700 ml-1">Image (Optional)</Label>
+                <Label class="ml-1 text-sm font-bold text-gray-700">Image (Optional)</Label>
 
                 <div
                     v-if="!imagePreview"
@@ -281,12 +281,12 @@ const submitForm = () => {
                         accept="image/*"
                         @change="handleImageUpload"
                     />
-                    <div class="p-5 rounded-3xl bg-white group-hover:scale-110 transition-transform shadow-sm border border-gray-200">
+                    <div class="p-5 transition-transform bg-white border border-gray-200 shadow-sm rounded-3xl group-hover:scale-110">
                         <ImagePlus class="w-10 h-10 text-emerald-600" />
                     </div>
                     <div class="space-y-1">
                         <div class="text-base font-bold text-gray-900">Click to upload or drag and drop</div>
-                        <div class="text-xs text-gray-400 font-medium">SVG, PNG, JPG or GIF (max. 10MB)</div>
+                        <div class="text-xs font-medium text-gray-400">SVG, PNG, JPG or GIF (max. 10MB)</div>
                     </div>
                 </div>
 
@@ -299,7 +299,7 @@ const submitForm = () => {
                   <div class="absolute top-4 right-4">
                       <button
                         type="button"
-                        class="h-10 w-10 rounded-full bg-white/90 backdrop-blur-md shadow-lg flex items-center justify-center text-gray-500 hover:text-red-500 hover:scale-110 transition-all"
+                        class="flex items-center justify-center w-10 h-10 text-gray-500 transition-all rounded-full shadow-lg bg-white/90 backdrop-blur-md hover:text-red-500 hover:scale-110"
                         @click="removeImage"
                       >
                         <X class="w-5 h-5" />
@@ -314,7 +314,7 @@ const submitForm = () => {
 
               <!-- Tags Selection -->
               <div class="space-y-4">
-                  <Label for="tags" class="text-sm font-bold text-gray-700 ml-1">Tags (optional)</Label>
+                  <Label for="tags" class="ml-1 text-sm font-bold text-gray-700">Tags (optional)</Label>
 
                   <div class="flex flex-wrap gap-2.5" v-if="form.tag_ids.length > 0">
                       <span
@@ -326,7 +326,7 @@ const submitForm = () => {
                           <button
                               type="button"
                               @click="removeTag(tagId)"
-                              class="text-gray-400 hover:text-red-500 transition-colors"
+                              class="text-gray-400 transition-colors hover:text-red-500"
                           >
                               <X class="w-3.5 h-3.5" />
                           </button>
@@ -334,15 +334,15 @@ const submitForm = () => {
                   </div>
 
                   <Select :model-value="''" @update:model-value="addTag">
-                      <SelectTrigger class="w-full h-14 rounded-2xl bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all shadow-inner text-base">
+                      <SelectTrigger class="w-full text-base transition-all border-gray-200 shadow-inner h-14 rounded-2xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20">
                           <SelectValue placeholder="Add tags to your post..." />
                       </SelectTrigger>
-                      <SelectContent class="rounded-2xl border-gray-200 shadow-2xl">
+                      <SelectContent class="border-gray-200 shadow-2xl rounded-2xl">
                           <SelectItem
                               v-for="tag in tags.filter(t => !form.tag_ids.includes(t.id))"
                               :key="tag.id"
                               :value="String(tag.id)"
-                              class="rounded-xl my-1"
+                              class="my-1 rounded-xl"
                           >
                               {{ tag.tag_name }}
                           </SelectItem>
@@ -359,7 +359,7 @@ const submitForm = () => {
                 <button
                   v-if="props.embedded"
                   type="button"
-                  class="px-8 py-3 text-sm font-bold text-gray-500 hover:text-gray-900 transition-colors"
+                  class="px-8 py-3 text-sm font-bold text-gray-500 transition-colors hover:text-gray-900"
                   :disabled="form.processing"
                   @click="$emit('close')"
                 >
@@ -368,7 +368,7 @@ const submitForm = () => {
                 <Link
                   v-else
                   href="/forum"
-                  class="px-8 py-3 text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors"
+                  class="px-8 py-3 text-sm font-bold text-gray-400 transition-colors hover:text-gray-900"
                   :disabled="form.processing"
                 >
                   Cancel

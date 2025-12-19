@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\ForumThread;
 use App\Models\ForumTag;
 use App\Models\ForumPost;
+use App\Services\SeasonalAlertService;
 use Inertia\Inertia;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
@@ -13,7 +14,7 @@ class ForumController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request)
+    public function index(Request $request, SeasonalAlertService $alertService)
     {
         $query = ForumThread::with([
             'user',
@@ -40,6 +41,7 @@ class ForumController extends Controller
             'threads' => $threads,
             'allTags' => $allTags,
             'filters' => $request->only(['category']),
+            'seasonalAlerts' => $alertService->getActiveAlerts($request->state),
         ]);
     }
 

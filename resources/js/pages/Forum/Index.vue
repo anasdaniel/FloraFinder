@@ -9,7 +9,7 @@ import type { BreadcrumbItem, ForumThread } from "@/types";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus, Heart, Share2, ChevronLeft, ChevronRight, SearchX, Coffee, ImageIcon } from 'lucide-vue-next';
+import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus, Heart, Share2, ChevronLeft, ChevronRight, SearchX, Coffee, ImageIcon, AlertTriangle, Info, FlaskConical, Sparkles } from 'lucide-vue-next';
 
 const activeCommentThread = ref<number | null>(null);
 const newComment = ref("");
@@ -77,10 +77,18 @@ interface PaginatedThreads {
 const props = defineProps<{
     threads: PaginatedThreads;
     allTags: any[];
+    seasonalAlerts: any[];
     filters: {
         category?: string;
     };
 }>();
+
+// Helper to get icon for alert type
+const getAlertIcon = (type: string) => {
+    if (type === 'warning') return AlertTriangle;
+    if (type === 'info') return Info;
+    return Sparkles;
+};
 
 // Category filter state
 const selectedCategory = ref(props.filters.category || "all");
@@ -341,6 +349,52 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                     <Plus class="w-4 h-4" />
                     <span class="font-bold">New Post</span>
                 </Link>
+            </div>
+
+            <!-- Seasonal Alerts -->
+            <div v-if="props.seasonalAlerts.length > 0" class="mb-10 bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="p-2 rounded-xl bg-orange-50">
+                        <AlertTriangle class="w-5 h-5 text-orange-600" />
+                    </div>
+                    <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Seasonal Alerts</h2>
+                </div>
+
+                <div class="space-y-4">
+                    <div
+                        v-for="alert in props.seasonalAlerts"
+                        :key="alert.id"
+                        class="group relative overflow-hidden rounded-3xl border transition-all duration-300"
+                        :class="[
+                            alert.color === 'orange' ? 'bg-orange-50/50 border-orange-100 hover:border-orange-200' : 'bg-blue-50/50 border-blue-100 hover:border-blue-200'
+                        ]"
+                    >
+                        <div class="p-6 flex items-start gap-5">
+                            <div
+                                class="flex-shrink-0 p-3 rounded-2xl shadow-sm border transition-transform group-hover:scale-110"
+                                :class="[
+                                    alert.color === 'orange' ? 'bg-white border-orange-100 text-orange-600' : 'bg-white border-blue-100 text-blue-600'
+                                ]"
+                            >
+                                <component :is="getAlertIcon(alert.type)" class="w-6 h-6" />
+                            </div>
+                            <div class="flex-1">
+                                <h3
+                                    class="text-lg font-bold mb-1"
+                                    :class="alert.color === 'orange' ? 'text-orange-900' : 'text-blue-900'"
+                                >
+                                    {{ alert.title }}
+                                </h3>
+                                <p
+                                    class="text-sm font-medium leading-relaxed"
+                                    :class="alert.color === 'orange' ? 'text-orange-700/80' : 'text-blue-700/80'"
+                                >
+                                    {{ alert.description }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Category Filter Tabs -->
