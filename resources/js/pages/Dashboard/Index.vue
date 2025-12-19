@@ -335,7 +335,7 @@ const quickActions: QuickAction[] = [
           <div
             v-for="(stat, index) in stats"
             :key="index"
-            class="p-6 bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm"
+            class="p-6 bg-white border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700 rounded-2xl"
           >
             <div class="flex items-start justify-between mb-4">
               <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ stat.label }}</h3>
@@ -363,7 +363,7 @@ const quickActions: QuickAction[] = [
         <!-- Middle Section: Chart & Map -->
         <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-3">
           <!-- Sighting Trends Chart -->
-          <div class="p-6 bg-white border border-gray-200 lg:col-span-2 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+          <div class="p-6 bg-white border border-gray-200 shadow-sm lg:col-span-2 dark:bg-gray-800 dark:border-gray-700 rounded-2xl">
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-lg font-bold text-gray-900 dark:text-white">Sighting Trends</h2>
               <div class="flex items-center gap-4">
@@ -373,7 +373,7 @@ const quickActions: QuickAction[] = [
                     <span class="text-gray-600 dark:text-gray-400">Sightings</span>
                   </div>
                   <div class="flex items-center gap-1.5">
-                    <span class="w-3 h-3 rounded-full bg-gray-900 dark:bg-gray-400"></span>
+                    <span class="w-3 h-3 bg-gray-900 rounded-full dark:bg-gray-400"></span>
                     <span class="text-gray-600 dark:text-gray-400">New Species</span>
                   </div>
                 </div>
@@ -501,7 +501,7 @@ const quickActions: QuickAction[] = [
           </div>
 
           <!-- Recent Discovery Map -->
-          <div class="flex flex-col overflow-hidden bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+          <div class="flex flex-col overflow-hidden bg-white border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700 rounded-2xl">
             <div class="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
               <h2 class="text-base font-bold text-gray-900 dark:text-white">Recent Discovery Map</h2>
               <Link href="/plant-map" class="text-xs font-medium text-emerald-600 hover:text-emerald-700">View Full Map</Link>
@@ -512,7 +512,7 @@ const quickActions: QuickAction[] = [
 
               <!-- Map Overlay Card -->
               <div v-if="latestSighting" class="absolute bottom-4 left-4 right-4 z-[1000] bg-white dark:bg-gray-800 p-3 rounded-xl shadow-lg flex items-center gap-3 border border-gray-100 dark:border-gray-700">
-                <div class="w-12 h-12 overflow-hidden rounded-lg bg-gray-100 shrink-0">
+                <div class="w-12 h-12 overflow-hidden bg-gray-100 rounded-lg shrink-0">
                   <img
                     v-if="latestSighting.image"
                     :src="latestSighting.image"
@@ -553,24 +553,16 @@ const quickActions: QuickAction[] = [
         </div>
 
         <!-- Recent Sightings Table -->
-        <div class="mt-8 overflow-hidden bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+        <div class="mt-8 overflow-hidden bg-white border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700 rounded-2xl">
           <div class="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white">Recent Sightings</h2>
             <div class="flex items-center gap-3">
-              <div class="flex p-1 bg-gray-100 rounded-lg dark:bg-gray-900">
-                <button class="p-1.5 rounded bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white">
-                  <Icon name="layout-grid" class="w-4 h-4" />
-                </button>
-                <button class="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                  <Icon name="list" class="w-4 h-4" />
-                </button>
-              </div>
               <Link href="/sightings" class="text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">View All</Link>
             </div>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left">
-              <thead class="text-xs font-medium uppercase bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400">
+              <thead class="text-xs font-medium text-gray-500 uppercase bg-gray-50 dark:bg-gray-900/50 dark:text-gray-400">
                 <tr>
                   <th class="px-6 py-4">Plant Name</th>
                   <th class="px-6 py-4">Family</th>
@@ -587,7 +579,7 @@ const quickActions: QuickAction[] = [
                 >
                   <td class="px-6 py-5">
                     <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-900 shrink-0">
+                      <div class="w-10 h-10 overflow-hidden bg-gray-100 rounded-lg dark:bg-gray-900 shrink-0">
                         <img
                           v-if="sighting.image"
                           :src="sighting.image"
@@ -635,7 +627,7 @@ const quickActions: QuickAction[] = [
         <!-- Bottom Section: Alerts & Actions -->
         <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
           <!-- Conservation Alerts -->
-          <div class="p-6 bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+          <div class="p-6 bg-white border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700 rounded-2xl">
             <h2 class="flex items-center gap-2 mb-4 text-lg font-bold text-gray-900 dark:text-white">
               <Icon name="alert-triangle" class="w-5 h-5 text-orange-500" />
               Conservation Alerts
@@ -667,7 +659,7 @@ const quickActions: QuickAction[] = [
           </div>
 
           <!-- Quick Actions -->
-          <div class="p-6 bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+          <div class="p-6 bg-white border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700 rounded-2xl">
             <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">Quick Actions</h2>
             <div class="grid grid-cols-2 gap-4">
               <Link

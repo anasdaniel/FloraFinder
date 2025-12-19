@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineProps, ref, computed, reactive } from "vue";
+import { defineProps, ref, computed, reactive, watch } from "vue";
 import { Head, Link, usePage, router } from "@inertiajs/vue3";
 import { Inertia } from "@inertiajs/inertia";
 import AppLayout from "@/layouts/AppLayout.vue";
@@ -9,7 +9,7 @@ import type { BreadcrumbItem, ForumThread } from "@/types";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus, Heart, Share2 } from 'lucide-vue-next';
+import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus, Heart, Share2, ChevronLeft, ChevronRight, SearchX } from 'lucide-vue-next';
 
 const activeCommentThread = ref<number | null>(null);
 const newComment = ref("");
@@ -29,9 +29,6 @@ const allTags = ref<{ id: number; tag_name: string }[]>([]);
 allTags.value = page.props.allTags || []; // if passed from backend
 
 const isOwner = (thread) => authUser && authUser.id === thread.user_id;
-
-// Visible threads count for "Load more" functionality
-const visibleThreadsCount = ref(10);
 
 const addTag = (threadId) => {
     if (!selectedTag.value) return;
@@ -67,33 +64,49 @@ const activeReplyComment = ref<number | null>(null);
 // reactive object keyed by comment id to hold reply input strings
 const newReplies = reactive<Record<number, string>>({});
 
+interface PaginatedThreads {
+    data: ForumThread[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    links: Array<{ url: string | null; label: string; active: boolean }>;
+}
+
 // Props
 const props = defineProps<{
-    threads: ForumThread[];
+    threads: PaginatedThreads;
+    allTags: any[];
+    filters: {
+        category?: string;
+    };
 }>();
 
 // Category filter state
-const selectedCategory = ref("general");
+const selectedCategory = ref(props.filters.category || "all");
 
 const filteredThreads = computed(() => {
-    const filtered = selectedCategory.value === "all"
-        ? props.threads
-        : props.threads.filter(t => t.category.toLowerCase() === selectedCategory.value.toLowerCase());
-
-    return filtered.slice(0, visibleThreadsCount.value);
+    return props.threads.data;
 });
 
-const hasMoreThreads = computed(() => {
-    const totalFiltered = selectedCategory.value === "all"
-        ? props.threads.length
-        : props.threads.filter(t => t.category.toLowerCase() === selectedCategory.value.toLowerCase()).length;
-
-    return visibleThreadsCount.value < totalFiltered;
-});
-
-const loadMore = () => {
-    visibleThreadsCount.value += 10;
+const goToPage = (url: string | null) => {
+    if (!url) return;
+    router.get(url, {
+        category: selectedCategory.value !== 'all' ? selectedCategory.value : undefined
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
 };
+
+watch(selectedCategory, (newCategory) => {
+    router.get('/forum', {
+        category: newCategory !== 'all' ? newCategory : undefined
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
+});
 
 // Delete thread
 const deleteThread = (threadId: number) => {
@@ -377,6 +390,13 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 
             <!-- Threads List -->
             <div class="space-y-6">
+                <div v-if="filteredThreads.length === 0" class="text-center py-12 bg-white border border-gray-100 rounded-2xl">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 mb-4">
+                        <SearchX class="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">No threads found</h3>
+                    <p class="text-gray-500">Try adjusting your filters or start a new discussion.</p>
+                </div>
                 <div
                     v-for="thread in filteredThreads"
                     :key="thread.id"
@@ -631,18 +651,36 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </div>
             </div>
 
-            <!-- Load More Button -->
-            <div v-if="hasMoreThreads" class="flex justify-center mt-8">
-                <Button
-                    variant="outline"
-                    @click="loadMore"
-                    class="gap-2 px-6"
-                >
-                    Load more posts
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </Button>
+            <!-- Pagination -->
+            <div v-if="threads.last_page > 1" class="flex justify-center mt-8">
+                <nav class="flex items-center space-x-2">
+                    <button
+                        @click="goToPage(threads.links[0]?.url)"
+                        :disabled="threads.current_page === 1"
+                        class="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <ChevronLeft class="w-4 h-4" />
+                    </button>
+
+                    <template v-for="(link, index) in threads.links.slice(1, -1)" :key="index">
+                        <button
+                            v-if="link.url"
+                            @click="goToPage(link.url)"
+                            class="px-3 py-2 text-sm font-medium transition-colors duration-200 rounded-md"
+                            :class="link.active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100'"
+                            v-html="link.label"
+                        ></button>
+                        <span v-else class="px-3 py-2 text-sm font-medium text-gray-400" v-html="link.label"></span>
+                    </template>
+
+                    <button
+                        @click="goToPage(threads.links[threads.links.length - 1]?.url)"
+                        :disabled="threads.current_page === threads.last_page"
+                        class="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <ChevronRight class="w-4 h-4" />
+                    </button>
+                </nav>
             </div>
 
             <div class="mt-10 text-xs text-center text-muted-foreground">

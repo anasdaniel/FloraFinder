@@ -13,9 +13,9 @@ class ForumController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index()
+    public function index(Request $request)
     {
-        $threads = ForumThread::with([
+        $query = ForumThread::with([
             'user',
             'tags',
             'posts' => function ($query) {
@@ -26,13 +26,20 @@ class ForumController extends Controller
                 $q->orderBy('created_at', 'asc');
             },
             'posts.replies.user',
-        ])->withCount('allPosts as posts_count')->latest()->get();
+        ])->withCount('allPosts as posts_count')->latest();
+
+        if ($request->filled('category') && $request->category !== 'all') {
+            $query->where('category', $request->category);
+        }
+
+        $threads = $query->paginate(10)->withQueryString();
 
         $allTags = ForumTag::all();
 
         return Inertia::render('Forum/Index', [
             'threads' => $threads,
             'allTags' => $allTags,
+            'filters' => $request->only(['category']),
         ]);
     }
 

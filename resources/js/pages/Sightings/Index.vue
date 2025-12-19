@@ -21,6 +21,7 @@ import {
     TreeDeciduous,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import SearchableSelect from '@/components/SearchableSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -282,29 +283,14 @@ const getPrimaryImage = (sighting: Sighting): string => {
                     <div class="p-2 bg-white/80 backdrop-blur-xl border border-gray-200/60 shadow-lg shadow-gray-200/20 rounded-2xl">
                         <div class="grid grid-cols-1 gap-2 lg:grid-cols-12">
                             <!-- Search -->
-                            <div class="lg:col-span-4 relative group">
+                            <div class="lg:col-span-7 relative group">
                                 <Search class="absolute left-3.5 top-3 h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors" />
                                 <input
                                     v-model="searchQuery"
                                     type="text"
-                                    placeholder="Search by plant name..."
+                                    placeholder="Search by plant name, region, or location..."
                                     class="w-full h-11 pl-11 pr-4 bg-gray-50/50 hover:bg-gray-100/50 focus:bg-white border-transparent focus:border-gray-200 rounded-xl text-sm transition-all focus:ring-2 focus:ring-gray-900/5"
                                 />
-                            </div>
-
-                            <!-- Region Select -->
-                            <div class="lg:col-span-3 relative">
-                                <MapPin class="absolute left-3.5 top-3 h-5 w-5 text-gray-400 pointer-events-none" />
-                                <select
-                                    v-model="selectedRegion"
-                                    class="w-full h-11 pl-11 pr-8 bg-gray-50/50 hover:bg-gray-100/50 focus:bg-white border-transparent focus:border-gray-200 rounded-xl text-sm appearance-none transition-all focus:ring-2 focus:ring-gray-900/5 cursor-pointer"
-                                >
-                                    <option value="">All Regions</option>
-                                    <option v-for="region in regions" :key="region" :value="region">
-                                        {{ region }}
-                                    </option>
-                                </select>
-                                <ChevronDown class="absolute right-3.5 top-3.5 h-4 w-4 text-gray-400 pointer-events-none" />
                             </div>
 
                             <!-- Date From -->
