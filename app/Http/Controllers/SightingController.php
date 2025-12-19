@@ -193,15 +193,14 @@ class SightingController extends Controller
         // Peninsular: roughly lat 1-7, long 99-105
 
         if ($longitude >= 115 && $longitude <= 119 && $latitude >= 4 && $latitude <= 7) {
-            $zone = Zone::where('zone_name', 'like', '%Sabah%')->first();
+            $zone = Zone::where('zone_name', 'Sabah')->first();
         } elseif ($longitude >= 109 && $longitude <= 116 && $latitude >= 1 && $latitude <= 5) {
-            $zone = Zone::where('zone_name', 'like', '%Sarawak%')->first();
+            $zone = Zone::where('zone_name', 'Sarawak')->first();
         } elseif ($longitude >= 99 && $longitude <= 105 && $latitude >= 1 && $latitude <= 7) {
-            $zone = Zone::where('zone_name', 'like', '%Peninsular%')
-                ->orWhere('zone_name', 'like', '%Peninsula%')
-                ->first();
-        } else {
-            $zone = null;
+            // For Peninsular, we could be more specific if we had more data, 
+            // but for now let's just return a generic one or try to match by state if we had state boundaries.
+            // Since we don't have boundaries, we'll just return null or a generic Peninsular zone if it existed.
+            return null;
         }
 
         return $zone?->id;

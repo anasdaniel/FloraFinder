@@ -19,8 +19,11 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             UserSeeder::class,
-            // ConservationStatusSeeder::class,
-            // ForumTagSeeder::class,
+            ConservationStatusSeeder::class,
+            PlantCategorySeeder::class,
+            ZoneSeeder::class,
+            MalaysianFloraSeeder::class,
+            ForumTagSeeder::class,
         ]);
 
         // Plant::factory(100)->create();

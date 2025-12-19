@@ -71,9 +71,9 @@ const features = computed(() => {
 });
 
 const popularPlants = [
+  { key: "hibiscus", name: "Bunga Raya", scientific: "Hibiscus rosa-sinensis", image: heroImage },
   { key: "rafflesia", name: "Rafflesia", scientific: "Rafflesia arnoldii", image: plant1 },
-  { key: "torch-ginger", name: "Torch Ginger", scientific: "Etlingera elatior", image: plant2 },
-  { key: "pitcher-plant", name: "Highland Pitcher Plant", scientific: "Nepenthes rajah", image: plant3 },
+  { key: "pitcher-plant", name: "Periuk Kera", scientific: "Nepenthes rajah", image: plant3 },
 ];
 </script>
 

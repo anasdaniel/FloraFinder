@@ -6,6 +6,7 @@ import type { IdentificationForm, ImageUpload } from '@/types/plant-identifier';
 interface UsePlantSaveModalOptions {
   toast: (toast: Omit<Toast, 'id'>) => string;
   selectedResult: Readonly<Ref<any>>; // Selected plant result from composable
+  careDetails: Readonly<Ref<any>>; // Care details from Gemini/Trefle
   uploadedImages: Readonly<Ref<ImageUpload[]>>;
   form: IdentificationForm;
   MALAYSIAN_REGIONS: string[];
@@ -51,6 +52,7 @@ function getIucnWarning(category: string | undefined | null): {
 export function usePlantSaveModal({
   toast,
   selectedResult,
+  careDetails,
   uploadedImages,
   form,
   MALAYSIAN_REGIONS,
@@ -162,7 +164,9 @@ export function usePlantSaveModal({
 
     const formData = new FormData();
     formData.append('scientific_name', match.species.scientificName);
+    formData.append('scientificNameWithoutAuthor', match.species.scientificNameWithoutAuthor || '');
     formData.append('common_name', match.species.commonNames?.[0] || '');
+    formData.append('malayName', careDetails.value?.malay_name || '');
     formData.append('family', match.species.family?.scientificNameWithoutAuthor || '');
     formData.append('genus', match.species.genus?.scientificNameWithoutAuthor || '');
     formData.append('confidence', String(match.score || 0));

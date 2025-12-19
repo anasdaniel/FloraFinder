@@ -47,5 +47,5 @@ test('dashboard screen can be rendered', function () {
 
     $response = $this->actingAs($user)->get('/dashboard');
 
-    $response->assertStatus(200);
+    $response->assertRedirect('welcome-plant');
 });

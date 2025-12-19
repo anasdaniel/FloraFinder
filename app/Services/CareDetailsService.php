@@ -270,6 +270,11 @@ EOT;
             $plant->common_name = $careData['common_name'];
         }
 
+        // Update malay_name from Gemini if not already set and Gemini provided one
+        if (!$plant->malay_name && !empty($careData['malay_name']) && $careData['malay_name'] !== 'null') {
+            $plant->malay_name = $careData['malay_name'];
+        }
+
         // Update care details
         $plant->update([
             'description' => $careData['description'] ?? null,
@@ -479,6 +484,8 @@ EOT;
     private function sanitizeCareData(array $data): array
     {
         $defaults = [
+            'common_name' => null,
+            'malay_name' => null,
             'description' => null,
             'watering_guide' => null,
             'sunlight_guide' => null,
@@ -563,9 +570,9 @@ EOT;
 You are a botanical expert. Provide care guidance for: {$plantIdentification}{$familyInfo}.
 
 Return ONLY valid JSON (no markdown, no backticks):
-{"common_name":"the most widely used common/vernacular name for this plant, or null if unknown","description":"1-2 sentences about the plant","watering_guide":"watering frequency and tips","sunlight_guide":"light requirements","soil_guide":"soil type and pH","temperature_guide":"temperature range and humidity","care_summary":"key care point in 1 sentence","care_tips":"2-3 practical tips"}
+{"common_name":"the most widely used common/vernacular name for this plant, or null if unknown","malay_name":"the common name in Malaysia (Bahasa Melayu), or null if not applicable","description":"1-2 sentences about the plant","watering_guide":"watering frequency and tips","sunlight_guide":"light requirements","soil_guide":"soil type and pH","temperature_guide":"temperature range and humidity","care_summary":"key care point in 1 sentence","care_tips":"2-3 practical tips"}
 
-Be concise but informative. Never leave fields empty. For common_name, provide the most recognized English common name if one exists.
+Be concise but informative. Never leave fields empty. For common_name, provide the most recognized English common name if one exists. For malay_name, provide the most common name used in Malaysia.
 PROMPT;
 
             // Use Saloon connector/request for Gemini instead of direct HTTP

@@ -27,10 +27,13 @@ interface Plant {
     id: number;
     scientific_name: string;
     common_name: string | null;
+    malay_name: string | null;
     family: string | null;
     genus: string | null;
     habitat: string | null;
     lifespan: string | null;
+    is_endemic: boolean;
+    is_native: boolean;
     description: string | null;
     light: number | null;
     atmospheric_humidity: number | null;
@@ -387,6 +390,9 @@ const goToPage = (url: string | null) => {
                                     <h3 class="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors line-clamp-1">
                                         {{ plant.common_name || plant.scientific_name }}
                                     </h3>
+                                    <p v-if="plant.malay_name" class="text-sm font-medium text-emerald-600 mt-0.5 line-clamp-1">
+                                        {{ plant.malay_name }}
+                                    </p>
                                     <p class="text-sm font-medium italic text-gray-500 font-serif mt-0.5 line-clamp-1">
                                         {{ plant.scientific_name }}
                                     </p>

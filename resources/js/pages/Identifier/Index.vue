@@ -29,6 +29,7 @@ const identification = usePlantIdentification({
 const saveModal = usePlantSaveModal({
   toast,
   selectedResult: identification.selectedResult,
+  careDetails: identification.careDetails,
   uploadedImages: uploads.uploadedImages,
   form: uploads.form,
   MALAYSIAN_REGIONS: uploads.MALAYSIAN_REGIONS,

@@ -12,12 +12,15 @@ class Plant extends Model
 
     protected $fillable = [
         'common_name',
+        'malay_name',
         'scientific_name',
         'image_url',
         'family',
         'genus',
         'habitat',
         'lifespan',
+        'is_endemic',
+        'is_native',
         'plant_category_id',
         'conservation_status_id',
         'gbif_id',

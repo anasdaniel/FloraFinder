@@ -26,6 +26,7 @@ class PlantController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('scientific_name', 'like', "%{$search}%")
                     ->orWhere('common_name', 'like', "%{$search}%")
+                    ->orWhere('malay_name', 'like', "%{$search}%")
                     ->orWhere('family', 'like', "%{$search}%");
             });
         }

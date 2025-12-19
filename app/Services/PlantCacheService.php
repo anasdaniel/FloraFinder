@@ -91,9 +91,9 @@ class PlantCacheService
             }
         }
 
-        // Refresh care details if needed
+        // Refresh care details in background if needed
         if ($plant->needsCareRefresh()) {
-            $this->refreshCareDetails($plant);
+            \App\Jobs\FetchPlantCareDetails::dispatch($plant);
         }
 
         return $plant;

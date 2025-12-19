@@ -21,10 +21,13 @@ class PlantFactory extends Factory
             'conservation_status_id' => \App\Models\ConservationStatus::inRandomOrder()->first()?->id ?? \App\Models\ConservationStatus::factory(),
             'planting_recommendation_id' => \App\Models\PlantingRecommendation::factory(),
             'common_name' => $this->faker->word(),
+            'malay_name' => $this->faker->word(),
             'scientific_name' => fake()->unique()->word(),
             'family' => $this->faker->word(),
             'habitat' => $this->faker->word(),
             'lifespan' => $this->faker->numberBetween(1, 100),
+            'is_endemic' => $this->faker->boolean(10),
+            'is_native' => $this->faker->boolean(80),
         ];
     }
 }

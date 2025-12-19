@@ -33,11 +33,14 @@ interface Plant {
   id: number;
   scientific_name: string;
   common_name: string | null;
+  malay_name: string | null;
   image_url: string | null;
   family: string | null;
   genus: string | null;
   habitat: string | null;
   lifespan: string | null;
+  is_endemic: boolean;
+  is_native: boolean;
   gbif_id: string | null;
   powo_id: string | null;
   iucn_category: string | null;
@@ -347,6 +350,24 @@ const getConservationMessage = (category: string | null): string => {
               </Link>
 
               <div class="flex flex-wrap items-center gap-3 mb-4">
+                <span
+                  v-if="plant.malay_name"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-100 text-sm backdrop-blur-sm border border-emerald-500/20 font-medium"
+                >
+                  Nama Tempatan: {{ plant.malay_name }}
+                </span>
+                <span
+                  v-if="plant.is_endemic"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-100 text-sm backdrop-blur-sm border border-amber-500/20 font-medium"
+                >
+                  Endemic to Malaysia
+                </span>
+                <span
+                  v-if="plant.is_native"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-100 text-sm backdrop-blur-sm border border-blue-500/20 font-medium"
+                >
+                  Native to Malaysia
+                </span>
                 <span
                   v-if="plant.family"
                   class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-sm backdrop-blur-sm border border-white/10"
