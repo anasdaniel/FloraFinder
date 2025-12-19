@@ -7,6 +7,7 @@ use App\Models\PlantIdentification;
 use App\Services\PlantCacheService;
 use App\Services\CareDetailsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use App\Http\Integrations\PlantNetConnector as IntegrationsPlantNetConnector;
@@ -101,9 +102,35 @@ class PlantIdentifierController extends Controller
                         $imageUrl,
                         $referenceImages
                     );
+
+                    // Save identification record for dashboard tracking (New Species)
+                    // This ensures detections are counted even if not explicitly saved to collection
+                    $firstImage = $images[0];
+                    $firstOrgan = $organs[0];
+                    $path = $firstImage->store('plant-identifications', 'public');
+
+                    PlantIdentification::create([
+                        'path' => $path,
+                        'url' => Storage::url($path),
+                        'filename' => $firstImage->getClientOriginalName(),
+                        'mime_type' => $firstImage->getMimeType(),
+                        'size' => $firstImage->getSize(),
+                        'organ' => $firstOrgan,
+                        'organ_score' => $plantData['predictedOrgans'][0]['score'] ?? null,
+                        'scientific_name' => $species['scientificName'] ?? null,
+                        'scientific_name_without_author' => $species['scientificNameWithoutAuthor'] ?? null,
+                        'common_name' => $species['commonNames'][0] ?? null,
+                        'family' => $species['family']['scientificNameWithoutAuthor'] ?? null,
+                        'genus' => $species['genus']['scientificNameWithoutAuthor'] ?? null,
+                        'confidence' => $topResult['score'] ?? 0,
+                        'gbif_id' => $topResult['gbif']['id'] ?? null,
+                        'powo_id' => $topResult['powo']['id'] ?? null,
+                        'iucn_category' => $topResult['iucn']['category'] ?? null,
+                        'user_id' => Auth::id(),
+                    ]);
                 } catch (\Exception $e) {
                     // Log but don't fail the identification request
-                    Log::warning('Failed to auto-add top result to library: ' . $e->getMessage());
+                    Log::warning('Failed to auto-add top result or save identification: ' . $e->getMessage());
                 }
             }
 
@@ -182,7 +209,6 @@ class PlantIdentifierController extends Controller
             'gbifId' => 'nullable|string|max:255',
             'powoId' => 'nullable|string|max:255',
             'iucnCategory' => 'nullable|string|max:255',
-            'locationName' => 'nullable|string|max:255',
             'region' => 'nullable|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -207,7 +233,6 @@ class PlantIdentifierController extends Controller
                     'gbifId' => $request->input('gbifId'),
                     'powoId' => $request->input('powoId'),
                     'iucnCategory' => $request->input('iucnCategory'),
-                    'locationName' => $request->input('locationName'),
                     'region' => $request->input('region'),
                     'latitude' => $request->input('latitude'),
                     'longitude' => $request->input('longitude'),
@@ -408,12 +433,10 @@ class PlantIdentifierController extends Controller
             'iucn_category' => $plantData['iucnCategory'] ?? null,
 
             // Location data
-            'location_name' => $plantData['locationName'] ?? null,
             'region' => $plantData['region'] ?? null,
             'latitude' => $plantData['latitude'] ?? null,
             'longitude' => $plantData['longitude'] ?? null,
 
-            'uploaded_at' => now()->toDateTimeString(),
             'user_id' => $plantData['user_id'],
         ];
 

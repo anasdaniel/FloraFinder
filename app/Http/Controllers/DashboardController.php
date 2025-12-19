@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PlantIdentification;
 use App\Models\Sighting;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -11,10 +12,12 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         $userId = $user->id;
+
+        $range = (int) $request->query('range', 6);
 
         // Get user's sightings
         $userSightings = Sighting::where('user_id', $userId);
@@ -33,16 +36,15 @@ class DashboardController extends Controller
             ? round((($lastMonthSightings - $previousMonthSightings) / $previousMonthSightings) * 100)
             : ($lastMonthSightings > 0 ? 100 : 0);
 
-        // Get unique species/plants logged by user (from their actual sightings)
-        $uniqueSpecies = Sighting::where('user_id', $userId)
+        // Get unique species/plants detected by user (from their identifications)
+        $uniqueSpecies = PlantIdentification::where('user_id', $userId)
             ->distinct()
             ->count('scientific_name');
 
-        // Get unique families from sightings
-        $uniqueFamilies = Sighting::where('user_id', $userId)
-            ->join('plants', 'sightings.plant_id', '=', 'plants.id')
+        // Get unique families from identifications
+        $uniqueFamilies = PlantIdentification::where('user_id', $userId)
             ->distinct()
-            ->count('plants.family');
+            ->count('family');
 
         // Get unique regions explored
         $regionsExplored = Sighting::where('user_id', $userId)
@@ -57,12 +59,11 @@ class DashboardController extends Controller
             ->orderByDesc('count')
             ->first();
 
-        // Get conservation impact - count unique endangered species found in sightings
-        $endangeredCount = Sighting::where('user_id', $userId)
-            ->join('plants', 'sightings.plant_id', '=', 'plants.id')
-            ->whereIn('plants.iucn_category', ['EN', 'CR', 'VU']) // Endangered, Critically Endangered, Vulnerable
+        // Get conservation impact - count unique endangered species found in identifications
+        $endangeredCount = PlantIdentification::where('user_id', $userId)
+            ->whereIn('iucn_category', ['EN', 'CR', 'VU']) // Endangered, Critically Endangered, Vulnerable
             ->distinct()
-            ->count('plants.scientific_name');
+            ->count('scientific_name');
 
         $conservationImpact = $endangeredCount > 3 ? 'High' : ($endangeredCount > 0 ? 'Medium' : 'Low');
 
@@ -86,9 +87,15 @@ class DashboardController extends Controller
                 ];
             });
 
-        // Get activity data for the chart (last 6 months)
+        // Get first detection dates for each species to calculate "New Species" accurately
+        $firstDetections = PlantIdentification::where('user_id', $userId)
+            ->select('scientific_name', DB::raw('MIN(created_at) as first_detected_at'))
+            ->groupBy('scientific_name')
+            ->get();
+
+        // Get activity data for the chart
         $activityData = [];
-        for ($i = 5; $i >= 0; $i--) {
+        for ($i = $range - 1; $i >= 0; $i--) {
             $month = Carbon::now()->subMonths($i);
             $monthStart = $month->copy()->startOfMonth();
             $monthEnd = $month->copy()->endOfMonth();
@@ -97,10 +104,11 @@ class DashboardController extends Controller
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->count();
 
-            $newSpeciesCount = Sighting::where('user_id', $userId)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->distinct()
-                ->count('scientific_name');
+            // Count species whose FIRST detection was in this month
+            $newSpeciesCount = $firstDetections->filter(function ($detection) use ($monthStart, $monthEnd) {
+                $date = Carbon::parse($detection->first_detected_at);
+                return $date->between($monthStart, $monthEnd);
+            })->count();
 
             $activityData[] = [
                 'month' => $month->format('M'),
@@ -192,6 +200,9 @@ class DashboardController extends Controller
             ],
             'growthPercentage' => $sightingsGrowth,
             'mapSightings' => $mapSightings,
+            'filters' => [
+                'range' => $range,
+            ],
         ]);
     }
 

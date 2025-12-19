@@ -2,9 +2,16 @@
 import Icon from "@/components/Icon.vue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { type SharedData } from "@/types";
-import { Link, usePage } from "@inertiajs/vue3";
+import { Link, usePage, router } from "@inertiajs/vue3";
 import { computed, ref, onMounted, onUnmounted, nextTick, watch } from "vue";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -78,12 +85,28 @@ const props = defineProps<{
   };
   growthPercentage: number;
   mapSightings: MapSighting[];
+  filters: {
+    range: number;
+  };
 }>();
 
 const user = computed(() => usePage<SharedData>().props.auth.user);
 
 // Chart state
 const hoveredPoint = ref<number | null>(null);
+const selectedRange = ref(props.filters?.range?.toString() || "6");
+
+watch(selectedRange, (newRange) => {
+  router.get(
+    route("welcome-plant"),
+    { range: newRange },
+    {
+      preserveState: true,
+      preserveScroll: true,
+      only: ["activityData", "filters"],
+    }
+  );
+});
 
 // Map references
 const mapContainer = ref<HTMLElement | null>(null);
@@ -377,10 +400,16 @@ const quickActions: QuickAction[] = [
                     <span class="text-gray-600 dark:text-gray-400">New Species</span>
                   </div>
                 </div>
-                <button class="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-500 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
-                  Last 6 Months
-                  <Icon name="chevron-down" class="w-3.5 h-3.5" />
-                </button>
+                <Select v-model="selectedRange">
+                  <SelectTrigger class="w-[140px] h-9 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
+                    <SelectValue placeholder="Select range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">Last 3 Months</SelectItem>
+                    <SelectItem value="6">Last 6 Months</SelectItem>
+                    <SelectItem value="12">Last 12 Months</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
