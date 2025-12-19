@@ -574,6 +574,13 @@ const quickActions: QuickAction[] = [
                   </p>
                 </div>
               </div>
+              <div v-else class="absolute inset-0 z-[1000] bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center">
+                <div class="p-3 mb-3 bg-white rounded-full shadow-sm dark:bg-gray-800">
+                  <Icon name="map" class="w-6 h-6 text-gray-400" />
+                </div>
+                <h4 class="text-sm font-bold text-gray-900 dark:text-white">No locations recorded</h4>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Your plant discoveries will appear on this map.</p>
+              </div>
 
               <!-- Map Controls -->
               <div class="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
@@ -615,6 +622,7 @@ const quickActions: QuickAction[] = [
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                 <tr
+                  v-if="recentSightings.length > 0"
                   v-for="sighting in recentSightings"
                   :key="sighting.id"
                   class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
@@ -659,6 +667,23 @@ const quickActions: QuickAction[] = [
                         <Icon name="more-vertical" class="w-5 h-5" />
                       </button>
                     </Link>
+                  </td>
+                </tr>
+                <tr v-else>
+                  <td colspan="5" class="px-6 py-12 text-center">
+                    <div class="flex flex-col items-center justify-center">
+                      <div class="p-3 mb-4 bg-gray-50 rounded-full dark:bg-gray-900/50">
+                        <Icon name="search-x" class="w-8 h-8 text-gray-400" />
+                      </div>
+                      <h3 class="text-sm font-bold text-gray-900 dark:text-white">No sightings yet</h3>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Start exploring and identify plants to see them here.</p>
+                      <Link href="/plant-identifier" class="mt-4">
+                        <Button variant="outline" size="sm" class="gap-2">
+                          <Icon name="camera" class="w-4 h-4" />
+                          Identify Plant
+                        </Button>
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               </tbody>
