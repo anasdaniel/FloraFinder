@@ -41,9 +41,6 @@ defineProps<{
                         </span>
                         <span class="text-base font-semibold tracking-tight">{{ name ?? 'FloraFinder' }}</span>
                     </Link>
-                    <Link :href="route('dashboard.preview')" class="text-sm font-semibold text-white/80 hover:text-white">
-                        Preview →
-                    </Link>
                 </div>
 
                 <div class="relative z-10 mt-16 space-y-6">
@@ -105,11 +102,6 @@ defineProps<{
                             <slot />
                         </CardContent>
                     </Card>
-
-                    <p class="mt-6 text-center text-xs text-slate-500">
-                        Tip: you can view the UI without an account on
-                        <Link :href="route('dashboard.preview')" class="font-semibold text-emerald-800 hover:text-emerald-700">dashboard preview</Link>.
-                    </p>
                 </div>
             </main>
         </div>

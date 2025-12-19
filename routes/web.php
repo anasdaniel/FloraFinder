@@ -14,8 +14,6 @@ use App\Models\ForumTag;
 
 Route::get('/', [DashboardController::class, 'welcome'])->name('home');
 
-Route::get('/dashboard-preview', [DashboardController::class, 'preview'])->name('dashboard.preview');
-
 
 //tags of forum
 Route::get('/forum/tags', [ForumController::class, 'tags']);

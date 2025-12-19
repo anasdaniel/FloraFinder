@@ -326,10 +326,10 @@ const alerts = computed(() => {
 });
 
 const quickActions: QuickAction[] = [
-  { label: "Export CSV", icon: "download", href: "#", color: "text-gray-500" },
+  { label: "Plant Search", icon: "search", href: "/plant-search", color: "text-gray-500" },
   { label: "Edit Profile", icon: "user", href: "/settings/profile", color: "text-gray-500" },
-  { label: "Scan QR", icon: "qr-code", href: "/plant-identifier", color: "text-gray-500" },
-  { label: "Help Center", icon: "help-circle", href: "#", color: "text-gray-500" },
+  { label: "Community Forum", icon: "message-square", href: "/forum", color: "text-gray-500" },
+  { label: "My Collection", icon: "leaf", href: "/my-plants", color: "text-gray-500" },
 ];
 </script>
 

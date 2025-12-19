@@ -18,11 +18,6 @@ class DashboardController extends Controller
         return Inertia::render('Welcome');
     }
 
-    public function preview()
-    {
-        return Inertia::render('Dashboard/Guest');
-    }
-
     public function dashboard()
     {
         return redirect()->route('welcome-plant');
