@@ -9,7 +9,7 @@ import type { BreadcrumbItem, ForumThread } from "@/types";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus, Heart, Share2, ChevronLeft, ChevronRight, SearchX } from 'lucide-vue-next';
+import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus, Heart, Share2, ChevronLeft, ChevronRight, SearchX, Coffee, ImageIcon } from 'lucide-vue-next';
 
 const activeCommentThread = ref<number | null>(null);
 const newComment = ref("");
@@ -327,38 +327,39 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 <template>
     <Head title="Forum" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="w-full max-w-3xl px-4 py-8 mx-auto">
+        <div class="w-full max-w-3xl px-4 py-12 mx-auto">
             <!-- Header -->
-            <div class="flex flex-col items-start justify-between gap-4 mb-6 sm:flex-row sm:items-center">
+            <div class="flex flex-col items-start justify-between gap-4 mb-10 sm:flex-row sm:items-center">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Forum</h1>
-                    <p class="mt-1 text-sm text-gray-600">Ask questions, share knowledge, and connect with the FloraFinder community.</p>
+                    <h1 class="text-4xl font-extrabold text-[#0f172a] tracking-tight">Forum</h1>
+                    <p class="mt-2 text-gray-500 font-medium">Ask questions, share knowledge, and connect with the FloraFinder community.</p>
                 </div>
-                <Link href="/forum/new">
-                    <Button type="button" variant="default" size="default" class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-6">
-                        <Plus class="w-4 h-4" />
-                        New Post
-                    </Button>
+                <Link
+                    href="/forum/new"
+                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white transition-all bg-gray-900 rounded-xl hover:bg-black shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20"
+                >
+                    <Plus class="w-4 h-4" />
+                    <span class="font-bold">New Post</span>
                 </Link>
             </div>
 
             <!-- Category Filter Tabs -->
-            <div class="flex flex-wrap gap-2 mb-8">
+            <div class="flex flex-wrap gap-3 mb-8">
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all border"
-                    :class="selectedCategory === 'general'
-                        ? 'bg-gray-900 text-white border-gray-900'
+                    class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-full transition-all border shadow-sm"
+                    :class="selectedCategory === 'all' || selectedCategory === 'general'
+                        ? 'bg-[#0f172a] text-white border-[#0f172a]'
                         : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
-                    @click="selectedCategory = 'general'"
+                    @click="selectedCategory = 'all'"
                 >
                     General
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all border"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-full transition-all border bg-white shadow-sm"
                     :class="selectedCategory === 'identification'
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
+                        ? 'ring-2 ring-primary/20 border-primary text-primary'
+                        : 'text-gray-700 border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'identification'"
                 >
                     <Search class="w-4 h-4" />
@@ -366,10 +367,10 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all border"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-full transition-all border bg-white shadow-sm"
                     :class="selectedCategory === 'care'
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
+                        ? 'ring-2 ring-primary/20 border-primary text-primary'
+                        : 'text-gray-700 border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'care'"
                 >
                     <Leaf class="w-4 h-4" />
@@ -377,13 +378,13 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all border"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-full transition-all border bg-white shadow-sm"
                     :class="selectedCategory === 'offtopic'
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
+                        ? 'ring-2 ring-primary/20 border-primary text-primary'
+                        : 'text-gray-700 border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'offtopic'"
                 >
-                    <Users class="w-4 h-4" />
+                    <Coffee class="w-4 h-4" />
                     Off Topic
                 </button>
             </div>
@@ -400,65 +401,69 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 <div
                     v-for="thread in filteredThreads"
                     :key="thread.id"
-                    class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200"
+                    class="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-all duration-300"
                 >
                     <!-- Header: Author & Meta -->
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-3">
-                            <Avatar class="h-10 w-10 border border-gray-100">
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-4">
+                            <Avatar class="h-12 w-12 border-2 border-gray-50 shadow-sm">
                                 <AvatarImage :src="thread.user?.avatar" />
-                                <AvatarFallback class="bg-primary/5 text-primary text-xs font-bold">
+                                <AvatarFallback class="bg-emerald-50 text-emerald-700 text-sm font-bold">
                                     {{ (thread.user?.name || thread.title).substring(0, 2).toUpperCase() }}
                                 </AvatarFallback>
                             </Avatar>
                             <div>
-                                <div class="font-semibold text-gray-900 text-sm">{{ thread.user?.name || 'Unknown' }}</div>
-                                <div class="text-xs text-gray-500">{{ new Date(thread.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</div>
+                                <div class="font-bold text-gray-900 text-base">{{ thread.user?.name || 'Unknown' }}</div>
+                                <div class="text-xs font-medium text-gray-400">{{ new Date(thread.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</div>
                             </div>
                         </div>
 
-                        <!-- Actions Dropdown or Buttons -->
+                        <!-- Actions -->
                         <div class="flex items-center gap-2">
                              <button
                                 v-if="isOwner(thread)"
                                 @click="deleteThread(thread.id)"
-                                class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                class="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                                 title="Delete Thread"
                             >
-                                <Trash2 class="w-4 h-4" />
+                                <Trash2 class="w-5 h-5" />
                             </button>
                         </div>
                     </div>
 
                     <!-- Content -->
-                    <div class="mb-4">
+                    <div class="mb-6">
                         <Link :href="`/forum/${thread.id}`" class="block group/title">
-                            <h3 class="font-bold text-gray-900 text-lg mb-2 leading-tight group-hover/title:text-primary transition-colors">{{ thread.title }}</h3>
+                            <h3 class="font-extrabold text-gray-900 text-2xl mb-3 leading-tight group-hover/title:text-emerald-600 transition-colors">{{ thread.title }}</h3>
                         </Link>
-                        <p v-if="thread.content" class="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                        <p v-if="thread.content" class="text-gray-600 text-base leading-relaxed whitespace-pre-wrap">
                             {{ thread.content }}
                         </p>
                     </div>
 
                     <!-- Image -->
-                     <div v-if="thread.image" class="mb-4 rounded-xl overflow-hidden border border-gray-100">
+                     <div v-if="thread.image" class="mb-6 relative rounded-3xl overflow-hidden border border-gray-100 group/image">
                         <img
                             :src="`/storage/${thread.image}`"
-                            class="w-full h-auto max-h-[500px] object-cover"
+                            class="w-full h-auto max-h-[600px] object-cover transition-transform duration-500 group-hover/image:scale-[1.02]"
                         />
+                        <div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2">
+                            <ImageIcon class="w-3.5 h-3.5" />
+                            1 Image
+                        </div>
                     </div>
 
                     <!-- Tags -->
-                    <div v-if="thread.tags?.length || isOwner(thread)" class="flex flex-wrap gap-2 mb-4">
+                    <div v-if="thread.tags?.length || isOwner(thread)" class="flex flex-wrap items-center gap-3 mb-8">
                         <span
                             v-for="tag in thread.tags"
                             :key="tag.id"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200"
+                            class="inline-flex items-center gap-1 px-4 py-2 text-xs font-bold bg-gray-100 text-gray-700 rounded-full border border-transparent hover:bg-gray-200 transition-colors"
                         >
-                            {{ tag.tag_name }}
+                            #{{ tag.tag_name }}
                             <button
                                 v-if="isOwner(thread)"
-                                class="text-emerald-400 hover:text-red-500 ml-1"
+                                class="text-gray-400 hover:text-red-500 ml-1"
                                 @click="removeTag(thread.id, tag.id)"
                             >
                                 ×
@@ -467,16 +472,17 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 
                          <div v-if="isOwner(thread)" class="relative">
                             <button
-                                class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 rounded-full border border-gray-200 transition-colors"
+                                class="px-4 py-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-full border border-emerald-100 transition-all flex items-center gap-1.5"
                                 @click="showTagDropdown[thread.id] = !showTagDropdown[thread.id]"
                             >
-                                + Tag
+                                <Plus class="w-3.5 h-3.5" />
+                                Tag
                             </button>
                             <div
                                 v-if="showTagDropdown[thread.id]"
-                                class="absolute left-0 mt-2 bg-white shadow-xl border rounded-lg p-3 z-50 w-48"
+                                class="absolute left-0 mt-2 bg-white shadow-2xl border border-gray-100 rounded-2xl p-4 z-50 w-56 animate-in fade-in zoom-in duration-200"
                             >
-                                <select v-model="selectedTag" class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm mb-2 focus:ring-2 focus:ring-primary/20 outline-none">
+                                <select v-model="selectedTag" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mb-3 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none bg-gray-50">
                                     <option disabled value="">Select tag</option>
                                     <option v-for="t in allTags" :key="t.id" :value="t.id">
                                         {{ t.tag_name }}
@@ -484,7 +490,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                 </select>
                                 <Button
                                     size="sm"
-                                    class="w-full"
+                                    class="w-full bg-emerald-600 hover:bg-emerald-700 rounded-xl"
                                     @click="addTag(thread.id)"
                                 >
                                     Add Tag
@@ -494,72 +500,55 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                     </div>
 
                     <!-- Footer / Actions -->
-                    <div class="flex items-center justify-between pt-4 border-t border-gray-50">
-                        <div class="flex items-center gap-5">
+                    <div class="flex items-center justify-between pt-6 border-t border-gray-50">
+                        <div class="flex items-center gap-6">
                              <button
                                 @click="toggleCommentField(thread.id)"
-                                class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                                class="flex items-center gap-2.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
                             >
-                                <MessageCircle class="w-4 h-4" />
-                                <span class="font-medium">{{ thread.posts_count || 0 }} Comments</span>
+                                <MessageCircle class="w-5 h-5" />
+                                <span>{{ thread.posts_count || 0 }} Comments</span>
                             </button>
 
                             <button
                                 @click="toggleLike(thread)"
-                                class="flex items-center gap-2 text-sm transition-colors"
+                                class="flex items-center gap-2.5 text-sm font-semibold transition-colors"
                                 :class="thread.is_liked_by_user ? 'text-red-500 hover:text-red-600' : 'text-gray-500 hover:text-red-500'"
                             >
-                                <Heart class="w-4 h-4" :class="{ 'fill-red-500': thread.is_liked_by_user }" />
-                                <span class="font-medium">{{ thread.likes_count || 0 }} Likes</span>
+                                <Heart class="w-5 h-5" :class="{ 'fill-red-500': thread.is_liked_by_user }" />
+                                <span>{{ thread.likes_count || 0 }} Likes</span>
                             </button>
 
                             <button
                                 @click="shareThread(thread)"
-                                class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                                class="flex items-center gap-2.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
                             >
-                                <Share2 class="w-4 h-4" />
-                                <span class="font-medium">Share</span>
+                                <Share2 class="w-5 h-5" />
+                                <span>Share</span>
                             </button>
+                        </div>
+
+                        <!-- Interaction Avatars -->
+                        <div class="hidden sm:flex -space-x-2 overflow-hidden">
+                            <Avatar v-for="i in 2" :key="i" class="inline-block h-7 w-7 rounded-full ring-2 ring-white">
+                                <AvatarImage :src="`https://i.pravatar.cc/150?u=${thread.id + i}`" />
+                                <AvatarFallback>U</AvatarFallback>
+                            </Avatar>
                         </div>
                     </div>
 
                     <!-- Comments Section -->
-                    <div v-if="activeCommentThread === thread.id" class="mt-4 pt-4 border-t border-gray-50 bg-gray-50/50 -mx-6 px-6 pb-6 rounded-b-2xl">
-                         <!-- Input -->
-                        <div class="flex gap-3 mb-6">
-                            <Avatar class="h-8 w-8 hidden sm:block">
-                                <AvatarImage :src="$page.props.auth.user.avatar" />
-                                <AvatarFallback>{{ $page.props.auth.user.name.substring(0,2).toUpperCase() }}</AvatarFallback>
-                            </Avatar>
-                            <div class="flex-1 relative">
-                                <input
-                                    v-model="newComment"
-                                    type="text"
-                                    placeholder="Write a comment..."
-                                    class="w-full border border-gray-200 rounded-full py-2.5 pl-4 pr-12 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 shadow-sm transition-all"
-                                    @focus="activeCommentThread = thread.id"
-                                    @keydown.enter="postComment(thread.id)"
-                                />
-                                <button
-                                    @click="postComment(thread.id)"
-                                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
-                                    :disabled="!newComment.trim()"
-                                >
-                                    <SendHorizontal class="w-4 h-4" />
-                                </button>
-                            </div>
+                    <div v-if="activeCommentThread === thread.id" class="mt-6 pt-8 border-t border-gray-50">
+                         <div v-if="commentsLoading" class="text-center py-8">
+                             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto"></div>
                         </div>
 
-                         <div v-if="commentsLoading" class="text-center py-4">
-                             <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-                        </div>
-
-                        <div v-else class="space-y-6">
+                        <div v-else class="space-y-8 mb-8">
                              <div
                                 v-if="(commentsMap[thread.id] || []).length === 0"
-                                class="text-sm text-gray-500 text-center py-2"
+                                class="text-sm text-gray-400 text-center py-4 font-medium"
                             >
-                                Be the first to comment.
+                                No comments yet. Be the first to join the conversation!
                             </div>
 
                             <div
@@ -567,32 +556,33 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                 :key="comment.id"
                                 class="group"
                             >
-                                <div class="flex gap-3">
-                                    <Avatar class="h-8 w-8 mt-1 border border-gray-200">
+                                <div class="flex gap-4">
+                                    <Avatar class="h-10 w-10 mt-1 border border-gray-100 shadow-sm">
                                         <AvatarImage :src="comment.user?.avatar" />
-                                        <AvatarFallback class="text-xs bg-white text-gray-700">
+                                        <AvatarFallback class="text-xs bg-gray-50 text-gray-600 font-bold">
                                             {{ (comment.user?.name || '?').substring(0, 2).toUpperCase() }}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div class="flex-1">
-                                        <div class="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm inline-block min-w-[200px]">
-                                             <div class="flex justify-between items-start mb-1">
-                                                <span class="font-semibold text-sm text-gray-900">{{ comment.user?.name || 'Unknown' }}</span>
-                                                <span class="text-xs text-gray-400">{{ new Date(comment.created_at).toLocaleDateString() }}</span>
+                                        <div class="bg-gray-50/80 rounded-[1.5rem] px-5 py-4 inline-block min-w-[240px] max-w-full">
+                                             <div class="flex justify-between items-center mb-1.5 gap-4">
+                                                <span class="font-bold text-sm text-gray-900">{{ comment.user?.name || 'Unknown' }}</span>
                                              </div>
                                             <p class="text-sm text-gray-700 leading-relaxed">{{ comment.content }}</p>
                                         </div>
 
-                                        <div class="flex items-center gap-4 mt-1 ml-2">
+                                        <div class="flex items-center gap-5 mt-2 ml-4">
+                                            <button class="text-xs font-bold text-gray-400 hover:text-gray-900 transition-colors">Like</button>
                                             <button
-                                                class="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                                                class="text-xs font-bold text-gray-400 hover:text-gray-900 transition-colors"
                                                 @click="activeReplyComment = (activeReplyComment === comment.id ? null : comment.id)"
                                             >
                                                 Reply
                                             </button>
+                                            <span class="text-xs font-medium text-gray-300">{{ new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}</span>
                                              <button
                                                 v-if="comment.user_id === $page.props.auth.user.id"
-                                                class="text-xs font-medium text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                                class="text-xs font-bold text-red-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                                                 @click="deleteComment(comment.id, thread.id)"
                                             >
                                                 Delete
@@ -600,41 +590,41 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                         </div>
 
                                         <!-- Reply Input -->
-                                         <div v-if="activeReplyComment === comment.id" class="mt-3 flex gap-2 items-center">
-                                            <div class="h-8 w-0.5 bg-gray-200"></div>
+                                         <div v-if="activeReplyComment === comment.id" class="mt-4 flex gap-3 items-center pl-4">
+                                            <div class="h-10 w-0.5 bg-emerald-100 rounded-full"></div>
                                             <input
                                                 v-model="newReplies[comment.id]"
                                                 type="text"
                                                 placeholder="Write a reply..."
-                                                class="flex-1 border border-gray-200 rounded-full py-2 px-4 text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                                                class="flex-1 bg-white border border-gray-100 rounded-xl py-2.5 px-4 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 shadow-sm"
                                                 @keydown.enter="postReply(comment.id, thread.id)"
                                             />
                                         </div>
 
                                         <!-- Replies -->
-                                        <div v-if="comment.replies && comment.replies.length" class="mt-3 space-y-3 pl-4 border-l-2 border-gray-200/50">
+                                        <div v-if="comment.replies && comment.replies.length" class="mt-5 space-y-5 pl-6 border-l-2 border-gray-100">
                                             <div
                                                 v-for="reply in comment.replies"
                                                 :key="reply.id"
                                                 class="flex gap-3 group/reply"
                                             >
-                                                 <Avatar class="h-6 w-6 mt-1 border border-gray-200">
+                                                 <Avatar class="h-8 w-8 mt-1 border border-gray-100 shadow-sm">
                                                     <AvatarImage :src="reply.user?.avatar" />
-                                                    <AvatarFallback class="text-[10px] bg-white text-gray-700">
+                                                    <AvatarFallback class="text-[10px] bg-gray-50 text-gray-600 font-bold">
                                                         {{ (reply.user?.name || '?').substring(0, 2).toUpperCase() }}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div>
-                                                    <div class="bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
-                                                        <div class="flex items-center gap-2 mb-0.5">
-                                                            <span class="font-semibold text-xs text-gray-900">{{ reply.user?.name }}</span>
+                                                    <div class="bg-gray-50/50 rounded-2xl px-4 py-2.5">
+                                                        <div class="flex items-center gap-2 mb-1">
+                                                            <span class="font-bold text-xs text-gray-900">{{ reply.user?.name }}</span>
                                                         </div>
-                                                        <p class="text-xs text-gray-700">{{ reply.content }}</p>
+                                                        <p class="text-xs text-gray-700 leading-relaxed">{{ reply.content }}</p>
                                                     </div>
-                                                     <div class="flex items-center gap-4 mt-1 ml-2">
+                                                     <div class="flex items-center gap-4 mt-1.5 ml-3">
                                                          <button
                                                             v-if="reply.user_id === $page.props.auth.user.id"
-                                                            class="text-[10px] font-medium text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover/reply:opacity-100"
+                                                            class="text-[10px] font-bold text-red-300 hover:text-red-500 transition-colors opacity-0 group-hover/reply:opacity-100"
                                                             @click="deleteComment(reply.id, thread.id)"
                                                         >
                                                             Delete
@@ -645,6 +635,31 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Input -->
+                        <div class="flex gap-4">
+                            <Avatar class="h-10 w-10 hidden sm:block border border-gray-100">
+                                <AvatarImage :src="$page.props.auth.user.avatar" />
+                                <AvatarFallback class="bg-gray-50 text-gray-600 text-xs font-bold">{{ $page.props.auth.user.name.substring(0,2).toUpperCase() }}</AvatarFallback>
+                            </Avatar>
+                            <div class="flex-1 relative group/input">
+                                <input
+                                    v-model="newComment"
+                                    type="text"
+                                    placeholder="Write a comment..."
+                                    class="w-full bg-gray-50 border-transparent rounded-2xl py-3.5 pl-5 pr-14 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all shadow-inner"
+                                    @focus="activeCommentThread = thread.id"
+                                    @keydown.enter="postComment(thread.id)"
+                                />
+                                <button
+                                    @click="postComment(thread.id)"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    :disabled="!newComment.trim()"
+                                >
+                                    <SendHorizontal class="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -683,7 +698,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                 </nav>
             </div>
 
-            <div class="mt-10 text-xs text-center text-muted-foreground">
+            <div class="mt-16 pb-12 text-xs text-center text-gray-400 font-medium tracking-wide">
                 <span>Powered by FloraFinder Community</span>
             </div>
         </div>
