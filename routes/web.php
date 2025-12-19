@@ -6,54 +6,22 @@ use App\Http\Controllers\ForumController;
 use App\Http\Controllers\PlantController;
 use App\Http\Controllers\SightingController;
 use App\Http\Controllers\MyPlantController;
-use App\Http\Integrations\CheckStatusRequest;
-use App\Http\Integrations\IdentifyPlantRequest;
-use App\Http\Integrations\PlantNetConnector;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Cache;
-use GuzzleHttp\Client;
-use App\Models\ForumThread;
 use App\Models\ForumTag;
-use App\Models\PlantIdentification;
-use App\Http\Integrations\TrefleConnector;
-use App\Http\Integrations\TrefleRequest;
-use App\Http\Integrations\SearchPlantRequest;
 
 
 
-Route::get('/', function () {
+Route::get('/', [DashboardController::class, 'welcome'])->name('home');
 
+Route::get('/dashboard-preview', [DashboardController::class, 'preview'])->name('dashboard.preview');
 
-    return Inertia::render('Welcome');
-})->name('home');
-
-Route::get('/dashboard-preview', function () {
-    return Inertia::render('Dashboard/Guest');
-})->name('dashboard.preview');
-
-
-Route::get('/login', function () {
-    return Inertia::render('Auth/Login');
-})->name('login');
-
-//register
-Route::get('/register', function () {
-    return Inertia::render('Auth/Register');
-})->name('register');
 
 //tags of forum
-Route::get('/forum/tags', function () {
-    return response()->json([
-        'tags' => ForumTag::all(), // get all tags
-    ]);
-});
+Route::get('/forum/tags', [ForumController::class, 'tags']);
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', function () {
-
-        return redirect('welcome-plant');
-    })->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
 
     //forum
     Route::get('/forum', [ForumController::class, 'index'])
@@ -68,24 +36,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('welcome-plant', [DashboardController::class, 'index'])->name('welcome-plant');
 
     //view a post
-    Route::get('/forum/{id}', function ($id) {
-        $thread = ForumThread::with([
-            'user',
-            'tags',
-            'posts' => function ($q) {
-                $q->whereNull('parent_post_id')->orderBy('created_at', 'asc'); // top-level comments only
-            },
-            'posts.user',
-            'posts.replies' => function ($q) {
-                $q->orderBy('created_at', 'asc'); // replies of each post
-            },
-            'posts.replies.user'
-        ])->findOrFail($id);
-
-        return Inertia::render('Forum/Post', [
-            'thread' => $thread
-        ]);
-    })->name('forum.show');
+    Route::get('/forum/{id}', [ForumController::class, 'show'])->name('forum.show');
 
 
     //delete a thread
@@ -126,92 +77,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
     // Plant search route
-    Route::get('plant-search', function () {
-
-
-        //fetch plant from database
-        $plants = PlantIdentification::all();
-        // dd($plants);
-        $plants = $plants->map(function ($plant) {
-            return [
-                'id' => $plant->id,
-                'user_id' => $plant->user_id,
-                'path' => $plant->url,
-                'filename' => $plant->filename,
-                'mime_type' => $plant->mime_type,
-                'size' => $plant->size,
-                'organ' => $plant->organ,
-                'scientific_name' => $plant->scientific_name,
-                'scientific_name_without_author' => $plant->scientific_name_without_author,
-                'common_name' => $plant->common_name,
-                'family' => $plant->family,
-                'genus' => $plant->genus,
-                'confidence' => $plant->confidence,
-                'gbif_id' => $plant->gbif_id,
-                'powo_id' => $plant->powo_id,
-                'iucn_category' => $plant->iucn_category,
-                'region' => $plant->region,
-                'latitude' => $plant->latitude,
-                'longitude' => $plant->longitude,
-                'created_at' => $plant->created_at,
-                'updated_at' => $plant->updated_at,
-            ];
-        });
-
-
-        return Inertia::render(
-            'Search/Index',
-            props: [
-                'plants' => $plants
-            ]
-        );
-    })->name('plant-search');
+    Route::get('plant-search', [PlantIdentifierController::class, 'search'])->name('plant-search');
 
     // My Plants Map - User's personal plant collection on a map
     // Component: resources/js/pages/MyPlants/Map.vue
-    // Filtering: Client-side (Vue computed properties)
-    Route::get('plant-map', function () {
-        // Fetch actual sightings from database
-        $sightings = \App\Models\Sighting::with(['images', 'user', 'plant'])
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->get();
-
-        $sightings = $sightings->map(function ($sighting) {
-            return [
-                'id' => $sighting->id,
-                'user_id' => $sighting->user_id,
-                'user_name' => $sighting->user?->name,
-                'path' => $sighting->images->first()?->image_url ?? $sighting->image_url,
-                'images' => $sighting->images->map(fn($img) => [
-                    'id' => $img->id,
-                    'url' => $img->image_url,
-                    'organ' => $img->organ,
-                ])->toArray(),
-                'scientific_name' => $sighting->scientific_name,
-                'scientific_name_without_author' => $sighting->scientific_name,
-                'common_name' => $sighting->common_name,
-                'family' => $sighting->plant?->family ?? null,
-                'genus' => $sighting->plant?->genus ?? null,
-                'iucn_category' => $sighting->plant?->iucn_category ?? null,
-                'region' => $sighting->region,
-                'location_name' => $sighting->location_name,
-                'latitude' => $sighting->latitude,
-                'longitude' => $sighting->longitude,
-                'description' => $sighting->description,
-                'sighted_at' => $sighting->sighted_at,
-                'created_at' => $sighting->created_at,
-                'updated_at' => $sighting->updated_at,
-            ];
-        });
-
-        return Inertia::render(
-            'MyPlants/Map',
-            props: [
-                'plants' => $sightings
-            ]
-        );
-    })->name('plant-map');
+    Route::get('plant-map', [MyPlantController::class, 'map'])->name('plant-map');
 
     // Public Sightings Map - Shows all users' plant sightings
     // Component: resources/js/pages/Sightings/PublicMap.vue
@@ -249,9 +119,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::post('plant-identifier/identify', [PlantIdentifierController::class, 'identify'])->name('plant-identifier.identify');
 
 // Redirect GET requests to identify endpoint back to the main page
-Route::get('plant-identifier/identify', function () {
-    return redirect()->route('plant-identifier');
-});
+Route::get('plant-identifier/identify', [PlantIdentifierController::class, 'identifyRedirect']);
 
 Route::post(
     '/plant-identifier/care-details',

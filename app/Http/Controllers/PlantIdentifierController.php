@@ -28,6 +28,77 @@ class PlantIdentifierController extends Controller
     {
         return Inertia::render('Identifier/Index');
     }
+    public function identifyRedirect()
+    {
+        return redirect()->route('plant-identifier');
+    }
+    public function search(Request $request)
+    {
+        $query = PlantIdentification::query();
+
+        // Apply search filter
+        if ($request->filled('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('common_name', 'like', "%{$search}%")
+                    ->orWhere('scientific_name', 'like', "%{$search}%")
+                    ->orWhere('family', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply family filter
+        if ($request->filled('family')) {
+            $query->where('family', $request->get('family'));
+        }
+
+        // Apply conservation status filter
+        if ($request->filled('conservation')) {
+            $query->where('iucn_category', $request->get('conservation'));
+        }
+
+        // Apply region filter
+        if ($request->filled('region')) {
+            $query->where('region', $request->get('region'));
+        }
+
+        // Fetch paginated results
+        $plants = $query->latest()->paginate(12)->withQueryString();
+
+        // Map the collection data
+        $plants->getCollection()->transform(function ($plant) {
+            return [
+                'id' => $plant->id,
+                'user_id' => $plant->user_id,
+                'path' => $plant->url,
+                'filename' => $plant->filename,
+                'mime_type' => $plant->mime_type,
+                'size' => $plant->size,
+                'organ' => $plant->organ,
+                'scientific_name' => $plant->scientific_name,
+                'scientific_name_without_author' => $plant->scientific_name_without_author,
+                'common_name' => $plant->common_name,
+                'family' => $plant->family,
+                'genus' => $plant->genus,
+                'confidence' => $plant->confidence,
+                'gbif_id' => $plant->gbif_id,
+                'powo_id' => $plant->powo_id,
+                'iucn_category' => $plant->iucn_category ?: 'DD',
+                'region' => $plant->region,
+                'latitude' => $plant->latitude,
+                'longitude' => $plant->longitude,
+                'created_at' => $plant->created_at,
+                'updated_at' => $plant->updated_at,
+            ];
+        });
+
+        return Inertia::render(
+            'Search/Index',
+            [
+                'plants' => $plants,
+                'filters' => $request->only(['search', 'family', 'conservation', 'region'])
+            ]
+        );
+    }
 
     public function identify(Request $request)
     {

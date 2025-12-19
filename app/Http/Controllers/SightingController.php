@@ -166,44 +166,37 @@ class SightingController extends Controller
      */
     private function detectZoneFromCoordinates(float $latitude, float $longitude): ?int
     {
-        // Simple region-based zone detection for Malaysian regions
-        // This could be enhanced with proper geospatial queries if zones have boundaries
-
-        $regionZoneMap = [
-            'Peninsular Malaysia' => 'peninsular',
-            'Sabah' => 'sabah',
-            'Sarawak' => 'sarawak',
-            'Johor' => 'johor',
-            'Kedah' => 'kedah',
-            'Kelantan' => 'kelantan',
-            'Melaka' => 'melaka',
-            'Negeri Sembilan' => 'negeri_sembilan',
-            'Pahang' => 'pahang',
-            'Perak' => 'perak',
-            'Perlis' => 'perlis',
-            'Pulau Pinang' => 'penang',
-            'Selangor' => 'selangor',
-            'Terengganu' => 'terengganu',
-            'Labuan' => 'labuan',
+        // Rough bounding boxes for Malaysian states
+        $states = [
+            'Sabah' => ['lat' => [4.0, 7.5], 'lng' => [115.0, 119.5]],
+            'Sarawak' => ['lat' => [0.8, 5.0], 'lng' => [109.5, 115.8]],
+            'Perlis' => ['lat' => [6.3, 6.7], 'lng' => [100.1, 100.3]],
+            'Kedah' => ['lat' => [5.0, 6.5], 'lng' => [100.2, 101.0]],
+            'Pulau Pinang' => ['lat' => [5.1, 5.6], 'lng' => [100.1, 100.6]],
+            'Perak' => ['lat' => [3.6, 6.0], 'lng' => [100.4, 101.8]],
+            'Kelantan' => ['lat' => [4.5, 6.3], 'lng' => [101.3, 102.7]],
+            'Terengganu' => ['lat' => [3.9, 5.9], 'lng' => [102.4, 103.6]],
+            'Pahang' => ['lat' => [2.5, 4.8], 'lng' => [101.3, 103.6]],
+            'Selangor' => ['lat' => [2.6, 3.9], 'lng' => [100.7, 101.9]],
+            'Kuala Lumpur' => ['lat' => [3.0, 3.3], 'lng' => [101.6, 101.8]],
+            'Negeri Sembilan' => ['lat' => [2.4, 3.3], 'lng' => [101.8, 102.8]],
+            'Melaka' => ['lat' => [2.0, 2.5], 'lng' => [102.0, 102.6]],
+            'Johor' => ['lat' => [1.2, 2.8], 'lng' => [102.5, 104.5]],
         ];
 
-        // Basic coordinate-based region detection for Malaysia
-        // Sabah: roughly lat 4-7, long 115-119
-        // Sarawak: roughly lat 1-5, long 109-116
-        // Peninsular: roughly lat 1-7, long 99-105
-
-        if ($longitude >= 115 && $longitude <= 119 && $latitude >= 4 && $latitude <= 7) {
-            $zone = Zone::where('zone_name', 'Sabah')->first();
-        } elseif ($longitude >= 109 && $longitude <= 116 && $latitude >= 1 && $latitude <= 5) {
-            $zone = Zone::where('zone_name', 'Sarawak')->first();
-        } elseif ($longitude >= 99 && $longitude <= 105 && $latitude >= 1 && $latitude <= 7) {
-            // For Peninsular, we could be more specific if we had more data, 
-            // but for now let's just return a generic one or try to match by state if we had state boundaries.
-            // Since we don't have boundaries, we'll just return null or a generic Peninsular zone if it existed.
-            return null;
+        foreach ($states as $name => $bounds) {
+            if (
+                $latitude >= $bounds['lat'][0] && $latitude <= $bounds['lat'][1] &&
+                $longitude >= $bounds['lng'][0] && $longitude <= $bounds['lng'][1]
+            ) {
+                $zone = Zone::where('zone_name', $name)->first();
+                if ($zone) {
+                    return $zone->id;
+                }
+            }
         }
 
-        return $zone?->id;
+        return null;
     }
 
     /**

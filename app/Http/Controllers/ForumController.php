@@ -45,6 +45,13 @@ class ForumController extends Controller
         ]);
     }
 
+    public function tags()
+    {
+        return response()->json([
+            'tags' => ForumTag::all(),
+        ]);
+    }
+
     public function create()
     {
         return Inertia::render('Forum/Create');
@@ -129,10 +136,21 @@ class ForumController extends Controller
 
     public function show($id)
     {
-        $thread = ForumThread::with(['posts.user'])->findOrFail($id);
+        $thread = ForumThread::with([
+            'user',
+            'tags',
+            'posts' => function ($q) {
+                $q->whereNull('parent_post_id')->orderBy('created_at', 'asc'); // top-level comments only
+            },
+            'posts.user',
+            'posts.replies' => function ($q) {
+                $q->orderBy('created_at', 'asc'); // replies of each post
+            },
+            'posts.replies.user'
+        ])->findOrFail($id);
 
-        return inertia('Forum/Post', [
-            'thread' => $thread,
+        return Inertia::render('Forum/Post', [
+            'thread' => $thread
         ]);
     }
 

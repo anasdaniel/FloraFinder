@@ -13,6 +13,21 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
+    public function welcome()
+    {
+        return Inertia::render('Welcome');
+    }
+
+    public function preview()
+    {
+        return Inertia::render('Dashboard/Guest');
+    }
+
+    public function dashboard()
+    {
+        return redirect()->route('welcome-plant');
+    }
+
     public function index(Request $request, SeasonalAlertService $alertService)
     {
         $user = Auth::user();

@@ -10,6 +10,51 @@ use Inertia\Inertia;
 
 class MyPlantController extends Controller
 {
+    public function map()
+    {
+        // Fetch actual sightings from database for the current user
+        $sightings = \App\Models\Sighting::with(['images', 'user', 'plant'])
+            ->where('user_id', Auth::id())
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get();
+
+        $sightings = $sightings->map(function ($sighting) {
+            return [
+                'id' => $sighting->id,
+                'user_id' => $sighting->user_id,
+                'user_name' => $sighting->user?->name,
+                'path' => $sighting->images->first()?->image_url ?? $sighting->image_url,
+                'images' => $sighting->images->map(fn($img) => [
+                    'id' => $img->id,
+                    'url' => $img->image_url,
+                    'organ' => $img->organ,
+                ])->toArray(),
+                'scientific_name' => $sighting->scientific_name,
+                'scientific_name_without_author' => $sighting->scientific_name,
+                'common_name' => $sighting->common_name,
+                'family' => $sighting->plant?->family ?? null,
+                'genus' => $sighting->plant?->genus ?? null,
+                'iucn_category' => $sighting->plant?->iucn_category ?? null,
+                'region' => $sighting->region,
+                'location_name' => $sighting->location_name,
+                'latitude' => $sighting->latitude,
+                'longitude' => $sighting->longitude,
+                'description' => $sighting->description,
+                'sighted_at' => $sighting->sighted_at,
+                'created_at' => $sighting->created_at,
+                'updated_at' => $sighting->updated_at,
+            ];
+        });
+
+        return Inertia::render(
+            'MyPlants/Map',
+            [
+                'plants' => $sightings
+            ]
+        );
+    }
+
     /**
      * Display the user's plant collection.
      */
