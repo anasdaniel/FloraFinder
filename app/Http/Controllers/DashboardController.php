@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PlantIdentification;
 use App\Models\Sighting;
+use App\Services\SeasonalAlertService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +13,7 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, SeasonalAlertService $alertService)
     {
         $user = Auth::user();
         $userId = $user->id;
@@ -200,6 +201,7 @@ class DashboardController extends Controller
             ],
             'growthPercentage' => $sightingsGrowth,
             'mapSightings' => $mapSightings,
+            'seasonalAlerts' => $alertService->getActiveAlerts($request->state),
             'filters' => [
                 'range' => $range,
             ],

@@ -19,12 +19,13 @@ class SeasonalAlertService
             ->when($state, fn($q) => $q->where('state', $state))
             ->get()
             ->map(function ($alert) {
+                $isFruiting = $alert->type === 'fruiting';
                 return [
                     'id' => $alert->id,
                     'title' => $alert->title,
                     'description' => $alert->description,
-                    'type' => $alert->type === 'flowering' ? 'info' : 'warning',
-                    'color' => $alert->type === 'flowering' ? 'blue' : 'orange',
+                    'type' => $isFruiting ? 'peak' : 'starting',
+                    'color' => $isFruiting ? 'orange' : 'blue',
                     'source' => 'api',
                     'observation_count' => $alert->observation_count,
                 ];
@@ -33,21 +34,25 @@ class SeasonalAlertService
         // 2. Get Static Alerts from Plant Model (if no live alert exists for that plant)
         $livePlantIds = $liveAlerts->pluck('plant_id')->toArray();
 
-        $staticAlerts = Plant::where(function ($query) use ($currentMonth) {
-            $query->whereJsonContains('bloom_months', (string)$currentMonth)
-                ->orWhereJsonContains('fruit_months', (string)$currentMonth);
-        })
-            ->whereNotIn('id', $livePlantIds)
-            ->limit(3)
+        $staticAlerts = Plant::whereNotIn('id', $livePlantIds)
             ->get()
+            ->filter(function ($plant) use ($currentMonth) {
+                $bloomMonths = is_array($plant->bloom_months) ? $plant->bloom_months : json_decode($plant->bloom_months ?? '[]', true);
+                $fruitMonths = is_array($plant->fruit_months) ? $plant->fruit_months : json_decode($plant->fruit_months ?? '[]', true);
+
+                return in_array((string)$currentMonth, $bloomMonths ?: []) ||
+                    in_array((string)$currentMonth, $fruitMonths ?: []);
+            })
+            ->take(3)
             ->map(function ($plant) use ($currentMonth) {
-                $isBlooming = in_array((string)$currentMonth, json_decode($plant->bloom_months ?? '[]'));
+                $bloomMonths = is_array($plant->bloom_months) ? $plant->bloom_months : json_decode($plant->bloom_months ?? '[]', true);
+                $isBlooming = in_array((string)$currentMonth, $bloomMonths ?: []);
                 return [
                     'id' => 'static-' . $plant->id,
                     'title' => $plant->common_name . ($isBlooming ? ' Blooming Season' : ' Fruiting Season'),
                     'description' => "It's currently the expected " . ($isBlooming ? 'blooming' : 'fruiting') . " season for " . $plant->common_name . " in Malaysia.",
-                    'type' => 'info',
-                    'color' => 'blue',
+                    'type' => $isBlooming ? 'starting' : 'peak',
+                    'color' => $isBlooming ? 'blue' : 'orange',
                     'source' => 'static',
                 ];
             });

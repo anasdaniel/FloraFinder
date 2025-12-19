@@ -85,6 +85,7 @@ const props = defineProps<{
   };
   growthPercentage: number;
   mapSightings: MapSighting[];
+  seasonalAlerts: any[];
   filters: {
     range: number;
   };
@@ -297,20 +298,32 @@ const chartMonths = computed(() => {
 });
 
 // Static alerts data (could be made dynamic in the future)
-const alerts: Alert[] = [
-  {
-    title: "Durian Season Peak",
-    description: "Musang King and D24 availability is at its highest in the Pahang region.",
-    time: "2 hours ago",
-    type: "warning",
-  },
-  {
-    title: "Rambutan Season Starting",
-    description: "Early harvests of Anak Sekolah varieties are appearing in northern states.",
-    time: "1 day ago",
-    type: "info",
-  },
-];
+const alerts = computed(() => {
+  if (props.seasonalAlerts && props.seasonalAlerts.length > 0) {
+    return props.seasonalAlerts.map(alert => ({
+      title: alert.title,
+      description: alert.description,
+      time: alert.source === 'api' ? 'Live Update' : 'Seasonal',
+      type: alert.color === 'orange' ? 'warning' : 'info'
+    }));
+  }
+  
+  // Fallback if no dynamic alerts
+  return [
+    {
+      title: "Durian Season Peak",
+      description: "Musang King and D24 availability is at its highest in the Pahang region.",
+      time: "2 hours ago",
+      type: "warning",
+    },
+    {
+      title: "Rambutan Season Starting",
+      description: "Early harvests of Anak Sekolah varieties are appearing in northern states.",
+      time: "1 day ago",
+      type: "info",
+    },
+  ];
+});
 
 const quickActions: QuickAction[] = [
   { label: "Export CSV", icon: "download", href: "#", color: "text-gray-500" },

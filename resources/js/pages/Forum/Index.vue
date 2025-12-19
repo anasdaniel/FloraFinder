@@ -85,8 +85,8 @@ const props = defineProps<{
 
 // Helper to get icon for alert type
 const getAlertIcon = (type: string) => {
-    if (type === 'warning') return AlertTriangle;
-    if (type === 'info') return Info;
+    if (type === 'peak') return Info;
+    if (type === 'starting') return FlaskConical;
     return Sparkles;
 };
 
