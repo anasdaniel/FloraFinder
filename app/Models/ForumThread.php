@@ -16,7 +16,11 @@ class ForumThread extends Model
         'category',
         'content',
         'image',
+        'likes_count',
+        'shares_count',
     ];
+
+    protected $appends = ['is_liked_by_user'];
 
     public function posts()
     {
@@ -32,8 +36,22 @@ class ForumThread extends Model
     {
         return $this->belongsTo(User::class);
     }
+
     public function tags()
     {
         return $this->belongsToMany(ForumTag::class, 'thread_tag');
+    }
+
+    public function likes()
+    {
+        return $this->belongsToMany(User::class, 'thread_likes')->withTimestamps();
+    }
+
+    public function getIsLikedByUserAttribute()
+    {
+        if (!auth()->check()) {
+            return false;
+        }
+        return $this->likes()->where('user_id', auth()->id())->exists();
     }
 }

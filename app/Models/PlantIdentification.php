@@ -17,6 +17,7 @@ class PlantIdentification extends Model
         'scientific_name',
         'scientific_name_without_author',
         'common_name',
+        'malay_name',
         'family',
         'genus',
         'confidence',

@@ -1,9 +1,33 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from "@inertiajs/vue3";
 import { computed } from "vue";
+import Icon from "@/components/Icon.vue";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { reactive } from "vue";
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const isAuthed = computed(() => Boolean(user.value));
+
+const imgFailed = reactive<Record<string, boolean>>({});
+function markImgFailed(key: string) {
+  imgFailed[key] = true;
+}
+
+const primaryCta = computed(() => {
+  if (isAuthed.value) {
+    return { label: "Identify a plant", href: route("plant-identifier"), icon: "camera" };
+  }
+  return { label: "Create free account", href: route("register"), icon: "user-plus" };
+});
+
+const secondaryCta = computed(() => {
+  if (isAuthed.value) {
+    return { label: "Open dashboard", href: route("dashboard"), icon: "layout" };
+  }
+  return { label: "See dashboard preview", href: route("dashboard.preview"), icon: "sparkles" };
+});
 
 // Placeholder images - in a real app these would be assets
 const heroBackground = "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop"; // Nature background
@@ -12,236 +36,389 @@ const potdImage = "https://images.unsplash.com/photo-1572454591674-2739f30d8c40?
 const plant1 = "https://images.unsplash.com/photo-1616428790326-7248e301297e?q=80&w=2835&auto=format&fit=crop"; // Rafflesia equivalent/exotic
 const plant2 = "https://images.unsplash.com/photo-1596727040409-775b9f936f4d?q=80&w=2835&auto=format&fit=crop"; // Torch Ginger equivalent
 const plant3 = "https://images.unsplash.com/photo-1596727147705-56a53272d560?q=80&w=2835&auto=format&fit=crop"; // Pitcher plant equivalent
+
+const stats = [
+  { label: "Species catalogued", value: "1,240+" },
+  { label: "Sightings mapped", value: "3,210" },
+  { label: "Community posts", value: "8.7k" },
+];
+
+const features = computed(() => {
+  const lockedHref = route("register");
+  return [
+    {
+      icon: "camera",
+      title: "Instant identification",
+      description: "Upload a photo and get matches with confidence scoring and taxonomy.",
+      href: isAuthed.value ? route("plant-identifier") : lockedHref,
+      locked: !isAuthed.value,
+    },
+    {
+      icon: "map",
+      title: "Sightings on a map",
+      description: "Document discoveries and explore hotspots with an interactive map.",
+      href: isAuthed.value ? route("sightings.map") : lockedHref,
+      locked: !isAuthed.value,
+    },
+    {
+      icon: "book-open",
+      title: "Plant library",
+      description: "Browse profiles, care details, and conservation status in one place.",
+      href: isAuthed.value ? route("plants.index") : lockedHref,
+      locked: !isAuthed.value,
+    },
+  ] as const;
+});
+
+const popularPlants = [
+  { key: "hibiscus", name: "Bunga Raya", scientific: "Hibiscus rosa-sinensis", image: heroImage },
+  { key: "rafflesia", name: "Rafflesia", scientific: "Rafflesia arnoldii", image: plant1 },
+  { key: "pitcher-plant", name: "Periuk Kera", scientific: "Nepenthes rajah", image: plant3 },
+];
 </script>
 
 <template>
   <Head title="Welcome to FloraFinder" />
 
-  <div class="min-h-screen bg-gray-50 text-[#1b1b18] font-sans selection:bg-[#FF2D20] selection:text-white">
+  <div class="min-h-screen bg-gradient-to-b from-white via-white to-emerald-50/40 text-slate-950 font-sans selection:bg-emerald-200 selection:text-slate-950">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-6 focus:top-6 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-900 focus:shadow-lg"
+    >
+      Skip to content
+    </a>
+
+    <!-- Subtle background -->
+    <div class="pointer-events-none fixed inset-0 -z-10">
+      <div class="absolute -top-32 -left-40 h-[420px] w-[420px] rounded-full bg-emerald-300/25 blur-3xl" />
+      <div class="absolute top-24 -right-48 h-[520px] w-[520px] rounded-full bg-indigo-300/15 blur-3xl" />
+      <div class="absolute bottom-[-140px] left-1/3 h-[520px] w-[520px] rounded-full bg-teal-300/15 blur-3xl" />
+    </div>
 
     <!-- Navigation -->
-    <header class="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <!-- Logo Icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6 text-green-700">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-        </svg>
-        <span class="text-xl font-bold tracking-tight text-gray-900">FloraFinder</span>
-      </div>
-
-      <nav class="flex items-center gap-4">
-        <Link
-          v-if="user"
-          :href="route('dashboard')"
-          class="text-sm font-medium text-gray-700 hover:text-green-700 transition"
-        >
-          Dashboard
+    <header class="sticky top-0 z-40 border-b border-black/5 bg-white/70 backdrop-blur">
+      <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
+        <Link :href="route('home')" class="flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40">
+          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+            <Icon name="leaf" class="h-5 w-5" />
+          </span>
+          <span class="text-base font-bold tracking-tight text-slate-950">FloraFinder</span>
         </Link>
-        <template v-else>
-          <Link
-            :href="route('login')"
-            class="text-sm font-medium text-gray-700 hover:text-green-700 transition"
-          >
-            Log in
+
+        <nav aria-label="Primary" class="flex items-center gap-2 sm:gap-3">
+          <Link v-if="isAuthed" :href="route('dashboard')" class="hidden sm:block">
+            <Button variant="ghost">Dashboard</Button>
           </Link>
-          <Link
-            :href="route('register')"
-            class="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-full hover:bg-gray-800 transition"
-          >
-            Register
+          <Link v-else :href="route('dashboard.preview')" class="hidden sm:block">
+            <Button variant="ghost">Preview</Button>
           </Link>
-        </template>
-      </nav>
+          <Link :href="route('login')">
+            <Button variant="ghost">Log in</Button>
+          </Link>
+          <Link :href="route('register')">
+            <Button class="bg-slate-900 text-white hover:bg-slate-800">Register</Button>
+          </Link>
+        </nav>
+      </div>
     </header>
 
-    <main>
+    <main id="main">
       <!-- Hero Section -->
-      <section class="relative isolate overflow-hidden pt-14">
-        <img :src="heroBackground" alt="" class="absolute inset-0 -z-10 h-full w-full object-cover opacity-20" />
+      <section class="relative isolate overflow-hidden">
+        <img :src="heroBackground" alt="" class="absolute inset-0 -z-10 h-full w-full object-cover opacity-[0.08]" />
         <div class="mx-auto max-w-7xl px-6 py-12 lg:py-20">
-          <div class="grid lg:grid-cols-2 gap-12 items-center">
-          <div class="space-y-8">
-            <h1 class="text-5xl lg:text-6xl font-bold leading-tight tracking-tight text-gray-900">
-              Discover & Identify <br>
-              <span class="text-green-700">Malaysian Plants</span>
-            </h1>
-            <p class="text-lg text-gray-600 max-w-lg leading-relaxed">
-              Explore the rich biodiversity of Malaysian flora using our advanced plant identification technology.
-            </p>
-            <div class="flex flex-wrap gap-4">
-              <button class="px-6 py-3 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
-                </svg>
-                Identify Plants
-              </button>
-              <button class="px-6 py-3 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition flex items-center gap-2 shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                </svg>
-                Browse Plants
-              </button>
+          <div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+            <div class="space-y-8">
+              <div class="inline-flex items-center gap-2 rounded-full border border-emerald-600/15 bg-emerald-600/10 px-3 py-1 text-xs font-semibold text-emerald-800">
+                <Icon name="sparkles" class="h-3.5 w-3.5" />
+                Malaysia-first plant discovery
+              </div>
+              <div class="space-y-4">
+                <h1 class="text-4xl font-bold leading-[1.08] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+                  Discover and identify Malaysian plants — with a dashboard built for focus.
+                </h1>
+                <p class="max-w-xl text-lg leading-relaxed text-slate-600">
+                  Turn photos into knowledge, sightings into maps, and curiosity into community contributions.
+                </p>
+              </div>
+
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Link :href="primaryCta.href">
+                  <Button class="h-11 w-full gap-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 sm:w-auto">
+                    <Icon :name="primaryCta.icon" class="h-4 w-4" />
+                    {{ primaryCta.label }}
+                  </Button>
+                </Link>
+                <Link :href="secondaryCta.href">
+                  <Button variant="outline" class="h-11 w-full gap-2 rounded-full sm:w-auto">
+                    <Icon :name="secondaryCta.icon" class="h-4 w-4" />
+                    {{ secondaryCta.label }}
+                  </Button>
+                </Link>
+              </div>
+
+              <dl class="grid gap-4 pt-2 sm:grid-cols-3">
+                <div v-for="s in stats" :key="s.label" class="rounded-2xl border border-black/5 bg-white/70 p-4 shadow-sm">
+                  <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ s.label }}</dt>
+                  <dd class="mt-2 text-2xl font-bold tracking-tight text-slate-950">{{ s.value }}</dd>
+                </div>
+              </dl>
             </div>
-          </div>
-          <div class="relative">
-            <div class="rounded-2xl overflow-hidden shadow-xl">
-              <img :src="heroImage" alt="Malaysian Hibiscus" class="w-full h-[400px] object-cover hover:scale-105 transition duration-700" />
-            </div>
-            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-green-100 flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span class="text-sm font-semibold text-green-800">1000+ Plant Species</span>
+
+            <div class="relative">
+              <div class="overflow-hidden rounded-3xl border border-black/5 bg-white shadow-xl">
+                <img
+                  v-if="!imgFailed.hero"
+                  :src="heroImage"
+                  alt="Malaysian Hibiscus"
+                  class="h-[420px] w-full object-cover"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  @error="markImgFailed('hero')"
+                />
+                <div
+                  v-else
+                  class="flex h-[420px] w-full items-center justify-center bg-gradient-to-br from-emerald-100 via-white to-indigo-100"
+                  role="img"
+                  aria-label="Plant photo unavailable"
+                >
+                  <div class="text-center">
+                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/70 text-emerald-700 shadow-sm ring-1 ring-black/5">
+                      <Icon name="image" class="h-7 w-7" />
+                    </div>
+                    <p class="mt-3 text-sm font-semibold text-slate-900">Photo unavailable</p>
+                    <p class="mt-1 text-xs text-slate-600">We’ll show a placeholder instead.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="absolute bottom-5 left-5 rounded-2xl border border-black/5 bg-white/90 px-4 py-3 shadow-lg backdrop-blur">
+                <div class="flex items-center gap-3">
+                  <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+                    <Icon name="leaf" class="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p class="text-sm font-semibold text-slate-950">Personalized dashboard</p>
+                    <p class="text-xs text-slate-600">Save identifications + sightings</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- Features -->
+      <section class="mx-auto max-w-7xl px-6 py-14">
+        <div class="mx-auto max-w-2xl text-center">
+          <h2 class="text-3xl font-bold tracking-tight text-slate-950">What you can do</h2>
+          <p class="mt-3 text-slate-600">Three fast workflows, designed with clear next steps and low friction.</p>
+        </div>
+
+        <div class="mt-10 grid gap-6 lg:grid-cols-3">
+          <Card v-for="f in features" :key="f.title" class="relative overflow-hidden border-black/5 bg-white/70 shadow-sm backdrop-blur">
+            <Link
+              :href="f.href"
+              class="absolute inset-0 z-10 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+              :aria-label="f.locked ? `Create an account to unlock ${f.title}` : `Open ${f.title}`"
+            >
+              <span class="sr-only">{{ f.title }}</span>
+            </Link>
+
+            <CardHeader class="relative">
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+                  <Icon :name="f.icon" class="h-6 w-6" />
+                </div>
+                <span
+                  v-if="f.locked"
+                  class="inline-flex items-center gap-1 rounded-full border border-black/5 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white"
+                >
+                  <Icon name="lock" class="h-3.5 w-3.5" />
+                  Account
+                </span>
+              </div>
+              <CardTitle class="text-lg text-slate-950">{{ f.title }}</CardTitle>
+              <CardDescription class="text-slate-600">{{ f.description }}</CardDescription>
+            </CardHeader>
+            <CardFooter class="relative pt-0">
+              <span class="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                {{ f.locked ? "Unlock with free account" : "Open" }}
+                <Icon name="arrow-right" class="h-4 w-4" />
+              </span>
+            </CardFooter>
+          </Card>
         </div>
       </section>
 
       <!-- Plant of the Day -->
-      <section class="max-w-5xl mx-auto px-6 py-16">
-        <div class="text-center mb-10">
-          <h2 class="text-2xl font-bold text-gray-900">Plant of the Day</h2>
-          <p class="text-gray-500 mt-2">Explore a new Malaysian plant each day</p>
+      <section class="mx-auto max-w-7xl px-6 pb-16">
+        <div class="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <h2 class="text-3xl font-bold tracking-tight text-slate-950">Plant of the day</h2>
+            <p class="mt-2 text-slate-600">A curated species spotlight with key facts and conservation context.</p>
+          </div>
+          <Link :href="isAuthed ? route('plants.index') : route('register')">
+            <Button variant="outline" class="gap-2">
+              <Icon name="book-open" class="h-4 w-4" />
+              {{ isAuthed ? "Browse library" : "Create account to browse" }}
+            </Button>
+          </Link>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden grid md:grid-cols-2">
-          <div class="relative h-64 md:h-auto">
-            <img :src="potdImage" alt="Paperflower" class="w-full h-full object-cover" />
-            <div class="absolute top-4 right-4 bg-[#D1FA59] text-green-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-              Least Concern
+        <Card class="overflow-hidden border-black/5 bg-white shadow-sm">
+          <div class="grid md:grid-cols-2">
+            <div class="relative">
+              <img
+                v-if="!imgFailed.potd"
+                :src="potdImage"
+                alt="Paperflower (Bougainvillea glabra)"
+                class="h-72 w-full object-cover md:h-full"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                @error="markImgFailed('potd')"
+              />
+              <div
+                v-else
+                class="flex h-72 w-full items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-amber-50 md:h-full"
+                role="img"
+                aria-label="Plant photo unavailable"
+              >
+                <div class="text-center">
+                  <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 text-emerald-700 shadow-sm ring-1 ring-black/5">
+                    <Icon name="image" class="h-6 w-6" />
+                  </div>
+                  <p class="mt-3 text-sm font-semibold text-slate-900">Photo unavailable</p>
+                </div>
+              </div>
+              <div class="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-3 py-1 text-xs font-semibold text-emerald-800 backdrop-blur">
+                <Icon name="shield-alert" class="h-3.5 w-3.5" />
+                Least Concern
+              </div>
+            </div>
+            <div class="p-8 md:p-10">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Today’s pick</p>
+              <h3 class="mt-2 text-3xl font-bold tracking-tight text-slate-950">Paperflower</h3>
+              <p class="mt-1 text-sm italic text-slate-500">Bougainvillea glabra</p>
+              <p class="mt-5 leading-relaxed text-slate-600">
+                A vibrant, hardy flowering plant widely cultivated in tropical regions. Known for its colorful bracts surrounding small white flowers.
+              </p>
+              <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link :href="isAuthed ? route('plants.index') : route('register')">
+                  <Button class="gap-2 bg-slate-900 text-white hover:bg-slate-800">
+                    <Icon name="arrow-right" class="h-4 w-4" />
+                    {{ isAuthed ? "Learn more" : "Create account to learn more" }}
+                  </Button>
+                </Link>
+                <Link :href="secondaryCta.href">
+                  <Button variant="outline" class="gap-2">
+                    <Icon :name="secondaryCta.icon" class="h-4 w-4" />
+                    {{ secondaryCta.label }}
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
-          <div class="p-8 md:p-12 flex flex-col justify-center">
-            <h3 class="text-3xl font-bold text-gray-900 mb-1">Paperflower</h3>
-            <p class="text-sm text-gray-400 italic mb-4">Bougainvillea glabra</p>
-            <p class="text-gray-600 mb-6 leading-relaxed">
-              Bougainvillea glabra, commonly known as Paperflower, is a vibrant and hardy flowering plant native to South America but widely cultivated in tropical regions, including Malaysia. It is renowned for its colorful bracts that surround its small white flowers.
-            </p>
-            <div>
-              <button class="px-5 py-2.5 bg-white border border-gray-200 text-gray-900 font-medium rounded-lg hover:bg-gray-50 transition flex items-center gap-2 text-sm shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                </svg>
-                Learn more
-              </button>
-            </div>
-          </div>
-        </div>
+        </Card>
       </section>
 
       <!-- Key Features -->
-      <section class="max-w-7xl mx-auto px-6 py-16 bg-white/50">
-        <div class="text-center mb-16">
-          <h2 class="text-3xl font-bold text-gray-900">Key Features</h2>
-          <p class="text-gray-500 mt-4 max-w-2xl mx-auto">Everything you need to explore Malaysian flora</p>
-        </div>
-
-        <div class="grid md:grid-cols-3 gap-8">
-          <!-- Feature 1 -->
-          <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center hover:shadow-md transition">
-            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6 text-gray-700">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-              </svg>
-            </div>
-            <h3 class="text-lg font-bold text-gray-900 mb-2">Instant Plant Identification</h3>
-            <p class="text-gray-500 text-sm leading-relaxed">
-              Identify any plant with a simple photo using our advanced AI technology.
-            </p>
-          </div>
-
-          <!-- Feature 2 -->
-          <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center hover:shadow-md transition">
-            <div class="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mx-auto mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6 text-green-700">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-              </svg>
-            </div>
-            <h3 class="text-lg font-bold text-gray-900 mb-2">Extensive Plant Database</h3>
-            <p class="text-gray-500 text-sm leading-relaxed">
-              Access information about thousands of plant species native to Malaysia.
-            </p>
-          </div>
-
-          <!-- Feature 3 -->
-          <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center hover:shadow-md transition">
-            <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-6">
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6 text-blue-700">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
-            </div>
-            <h3 class="text-lg font-bold text-gray-900 mb-2">Conservation Tracking</h3>
-            <p class="text-gray-500 text-sm leading-relaxed">
-              Learn about conservation status and contribute to preservation efforts.
-            </p>
-          </div>
-        </div>
-      </section>
-
       <!-- Popular Plants -->
-      <section class="max-w-7xl mx-auto px-6 py-16">
-        <div class="text-center mb-12">
-          <h2 class="text-3xl font-bold text-gray-900">Popular Malaysian Plants</h2>
-          <p class="text-gray-500 mt-2">Discover some of Malaysia's most iconic flora</p>
+      <section class="mx-auto max-w-7xl px-6 pb-20">
+        <div class="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <h2 class="text-3xl font-bold tracking-tight text-slate-950">Popular Malaysian plants</h2>
+            <p class="mt-2 text-slate-600">A few iconic picks to spark exploration.</p>
+          </div>
+          <Link :href="isAuthed ? route('plants.index') : route('register')">
+            <Button class="gap-2 bg-slate-900 text-white hover:bg-slate-800">
+              Explore all plants
+              <Icon name="arrow-right" class="h-4 w-4" />
+            </Button>
+          </Link>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-8 mb-12">
-          <!-- Card 1 -->
-          <div class="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition cursor-pointer">
+        <div class="grid gap-6 md:grid-cols-3">
+          <Card
+            v-for="p in popularPlants"
+            :key="p.key"
+            class="group relative overflow-hidden border-black/5 bg-white shadow-sm"
+          >
+            <Link
+              :href="isAuthed ? route('plants.index') : route('register')"
+              class="absolute inset-0 z-10 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+              :aria-label="isAuthed ? `Browse plants` : `Create an account to browse plants`"
+            >
+              <span class="sr-only">{{ p.name }}</span>
+            </Link>
             <div class="aspect-[4/3] overflow-hidden">
-              <img :src="plant1" alt="Rafflesia" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+              <img
+                v-if="!imgFailed[p.key]"
+                :src="p.image"
+                :alt="p.name"
+                class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                @error="markImgFailed(p.key)"
+              />
+              <div
+                v-else
+                class="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50"
+                role="img"
+                :aria-label="`${p.name} photo unavailable`"
+              >
+                <div class="text-center">
+                  <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 text-emerald-700 shadow-sm ring-1 ring-black/5">
+                    <Icon name="image" class="h-6 w-6" />
+                  </div>
+                  <p class="mt-3 text-sm font-semibold text-slate-900">Photo unavailable</p>
+                </div>
+              </div>
             </div>
-            <div class="p-6">
-              <h3 class="font-bold text-gray-900">Rafflesia</h3>
-              <p class="text-xs text-gray-500 italic">Rafflesia arnoldii</p>
-            </div>
-          </div>
-
-          <!-- Card 2 -->
-          <div class="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition cursor-pointer">
-            <div class="aspect-[4/3] overflow-hidden">
-              <img :src="plant2" alt="Torch Ginger" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-            </div>
-            <div class="p-6">
-              <h3 class="font-bold text-gray-900">Torch Ginger</h3>
-              <p class="text-xs text-gray-500 italic">Etlingera elatior</p>
-            </div>
-          </div>
-
-          <!-- Card 3 -->
-          <div class="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition cursor-pointer">
-            <div class="aspect-[4/3] overflow-hidden">
-              <img :src="plant3" alt="Highland Pitcher Plant" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-            </div>
-            <div class="p-6">
-              <h3 class="font-bold text-gray-900">Highland Pitcher Plant</h3>
-              <p class="text-xs text-gray-500 italic">Nepenthes rajah</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="text-center">
-          <button class="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white font-medium rounded-full hover:bg-gray-800 transition">
-            Explore All Plants
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-            </svg>
-          </button>
+            <CardContent class="pt-6">
+              <p class="text-base font-bold text-slate-950">{{ p.name }}</p>
+              <p class="mt-1 text-sm italic text-slate-500">{{ p.scientific }}</p>
+              <p class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                {{ isAuthed ? "View in library" : "Unlock to view" }}
+                <Icon name="arrow-right" class="h-4 w-4" />
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </section>
     </main>
 
     <!-- Footer CTA -->
-    <footer class="bg-[#0a0a0a] text-white py-20 px-6">
-      <div class="max-w-4xl mx-auto text-center space-y-8">
-        <h2 class="text-4xl font-bold">Ready to discover Malaysian plants?</h2>
-        <p class="text-gray-400 text-lg">Start identifying plants in your surroundings today.</p>
-        <button class="px-8 py-4 bg-white text-black font-semibold rounded-lg hover:bg-gray-100 transition inline-flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-          </svg>
-          Start Identifying
-        </button>
+    <footer class="border-t border-black/5 bg-white/60 px-6 py-16 backdrop-blur">
+      <div class="mx-auto max-w-7xl">
+        <div class="grid gap-10 rounded-3xl border border-black/5 bg-gradient-to-br from-emerald-600/10 via-white to-indigo-600/10 p-8 shadow-sm md:grid-cols-2 md:items-center md:p-12">
+          <div class="space-y-4">
+            <h2 class="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Ready to discover Malaysian plants?</h2>
+            <p class="text-slate-600">Start identifying, logging sightings, and building your personal dashboard today.</p>
+          </div>
+          <div class="flex flex-col gap-3 sm:flex-row md:justify-end">
+            <Link :href="primaryCta.href">
+              <Button class="h-11 w-full gap-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 sm:w-auto">
+                <Icon :name="primaryCta.icon" class="h-4 w-4" />
+                {{ primaryCta.label }}
+              </Button>
+            </Link>
+            <Link :href="secondaryCta.href">
+              <Button variant="outline" class="h-11 w-full gap-2 rounded-full sm:w-auto">
+                <Icon :name="secondaryCta.icon" class="h-4 w-4" />
+                {{ secondaryCta.label }}
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        <div class="mt-10 flex flex-col items-start justify-between gap-4 border-t border-black/5 pt-8 text-sm text-slate-500 sm:flex-row sm:items-center">
+          <p>&copy; 2025 FloraFinder. All rights reserved.</p>
+          <div class="flex gap-6">
+            <Link href="#" class="hover:text-slate-700">Privacy</Link>
+            <Link href="#" class="hover:text-slate-700">Terms</Link>
+            <Link href="#" class="hover:text-slate-700">Contact</Link>
+          </div>
+        </div>
       </div>
     </footer>
   </div>

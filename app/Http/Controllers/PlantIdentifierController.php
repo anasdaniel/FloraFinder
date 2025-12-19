@@ -7,6 +7,7 @@ use App\Models\PlantIdentification;
 use App\Services\PlantCacheService;
 use App\Services\CareDetailsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use App\Http\Integrations\PlantNetConnector as IntegrationsPlantNetConnector;
@@ -26,6 +27,77 @@ class PlantIdentifierController extends Controller
     public function index()
     {
         return Inertia::render('Identifier/Index');
+    }
+    public function identifyRedirect()
+    {
+        return redirect()->route('plant-identifier');
+    }
+    public function search(Request $request)
+    {
+        $query = PlantIdentification::query();
+
+        // Apply search filter
+        if ($request->filled('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('common_name', 'like', "%{$search}%")
+                    ->orWhere('scientific_name', 'like', "%{$search}%")
+                    ->orWhere('family', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply family filter
+        if ($request->filled('family')) {
+            $query->where('family', $request->get('family'));
+        }
+
+        // Apply conservation status filter
+        if ($request->filled('conservation')) {
+            $query->where('iucn_category', $request->get('conservation'));
+        }
+
+        // Apply region filter
+        if ($request->filled('region')) {
+            $query->where('region', $request->get('region'));
+        }
+
+        // Fetch paginated results
+        $plants = $query->latest()->paginate(12)->withQueryString();
+
+        // Map the collection data
+        $plants->getCollection()->transform(function ($plant) {
+            return [
+                'id' => $plant->id,
+                'user_id' => $plant->user_id,
+                'path' => $plant->url,
+                'filename' => $plant->filename,
+                'mime_type' => $plant->mime_type,
+                'size' => $plant->size,
+                'organ' => $plant->organ,
+                'scientific_name' => $plant->scientific_name,
+                'scientific_name_without_author' => $plant->scientific_name_without_author,
+                'common_name' => $plant->common_name,
+                'family' => $plant->family,
+                'genus' => $plant->genus,
+                'confidence' => $plant->confidence,
+                'gbif_id' => $plant->gbif_id,
+                'powo_id' => $plant->powo_id,
+                'iucn_category' => $plant->iucn_category ?: 'DD',
+                'region' => $plant->region,
+                'latitude' => $plant->latitude,
+                'longitude' => $plant->longitude,
+                'created_at' => $plant->created_at,
+                'updated_at' => $plant->updated_at,
+            ];
+        });
+
+        return Inertia::render(
+            'Search/Index',
+            [
+                'plants' => $plants,
+                'filters' => $request->only(['search', 'family', 'conservation', 'region'])
+            ]
+        );
     }
 
     public function identify(Request $request)
@@ -74,6 +146,65 @@ class PlantIdentifierController extends Controller
                 $plantData = $result;
             }
 
+            // Automatically add the top result to the plant library if successful
+            if ($plantData['success'] && !empty($plantData['data']['results'])) {
+                try {
+                    $topResult = $plantData['data']['results'][0];
+                    $species = $topResult['species'] ?? [];
+                    $imageUrl = $topResult['images'][0]['url']['m'] ?? $topResult['images'][0]['url']['o'] ?? null;
+
+                    // Collect all reference images from the API
+                    $referenceImages = [];
+                    if (!empty($topResult['images'])) {
+                        foreach ($topResult['images'] as $img) {
+                            $referenceImages[] = $img['url']['m'] ?? $img['url']['o'] ?? null;
+                        }
+                    }
+                    $referenceImages = array_filter($referenceImages);
+
+                    $this->plantCacheService->findOrCreateWithCare(
+                        $species['scientificName'] ?? $species['scientificNameWithoutAuthor'] ?? 'Unknown',
+                        $species['commonNames'][0] ?? null,
+                        $species['family']['scientificNameWithoutAuthor'] ?? null,
+                        $species['genus']['scientificNameWithoutAuthor'] ?? null,
+                        $topResult['gbif']['id'] ?? null,
+                        $topResult['powo']['id'] ?? null,
+                        $topResult['iucn']['category'] ?? null,
+                        $imageUrl,
+                        $referenceImages
+                    );
+
+                    // Save identification record for dashboard tracking (New Species)
+                    // This ensures detections are counted even if not explicitly saved to collection
+                    $firstImage = $images[0];
+                    $firstOrgan = $organs[0];
+                    $path = $firstImage->store('plant-identifications', 'public');
+
+                    PlantIdentification::create([
+                        'path' => $path,
+                        'url' => Storage::url($path),
+                        'filename' => $firstImage->getClientOriginalName(),
+                        'mime_type' => $firstImage->getMimeType(),
+                        'size' => $firstImage->getSize(),
+                        'organ' => $firstOrgan,
+                        'organ_score' => $plantData['predictedOrgans'][0]['score'] ?? null,
+                        'scientific_name' => $species['scientificName'] ?? null,
+                        'scientific_name_without_author' => $species['scientificNameWithoutAuthor'] ?? null,
+                        'common_name' => $species['commonNames'][0] ?? null,
+                        'family' => $species['family']['scientificNameWithoutAuthor'] ?? null,
+                        'genus' => $species['genus']['scientificNameWithoutAuthor'] ?? null,
+                        'confidence' => $topResult['score'] ?? 0,
+                        'gbif_id' => $topResult['gbif']['id'] ?? null,
+                        'powo_id' => $topResult['powo']['id'] ?? null,
+                        'iucn_category' => $topResult['iucn']['category'] ?? null,
+                        'user_id' => Auth::id(),
+                    ]);
+                } catch (\Exception $e) {
+                    // Log but don't fail the identification request
+                    Log::warning('Failed to auto-add top result or save identification: ' . $e->getMessage());
+                }
+            }
+
             return Inertia::render('Identifier/Index', [
                 'plantData' => $plantData
             ]);
@@ -107,12 +238,28 @@ class PlantIdentifierController extends Controller
             'message' => 'required|string',
             'history' => 'nullable|array',
         ]);
+
         $plantName = $request->input('plantName');
         $message = $request->input('message');
         $history = $request->input('history', []);
 
-        $reply = $this->careDetailsService->generateBotReply($plantName, $history, $message);
-        return response()->json(['success' => true, 'reply' => $reply]);
+        Log::info('Botanist chat request', [
+            'plantName' => $plantName,
+            'message' => substr($message, 0, 100),
+            'historyCount' => count($history),
+        ]);
+
+        try {
+            $reply = $this->careDetailsService->generateBotReply($plantName, $history, $message);
+            Log::info('Botanist chat reply generated', ['replyLength' => strlen($reply)]);
+            return response()->json(['success' => true, 'reply' => $reply]);
+        } catch (\Exception $e) {
+            Log::error('Botanist chat exception: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'reply' => "I'm having trouble checking my botanical reference books right now."
+            ], 500);
+        }
     }
 
     public function save(Request $request)
@@ -126,13 +273,13 @@ class PlantIdentifierController extends Controller
             'scientificName' => 'required|string|max:255',
             'scientificNameWithoutAuthor' => 'required|string|max:255',
             'commonName' => 'nullable|string|max:255',
+            'malayName' => 'nullable|string|max:255',
             'family' => 'required|string|max:255',
             'genus' => 'required|string|max:255',
             'confidence' => 'required|numeric|between:0,1',
             'gbifId' => 'nullable|string|max:255',
             'powoId' => 'nullable|string|max:255',
             'iucnCategory' => 'nullable|string|max:255',
-            'locationName' => 'nullable|string|max:255',
             'region' => 'nullable|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -150,13 +297,13 @@ class PlantIdentifierController extends Controller
                     'scientificName' => $request->input('scientificName'),
                     'scientificNameWithoutAuthor' => $request->input('scientificNameWithoutAuthor'),
                     'commonName' => $request->input('commonName'),
+                    'malayName' => $request->input('malayName'),
                     'family' => $request->input('family'),
                     'genus' => $request->input('genus'),
                     'confidence' => $request->input('confidence'),
                     'gbifId' => $request->input('gbifId'),
                     'powoId' => $request->input('powoId'),
                     'iucnCategory' => $request->input('iucnCategory'),
-                    'locationName' => $request->input('locationName'),
                     'region' => $request->input('region'),
                     'latitude' => $request->input('latitude'),
                     'longitude' => $request->input('longitude'),
@@ -184,6 +331,12 @@ class PlantIdentifierController extends Controller
             'scientificName' => 'required|string|max:255',
             'commonName' => 'nullable|string|max:255',
             'family' => 'nullable|string|max:255',
+            'genus' => 'nullable|string|max:255',
+            'gbifId' => 'nullable|string|max:255',
+            'powoId' => 'nullable|string|max:255',
+            'iucnCategory' => 'nullable|string|max:255',
+            'imageUrl' => 'nullable|string|max:1000',
+            'referenceImages' => 'nullable|array',
             'provider' => 'nullable|string|in:gemini,trefle',
             'forceRefresh' => 'nullable|boolean',
         ]);
@@ -192,14 +345,26 @@ class PlantIdentifierController extends Controller
             $scientificName = $request->input('scientificName');
             $commonName = $request->input('commonName');
             $family = $request->input('family');
+            $genus = $request->input('genus');
+            $gbifId = $request->input('gbifId');
+            $powoId = $request->input('powoId');
+            $iucnCategory = $request->input('iucnCategory');
+            $imageUrl = $request->input('imageUrl');
+            $referenceImages = $request->input('referenceImages');
             $provider = $request->input('provider', 'gemini'); // Default to gemini
             $forceRefresh = $request->boolean('forceRefresh', false);
 
-            // Use CareDetailsService to get care details with provider preference
-            $result = $this->careDetailsService->getCareDetails(
+            // Use PlantCacheService to get care details and ensure plant is in library
+            $result = $this->plantCacheService->getCareDetails(
                 $scientificName,
                 $commonName,
                 $family,
+                $genus,
+                $gbifId,
+                $powoId,
+                $iucnCategory,
+                $imageUrl,
+                $referenceImages,
                 $provider,
                 $forceRefresh
             );
@@ -330,6 +495,7 @@ class PlantIdentifierController extends Controller
             'scientific_name' => $plantData['scientificName'] ?? null,
             'scientific_name_without_author' => $plantData['scientificNameWithoutAuthor'] ?? null,
             'common_name' => $plantData['commonName'] ?? null,
+            'malay_name' => $plantData['malayName'] ?? null,
             'family' => $plantData['family'] ?? null,
             'genus' => $plantData['genus'] ?? null,
             'confidence' => $plantData['confidence'] ?? null,
@@ -338,12 +504,10 @@ class PlantIdentifierController extends Controller
             'iucn_category' => $plantData['iucnCategory'] ?? null,
 
             // Location data
-            'location_name' => $plantData['locationName'] ?? null,
             'region' => $plantData['region'] ?? null,
             'latitude' => $plantData['latitude'] ?? null,
             'longitude' => $plantData['longitude'] ?? null,
 
-            'uploaded_at' => now()->toDateTimeString(),
             'user_id' => $plantData['user_id'],
         ];
 

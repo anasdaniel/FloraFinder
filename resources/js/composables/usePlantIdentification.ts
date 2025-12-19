@@ -196,9 +196,21 @@ export function usePlantIdentification({
           activeImageIndex.value = 0;
           const topResult = matches[0];
 
-          // Fetch threat status first, passing the index for easier updates
+          // Fetch threat status first, then care details (both fire async, care waits slightly)
           fetchThreatStatus(topResult.species.scientificName, 0);
-          fetchCareDetails(topResult.species.scientificName);
+          // Small delay to avoid simultaneous Gemini API calls (rate limiting)
+          setTimeout(() => {
+            fetchCareDetails(topResult.species.scientificName, false, {
+              commonName: topResult.species.commonNames?.[0],
+              family: topResult.species.family?.scientificNameWithoutAuthor,
+              genus: topResult.species.genus?.scientificNameWithoutAuthor,
+              gbifId: topResult.gbif?.id,
+              powoId: topResult.powo?.id,
+              iucnCategory: topResult.iucn?.category,
+              imageUrl: topResult.images?.[0]?.url?.m || topResult.images?.[0]?.url?.o,
+              referenceImages: topResult.images?.map(img => img.url?.m || img.url?.o).filter(Boolean),
+            });
+          }, 500);
 
           toast({
             title: 'Identification Complete',
@@ -225,17 +237,30 @@ export function usePlantIdentification({
     }
   };
 
-  const fetchCareDetails = async (scientificName: string, forceRefresh = false) => {
+  const fetchCareDetails = async (
+    scientificName: string,
+    forceRefresh = false,
+    additionalData: any = {},
+  ) => {
     fetchingCareDetails.value = true;
     careSource.value = null;
     try {
-      const url = new URL(route('plant-identifier.care-details'));
-      url.searchParams.append('scientificName', scientificName);
-      url.searchParams.append('provider', preferredProvider.value);
-      if (forceRefresh) {
-        url.searchParams.append('forceRefresh', '1');
-      }
-      const res = await fetch(url.toString());
+      const payload = {
+        scientificName,
+        provider: preferredProvider.value,
+        ...additionalData,
+        forceRefresh: forceRefresh ? 1 : 0,
+      };
+
+      const res = await fetch(route('plant-identifier.care-details'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+        },
+        body: JSON.stringify(payload),
+      });
+
       const data = await res.json();
       if (data.success) {
         careDetails.value = data.data;
@@ -332,7 +357,17 @@ export function usePlantIdentification({
       // Re-fetch care details with new provider if we have a selected result
       // Use cached data if available (false = don't force refresh)
       if (selectedResult.value?.species?.scientificName) {
-        fetchCareDetails(selectedResult.value.species.scientificName, false);
+        const result = selectedResult.value;
+        fetchCareDetails(result.species.scientificName, false, {
+          commonName: result.species.commonNames?.[0],
+          family: result.species.family?.scientificNameWithoutAuthor,
+          genus: result.species.genus?.scientificNameWithoutAuthor,
+          gbifId: result.gbif?.id,
+          powoId: result.powo?.id,
+          iucnCategory: result.iucn?.category,
+          imageUrl: result.images?.[0]?.url?.m || result.images?.[0]?.url?.o,
+          referenceImages: result.images?.map(img => img.url?.m || img.url?.o).filter(Boolean),
+        });
       }
     }
   };
@@ -369,15 +404,50 @@ export function usePlantIdentification({
     // The backend constructs the system prompt for the Gemini model
     // Message history sent to backend will be serialized directly
     try {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      // Get CSRF token from meta tag (preferred) or XSRF cookie (fallback)
+      let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+      if (!csrfToken) {
+        // Fallback: get XSRF-TOKEN from cookies (Laravel sets this)
+        const xsrfCookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('XSRF-TOKEN='));
+        if (xsrfCookie) {
+          csrfToken = decodeURIComponent(xsrfCookie.split('=')[1]);
+        }
+      }
+
+      if (!csrfToken) {
+        console.error('No CSRF token found in meta tag or cookies');
+        return "Session expired. Please refresh the page and try again.";
+      }
+
       const response = await fetch(route('plant-identifier.chat'), {
         method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken || '' },
+        credentials: 'include', // Include cookies for session
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+          'X-XSRF-TOKEN': csrfToken, // Laravel accepts both
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ plantName, message, history }),
       });
+
+      // Check if response is OK (status 200-299)
+      if (!response.ok) {
+        console.error('Chat API returned error status:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
+
+        if (response.status === 419) {
+          return "Session expired. Please refresh the page and try again.";
+        }
+        return "I'm having trouble checking my botanical reference books right now.";
+      }
+
       const data = await response.json();
-      return data.reply ?? "I'm having trouble checking my botanical reference books right now.";
+      return data.reply ?? "I couldn't get a response. Please try again.";
     } catch (error) {
       console.error('Chat API Error:', error);
       return "I'm having trouble checking my botanical reference books right now.";
@@ -390,11 +460,14 @@ export function usePlantIdentification({
     const plantName =
       selectedResult.value.species.commonNames?.[0] || selectedResult.value.species.scientificName;
 
+    // Add user message to UI immediately
     chatMessages.value.push({ text: userText, role: 'user' });
     chatInput.value = '';
     isChatLoading.value = true;
 
-    const responseText = await callGeminiChat(plantName, chatMessages.value, userText);
+    // Send history WITHOUT the just-added user message (API will add it)
+    const historyWithoutLast = chatMessages.value.slice(0, -1);
+    const responseText = await callGeminiChat(plantName, historyWithoutLast, userText);
 
     chatMessages.value.push({ text: responseText, role: 'model' });
     isChatLoading.value = false;
@@ -406,7 +479,16 @@ export function usePlantIdentification({
     chatMessages.value = [];
     const match = results.value?.data?.results[index];
     if (match) {
-      fetchCareDetails(match.species.scientificName);
+      fetchCareDetails(match.species.scientificName, false, {
+        commonName: match.species.commonNames?.[0],
+        family: match.species.family?.scientificNameWithoutAuthor,
+        genus: match.species.genus?.scientificNameWithoutAuthor,
+        gbifId: match.gbif?.id,
+        powoId: match.powo?.id,
+        iucnCategory: match.iucn?.category,
+        imageUrl: match.images?.[0]?.url?.m || match.images?.[0]?.url?.o,
+        referenceImages: match.images?.map(img => img.url?.m || img.url?.o).filter(Boolean),
+      });
     }
   };
 

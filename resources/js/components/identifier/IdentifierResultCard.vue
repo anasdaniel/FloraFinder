@@ -295,6 +295,14 @@ const isDisplayingScientificName = computed(() => {
         >
           {{ displayName }}
         </h1>
+        <div v-if="props.careDetails?.malay_name" class="flex items-center gap-2 mb-2">
+          <span class="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-white/20 backdrop-blur-md rounded text-white/90 border border-white/10">
+            Nama Tempatan
+          </span>
+          <span class="text-xl font-semibold text-yellow-300 drop-shadow-md">
+            {{ props.careDetails.malay_name }}
+          </span>
+        </div>
         <p
           v-if="!isDisplayingScientificName"
           class="font-serif text-lg italic text-green-100 opacity-90 md:text-xl"

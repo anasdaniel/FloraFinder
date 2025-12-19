@@ -21,15 +21,19 @@ import {
     TreeDeciduous,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import SearchableSelect from '@/components/SearchableSelect.vue';
 
 interface Plant {
     id: number;
     scientific_name: string;
     common_name: string | null;
+    malay_name: string | null;
     family: string | null;
     genus: string | null;
     habitat: string | null;
     lifespan: string | null;
+    is_endemic: boolean;
+    is_native: boolean;
     description: string | null;
     light: number | null;
     atmospheric_humidity: number | null;
@@ -274,7 +278,7 @@ const goToPage = (url: string | null) => {
                     <div class="p-2 bg-white/80 backdrop-blur-xl border border-gray-200/60 shadow-lg shadow-gray-200/20 rounded-2xl">
                         <div class="grid grid-cols-1 gap-2 lg:grid-cols-12">
                             <!-- Search -->
-                            <div class="lg:col-span-5 relative group">
+                            <div class="lg:col-span-8 relative group">
                                 <Search class="absolute left-3.5 top-3 h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors" />
                                 <input
                                     v-model="searchQuery"
@@ -282,21 +286,6 @@ const goToPage = (url: string | null) => {
                                     placeholder="Search by name, scientific name, or family..."
                                     class="w-full h-11 pl-11 pr-4 bg-gray-50/50 hover:bg-gray-100/50 focus:bg-white border-transparent focus:border-gray-200 rounded-xl text-sm transition-all focus:ring-2 focus:ring-gray-900/5"
                                 />
-                            </div>
-
-                            <!-- Family Select -->
-                            <div class="lg:col-span-3 relative">
-                                <Leaf class="absolute left-3.5 top-3 h-5 w-5 text-gray-400 pointer-events-none" />
-                                <select
-                                    v-model="selectedFamily"
-                                    class="w-full h-11 pl-11 pr-8 bg-gray-50/50 hover:bg-gray-100/50 focus:bg-white border-transparent focus:border-gray-200 rounded-xl text-sm appearance-none transition-all focus:ring-2 focus:ring-gray-900/5 cursor-pointer"
-                                >
-                                    <option value="">All Families</option>
-                                    <option v-for="family in families" :key="family" :value="family">
-                                        {{ family }}
-                                    </option>
-                                </select>
-                                <ChevronDown class="absolute right-3.5 top-3.5 h-4 w-4 text-gray-400 pointer-events-none" />
                             </div>
 
                             <!-- Endangered Filter -->
@@ -401,6 +390,9 @@ const goToPage = (url: string | null) => {
                                     <h3 class="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors line-clamp-1">
                                         {{ plant.common_name || plant.scientific_name }}
                                     </h3>
+                                    <p v-if="plant.malay_name" class="text-sm font-medium text-emerald-600 mt-0.5 line-clamp-1">
+                                        {{ plant.malay_name }}
+                                    </p>
                                     <p class="text-sm font-medium italic text-gray-500 font-serif mt-0.5 line-clamp-1">
                                         {{ plant.scientific_name }}
                                     </p>

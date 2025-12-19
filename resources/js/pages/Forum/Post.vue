@@ -70,81 +70,81 @@ function deleteThread() {
 <template>
     <Head :title="thread.title" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="w-full max-w-3xl px-4 py-8 mx-auto">
-            <Button as-child variant="ghost" size="sm" class="gap-2 mb-4 pl-0 hover:bg-transparent hover:underline">
+        <div class="w-full max-w-2xl px-4 py-6 mx-auto">
+            <Button as-child variant="ghost" size="sm" class="gap-2 mb-3 pl-0 hover:bg-transparent hover:underline">
                 <Link href="/forum">
-                    <Icon name="arrow-left" class="w-4 h-4" /> Back to Forum
+                    <Icon name="arrow-left" class="w-3.5 h-3.5" /> Back to Forum
                 </Link>
             </Button>
 
-            <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
                 <!-- Header: Author & Meta -->
-                <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center justify-between mb-5">
                     <div class="flex items-center gap-3">
-                        <Avatar class="h-12 w-12 border border-gray-100">
+                        <Avatar class="h-10 w-10 border border-gray-100">
                             <AvatarImage :src="thread.user?.avatar" />
-                            <AvatarFallback class="bg-primary/5 text-primary text-sm font-bold">
+                            <AvatarFallback class="bg-primary/5 text-primary text-xs font-bold">
                                 {{ (thread.user?.name || thread.title).substring(0, 2).toUpperCase() }}
                             </AvatarFallback>
                         </Avatar>
                         <div>
-                            <div class="font-bold text-gray-900 text-base">{{ thread.user?.name || 'Unknown' }}</div>
-                            <div class="text-xs text-gray-500 mt-0.5">{{ new Date(thread.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</div>
+                            <div class="font-bold text-gray-900 text-sm">{{ thread.user?.name || 'Unknown' }}</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5">{{ new Date(thread.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</div>
                         </div>
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <span class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium capitalize">
+                        <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-medium capitalize">
                             {{ thread.category }}
                         </span>
                          <button
                             v-if="isOwner(thread)"
                             @click="deleteThread"
-                            class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                            class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
                             title="Delete Thread"
                         >
-                            <Trash2 class="w-4 h-4" />
+                            <Trash2 class="w-3.5 h-3.5" />
                         </button>
                     </div>
                 </div>
 
                 <!-- Content -->
-                <div class="mb-6">
-                    <h1 class="font-bold text-gray-900 text-2xl mb-4 leading-tight">{{ thread.title }}</h1>
-                    <p v-if="thread.content" class="text-gray-700 text-base leading-relaxed whitespace-pre-wrap">
+                <div class="mb-5">
+                    <h1 class="font-bold text-gray-900 text-xl mb-3 leading-tight">{{ thread.title }}</h1>
+                    <p v-if="thread.content" class="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
                         {{ thread.content }}
                     </p>
                 </div>
 
                 <!-- Image -->
-                 <div v-if="thread.image" class="mb-8 rounded-xl overflow-hidden border border-gray-100">
+                 <div v-if="thread.image" class="mb-6 rounded-xl overflow-hidden border border-gray-100">
                     <img
                         :src="`/storage/${thread.image}`"
-                        class="w-full h-auto max-h-[600px] object-cover"
+                        class="w-full h-auto max-h-[500px] object-cover"
                     />
                 </div>
 
                 <!-- Footer Stats -->
-                <div class="flex items-center gap-2 pb-6 border-b border-gray-100 mb-6">
-                    <MessageCircle class="w-5 h-5 text-gray-400" />
-                    <span class="font-medium text-gray-600">{{ thread.posts?.length || 0 }} Comments</span>
+                <div class="flex items-center gap-2 pb-5 border-b border-gray-100 mb-5">
+                    <MessageCircle class="w-4 h-4 text-gray-400" />
+                    <span class="font-medium text-xs text-gray-600">{{ thread.posts?.length || 0 }} Comments</span>
                 </div>
 
 
                 <!-- Comments Section -->
-                <div class="space-y-8">
+                <div class="space-y-6">
                      <!-- Input -->
-                    <div class="flex gap-4">
-                        <Avatar class="h-10 w-10 hidden sm:block">
+                    <div class="flex gap-3">
+                        <Avatar class="h-8 w-8 hidden sm:block">
                             <AvatarImage :src="$page.props.auth.user.avatar" />
-                            <AvatarFallback>{{ $page.props.auth.user.name.substring(0,2).toUpperCase() }}</AvatarFallback>
+                            <AvatarFallback class="text-[10px]">{{ $page.props.auth.user.name.substring(0,2).toUpperCase() }}</AvatarFallback>
                         </Avatar>
                         <div class="flex-1 relative">
                             <input
                                 v-model="commentContent"
                                 type="text"
                                 placeholder="Write a comment..."
-                                class="w-full border border-gray-200 rounded-full py-3 pl-5 pr-12 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 shadow-sm transition-all"
+                                class="w-full border border-gray-200 rounded-full py-2.5 pl-4 pr-10 text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 shadow-sm transition-all"
                                 @keydown.enter="submitComment"
                             />
                             <button
@@ -158,38 +158,38 @@ function deleteThread() {
                     </div>
 
                     <!-- Comments List -->
-                    <div class="space-y-6">
+                    <div class="space-y-5">
                         <div
                             v-for="post in thread.posts"
                             :key="post.id"
                             class="group"
                         >
-                            <div class="flex gap-4">
-                                <Avatar class="h-10 w-10 mt-1 border border-gray-200">
+                            <div class="flex gap-3">
+                                <Avatar class="h-8 w-8 mt-1 border border-gray-200">
                                     <AvatarImage :src="post.user?.avatar" />
-                                    <AvatarFallback class="text-xs bg-white text-gray-700">
+                                    <AvatarFallback class="text-[10px] bg-white text-gray-700">
                                         {{ (post.user?.name || '?').substring(0, 2).toUpperCase() }}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div class="flex-1">
-                                    <div class="bg-gray-50/80 border border-gray-100 rounded-2xl px-5 py-4 inline-block min-w-[200px]">
-                                         <div class="flex justify-between items-start mb-1">
-                                            <span class="font-bold text-sm text-gray-900">{{ post.user?.name || 'Unknown' }}</span>
-                                            <span class="text-xs text-gray-400 ml-4">{{ new Date(post.created_at).toLocaleDateString() }}</span>
+                                    <div class="bg-gray-50/80 border border-gray-100 rounded-2xl px-4 py-3 inline-block min-w-[180px]">
+                                         <div class="flex justify-between items-start mb-0.5">
+                                            <span class="font-bold text-xs text-gray-900">{{ post.user?.name || 'Unknown' }}</span>
+                                            <span class="text-[10px] text-gray-400 ml-4">{{ new Date(post.created_at).toLocaleDateString() }}</span>
                                          </div>
-                                        <p class="text-sm text-gray-800 leading-relaxed">{{ post.content }}</p>
+                                        <p class="text-xs text-gray-800 leading-relaxed">{{ post.content }}</p>
                                     </div>
 
-                                    <div class="flex items-center gap-4 mt-1.5 ml-2">
+                                    <div class="flex items-center gap-3 mt-1 ml-2">
                                         <button
-                                            class="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+                                            class="text-[10px] font-semibold text-gray-500 hover:text-gray-900 transition-colors"
                                             @click="toggleReplyBox(post.id)"
                                         >
                                             Reply
                                         </button>
                                          <button
                                             v-if="post.user_id === $page.props.auth.user.id"
-                                            class="text-xs font-semibold text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                            class="text-[10px] font-semibold text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
                                             @click="deleteComment(post.id)"
                                         >
                                             Delete
@@ -197,42 +197,42 @@ function deleteThread() {
                                     </div>
 
                                     <!-- Reply Input -->
-                                     <div v-if="openReplyBox === post.id" class="mt-3 flex gap-2 items-center max-w-lg">
-                                        <div class="h-8 w-0.5 bg-gray-200 ml-2"></div>
+                                     <div v-if="openReplyBox === post.id" class="mt-2 flex gap-2 items-center max-w-md">
+                                        <div class="h-6 w-0.5 bg-gray-200 ml-2"></div>
                                         <input
                                             v-model="replyContent"
                                             type="text"
                                             placeholder="Write a reply..."
-                                            class="flex-1 border border-gray-200 rounded-full py-2 px-4 text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                                            class="flex-1 border border-gray-200 rounded-full py-1.5 px-3 text-[10px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
                                             @keydown.enter="submitReply(post.id)"
                                         />
                                     </div>
 
                                     <!-- Replies -->
-                                    <div v-if="post.replies && post.replies.length" class="mt-4 space-y-4 pl-4 border-l-2 border-gray-100 ml-4">
+                                    <div v-if="post.replies && post.replies.length" class="mt-3 space-y-3 pl-3 border-l-2 border-gray-100 ml-3">
                                         <div
                                             v-for="reply in post.replies"
                                             :key="reply.id"
-                                            class="flex gap-3 group/reply"
+                                            class="flex gap-2 group/reply"
                                         >
-                                             <Avatar class="h-8 w-8 mt-1 border border-gray-200">
+                                             <Avatar class="h-7 w-7 mt-1 border border-gray-200">
                                                 <AvatarImage :src="reply.user?.avatar" />
-                                                <AvatarFallback class="text-xs bg-white text-gray-700">
+                                                <AvatarFallback class="text-[10px] bg-white text-gray-700">
                                                     {{ (reply.user?.name || '?').substring(0, 2).toUpperCase() }}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div>
-                                                <div class="bg-gray-50/80 border border-gray-100 rounded-2xl px-4 py-3">
-                                                    <div class="flex items-center justify-between gap-4 mb-1">
-                                                        <span class="font-bold text-xs text-gray-900">{{ reply.user?.name }}</span>
-                                                        <span class="text-[10px] text-gray-400">{{ new Date(reply.created_at).toLocaleDateString() }}</span>
+                                                <div class="bg-gray-50/80 border border-gray-100 rounded-2xl px-3 py-2">
+                                                    <div class="flex items-center justify-between gap-3 mb-0.5">
+                                                        <span class="font-bold text-[10px] text-gray-900">{{ reply.user?.name }}</span>
+                                                        <span class="text-[9px] text-gray-400">{{ new Date(reply.created_at).toLocaleDateString() }}</span>
                                                     </div>
-                                                    <p class="text-xs text-gray-800">{{ reply.content }}</p>
+                                                    <p class="text-[10px] text-gray-800">{{ reply.content }}</p>
                                                 </div>
-                                                 <div class="flex items-center gap-4 mt-1 ml-2">
+                                                 <div class="flex items-center gap-3 mt-0.5 ml-2">
                                                      <button
                                                         v-if="reply.user_id === $page.props.auth.user.id"
-                                                        class="text-[10px] font-semibold text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover/reply:opacity-100"
+                                                        class="text-[9px] font-semibold text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover/reply:opacity-100"
                                                         @click="deleteComment(reply.id)"
                                                     >
                                                         Delete

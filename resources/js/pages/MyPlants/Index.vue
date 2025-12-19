@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
+import SearchableSelect from "@/components/SearchableSelect.vue";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -242,28 +243,17 @@ const getConfidenceColor = (confidence: number) => {
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center flex-1">
               <!-- Search -->
-              <div class="relative flex-1 max-w-md">
+              <div class="relative flex-1 max-w-2xl">
                 <Search
                   class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                 />
                 <input
                   v-model="searchQuery"
                   type="text"
-                  placeholder="Search by name..."
+                  placeholder="Search by name, family, or genus..."
                   class="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                 />
               </div>
-
-              <!-- Family Filter -->
-              <select
-                v-model="selectedFamily"
-                class="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">All Families</option>
-                <option v-for="family in families" :key="family" :value="family">
-                  {{ family }}
-                </option>
-              </select>
 
               <!-- Clear Filters -->
               <button

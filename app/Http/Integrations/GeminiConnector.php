@@ -6,16 +6,24 @@ use Saloon\Http\Connector;
 
 class GeminiConnector extends Connector
 {
-              public function resolveBaseUrl(): string
-              {
-                            return 'https://generativelanguage.googleapis.com/v1beta';
-              }
+    public function resolveBaseUrl(): string
+    {
+        return 'https://generativelanguage.googleapis.com/v1beta';
+    }
 
-              protected function defaultHeaders(): array
-              {
-                            return [
-                                          'Accept' => 'application/json',
-                                          'Content-Type' => 'application/json',
-                            ];
-              }
+    protected function defaultHeaders(): array
+    {
+        return [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ];
+    }
+
+    protected function defaultConfig(): array
+    {
+        return [
+            'timeout' => 15, // 15 second timeout - fail fast
+            'connect_timeout' => 5, // 5 second connection timeout
+        ];
+    }
 }

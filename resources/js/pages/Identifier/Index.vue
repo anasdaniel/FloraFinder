@@ -29,6 +29,7 @@ const identification = usePlantIdentification({
 const saveModal = usePlantSaveModal({
   toast,
   selectedResult: identification.selectedResult,
+  careDetails: identification.careDetails,
   uploadedImages: uploads.uploadedImages,
   form: uploads.form,
   MALAYSIAN_REGIONS: uploads.MALAYSIAN_REGIONS,
@@ -447,7 +448,7 @@ const isThreatenedSpecies = computed(() => {
                   class="font-semibold text-sm mb-1"
                   :class="iucnWarning.shouldDisableSighting ? 'text-red-900 dark:text-red-200' : 'text-amber-900 dark:text-amber-200'"
                 >
-                  Conservation Alert
+                  Seasonal Alert
                 </h4>
                 <p
                   class="text-sm leading-relaxed"

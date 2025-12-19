@@ -38,8 +38,8 @@ class GeminiRequest extends Request implements HasBody
     protected function defaultBody(): array
     {
         $config = [
-            'temperature' => 0.4,
-            'maxOutputTokens' => 1024,
+            'temperature' => 0.2, // Lower = faster, more focused responses
+            'maxOutputTokens' => 2048,
         ];
 
         if ($this->responseMimeType) {

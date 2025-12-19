@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { ChevronDown, ChevronLeft, ChevronRight, Filter, Grid3X3, List, MapPin, Search, SearchX, X, Leaf, AlertCircle } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 // Reactive state
 const searchQuery = ref('');
@@ -45,8 +45,35 @@ interface plantsResult {
 
 //define props
 const props = defineProps<{
-    plants?: plantsResult[];
+    plants?: {
+        data: plantsResult[];
+        links: any[];
+        meta: {
+            current_page: number;
+            last_page: number;
+            total: number;
+            per_page: number;
+        };
+    };
+    filters?: {
+        search?: string;
+        family?: string;
+        conservation?: string;
+        region?: string;
+    };
 }>();
+
+// Initialize state from props
+if (props.filters) {
+    searchQuery.value = props.filters.search || '';
+    selectedFamily.value = props.filters.family || '';
+    selectedConservation.value = props.filters.conservation || '';
+    selectedRegion.value = props.filters.region || '';
+}
+
+if (props.plants?.meta) {
+    currentPage.value = props.plants.meta.current_page;
+}
 
 // Filter options
 const plantFamilies = ref([
@@ -105,73 +132,13 @@ const hasActiveFilters = computed(() => {
 });
 
 const filteredPlants = computed(() => {
-    let plants = [...(props.plants || [])];
-
-    // Set default conservation status to "DD" if null or undefined
-    plants = plants.map((plant) => ({
-        ...plant,
-        iucn_category: plant.iucn_category || 'DD',
-    }));
-
-    // Apply search filter
-    if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase();
-        plants = plants.filter(
-            (plant) => plant.common_name?.toLowerCase().includes(query) || false || plant.scientific_name.toLowerCase().includes(query),
-        );
-    }
-
-    // Apply family filter
-    if (selectedFamily.value) {
-        plants = plants.filter((plant) => plant.family === selectedFamily.value);
-    }
-
-    // Apply conservation status filter
-    if (selectedConservation.value) {
-        plants = plants.filter((plant) => plant.iucn_category === selectedConservation.value);
-    }
-
-    // Apply region filter
-    if (selectedRegion.value) {
-        plants = plants.filter((plant) => plant.region === selectedRegion.value);
-    }
-
-    // Apply sorting
-    plants.sort((a, b) => {
-        switch (sortBy.value) {
-            case 'name':
-                const aName = a.common_name || a.scientific_name;
-                const bName = b.common_name || b.scientific_name;
-                return aName.localeCompare(bName);
-            case 'family':
-                return a.family.localeCompare(b.family);
-            case 'conservation':
-                const statusOrder = {
-                    NE: 0,
-                    DD: 0.5,
-                    LC: 1,
-                    NT: 2,
-                    VU: 3,
-                    EN: 4,
-                    CR: 5,
-                    EW: 6,
-                    EX: 7,
-                };
-                return (statusOrder[a.iucn_category] || 0) - (statusOrder[b.iucn_category] || 0);
-            default:
-                return 0;
-        }
-    });
-
-    return plants;
+    return props.plants?.data || [];
 });
 
-const totalPages = computed(() => Math.ceil(filteredPlants.value.length / itemsPerPage.value));
+const totalPages = computed(() => props.plants?.meta?.last_page || 1);
 
 const paginatedPlants = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage.value;
-    const end = start + itemsPerPage.value;
-    return filteredPlants.value.slice(start, end);
+    return props.plants?.data || [];
 });
 
 const visiblePages = computed(() => {
@@ -210,13 +177,53 @@ const visiblePages = computed(() => {
     return pages;
 });
 
+// Watchers for server-side filtering
+const updateResults = () => {
+    router.get(
+        route('plant-search'),
+        {
+            search: searchQuery.value,
+            family: selectedFamily.value,
+            conservation: selectedConservation.value,
+            region: selectedRegion.value,
+            page: currentPage.value,
+        },
+        {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        },
+    );
+};
+
+watch([selectedFamily, selectedConservation, selectedRegion], () => {
+    currentPage.value = 1;
+    updateResults();
+});
+
+// Debounced search
+let searchTimeout;
+watch(searchQuery, () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        currentPage.value = 1;
+        updateResults();
+    }, 300);
+});
+
+watch(currentPage, (newPage, oldPage) => {
+    if (newPage !== oldPage) {
+        updateResults();
+    }
+});
+
 // Methods
 const handleSearch = () => {
-    currentPage.value = 1;
+    // Handled by watchers
 };
 
 const handleSort = () => {
-    currentPage.value = 1;
+    // Client-side sorting for the current page
 };
 
 const clearFilters = () => {
@@ -228,6 +235,7 @@ const clearFilters = () => {
     selectedGrowthForm.value = '';
     selectedFlowering.value = '';
     currentPage.value = 1;
+    updateResults();
 };
 
 // Dummy plant details
@@ -421,9 +429,8 @@ const getConservationStatusLabel = (status) => {
                 <div class="flex items-center justify-between mb-6">
                     <div class="text-gray-600">
                         Found
-                        <span class="font-semibold text-gray-900">{{ filteredPlants.length }}</span>
+                        <span class="font-semibold text-gray-900">{{ props.plants?.meta?.total || 0 }}</span>
                         plants
-                        <span v-if="hasActiveFilters" class="text-sm"> (filtered from {{ (props.plants || []).length }} total) </span>
                     </div>
 
                     <div class="flex items-center space-x-4">

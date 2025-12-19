@@ -1,277 +1,397 @@
 <script setup lang="ts">
 import Icon from "@/components/Icon.vue";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Head, Link } from "@inertiajs/vue3";
+import { reactive, ref } from "vue";
 
-const metrics = [
-  { label: "Species catalogued", value: "1,240+", accent: "from-teal-400 to-emerald-500" },
-  { label: "Community posts", value: "8.7k", accent: "from-violet-400 to-indigo-500" },
-  { label: "Sightings mapped", value: "3,210", accent: "from-amber-300 to-orange-400" },
-];
+const heroBackground =
+  "https://images.pexels.com/photos/957024/forest-trees-perspective-bright-957024.jpeg?auto=compress&cs=tinysrgb&w=1260";
+const heroCardImage =
+  "https://images.pexels.com/photos/244796/pexels-photo-244796.jpeg?auto=compress&cs=tinysrgb&w=1260";
+const featuresBackground =
+  "https://images.pexels.com/photos/38136/pexels-photo-38136.jpeg?auto=compress&cs=tinysrgb&w=1260";
+const ctaBackground =
+  "https://images.pexels.com/photos/1287075/pexels-photo-1287075.jpeg?auto=compress&cs=tinysrgb&w=1260";
 
-const quickActions = [
+const plantOfTheDay = {
+  name: "Bougainvillea glabra",
+  commonName: "Paperflower",
+  description:
+    "Bougainvillea glabra, commonly known as Paperflower, is a vibrant and hardy flowering plant widely cultivated in tropical regions. It is renowned for its colorful bracts that surround its small white flowers.",
+  conservationStatus: "Least Concern",
+  image:
+    "https://images.pexels.com/photos/13406833/pexels-photo-13406833.jpeg?w=400&h=300&fit=crop",
+};
+
+const features = [
   {
     icon: "camera",
-    title: "Identify a plant",
-    description: "Upload a photo and get instant AI results.",
-    href: "/plant-identifier",
-  },
-  {
-    icon: "map",
-    title: "View live map",
-    description: "See sightings glow across Malaysia in real-time.",
-    href: "/sightings-map",
+    title: "Instant Plant Identification",
+    description: "Identify any plant with a simple photo using our advanced AI technology.",
   },
   {
     icon: "book-open",
-    title: "Browse the library",
-    description: "Dive into curated species profiles and care.",
-    href: "/plants",
+    title: "Extensive Plant Database",
+    description: "Access information about thousands of plant species native to Malaysia.",
   },
   {
-    icon: "users",
-    title: "Visit the forum",
-    description: "Ask experts, share finds, and join discussions.",
-    href: "/forum",
+    icon: "map",
+    title: "Conservation Tracking",
+    description: "Learn about conservation status and contribute to preservation efforts.",
   },
 ];
 
-const highlights = [
+const popularPlants = [
   {
-    tag: "New",
-    title: "Fluid, glassy UI",
-    copy: "Translucent panels, soft gradients, and generous spacing keep focus on your plants.",
+    key: "rafflesia",
+    name: "Rafflesia",
+    scientificName: "Rafflesia arnoldii",
+    image: "https://images.pexels.com/photos/15695205/pexels-photo-15695205.jpeg?auto=compress&cs=tinysrgb&w=1260",
   },
   {
-    tag: "Realtime",
-    title: "Live insights",
-    copy: "See trending species, conservation signals, and fresh uploads at a glance.",
+    key: "torch-ginger",
+    name: "Torch Ginger",
+    scientificName: "Etlingera elatior",
+    image: "https://images.pexels.com/photos/4141814/pexels-photo-4141814.jpeg?auto=compress&cs=tinysrgb&w=1260",
   },
   {
-    tag: "Guided",
-    title: "Onboarding built-in",
-    copy: "Clear steps for identifying, mapping, and sharing — even before you sign in.",
+    key: "pitcher-plant",
+    name: "Highland Pitcher Plant",
+    scientificName: "Nepenthes rajah",
+    image: "https://images.pexels.com/photos/12875326/pexels-photo-12875326.jpeg?auto=compress&cs=tinysrgb&w=1260",
   },
 ];
+
+const heroCardLoaded = ref(false);
+const potdImageLoaded = ref(false);
+
+const imgFailed = reactive<Record<string, boolean>>({});
+function markImgFailed(key: string) {
+  imgFailed[key] = true;
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-950 text-slate-50">
-    <Head title="FloraFinder Dashboard Preview" />
+  <div class="min-h-screen bg-gray-50 text-gray-900 selection:bg-emerald-200 selection:text-slate-950 dark:bg-gray-950 dark:text-white">
+    <Head title="Dashboard Preview" />
 
-    <div class="absolute inset-0 overflow-hidden">
-      <div
-        class="pointer-events-none absolute left-1/2 top-[-10%] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-emerald-500/20 blur-[160px]"
-      />
-      <div
-        class="pointer-events-none absolute right-[-5%] top-[20%] h-[380px] w-[380px] rounded-full bg-indigo-500/20 blur-[150px]"
-      />
-    </div>
-
-    <div class="relative mx-auto flex max-w-6xl flex-col gap-10 px-6 pb-16 pt-10 sm:px-10">
-      <!-- Header -->
-      <header class="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-5 py-4 backdrop-blur">
+    <!-- Top bar (kept minimal for guests, but aligned with dashboard tone) -->
+    <header class="sticky top-0 z-40 border-b border-black/5 bg-white/70 backdrop-blur dark:border-white/10 dark:bg-gray-950/60">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
         <div class="flex items-center gap-3">
-          <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-indigo-500 shadow-lg shadow-emerald-500/20">
-            <Icon name="leaf" class="h-5 w-5 text-white" />
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+            <Icon name="leaf" class="h-5 w-5" />
           </div>
           <div>
-            <p class="text-xs uppercase tracking-[0.2em] text-slate-300">Dashboard Preview</p>
-            <p class="text-lg font-semibold text-white">FloraFinder</p>
+            <p class="text-sm font-semibold tracking-tight text-gray-900 dark:text-white">FloraFinder</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Dashboard preview</p>
           </div>
         </div>
         <div class="flex items-center gap-3">
           <Link :href="route('login')">
-            <Button variant="ghost" class="text-slate-100 hover:bg-white/10">Sign in</Button>
+            <Button variant="ghost">Log in</Button>
           </Link>
           <Link :href="route('register')">
-            <Button class="rounded-full bg-gradient-to-r from-emerald-400 to-indigo-500 text-slate-950 shadow-lg shadow-emerald-500/30 hover:opacity-90">
+            <Button class="bg-gray-900 text-white hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100">
               Create account
             </Button>
           </Link>
         </div>
-      </header>
+      </div>
+    </header>
 
-      <!-- Hero -->
-      <section class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div class="flex flex-col gap-6">
-          <div class="inline-flex w-fit items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-emerald-100 shadow-sm shadow-emerald-500/30 ring-1 ring-white/15">
-            Live preview · No sign-in required
-          </div>
-          <div class="space-y-4">
-            <h1 class="text-4xl font-semibold leading-tight text-white sm:text-5xl">
-              A sleek dashboard built for plant lovers — before you even log in.
+    <main>
+      <!-- Hero (mirrors Dashboard/Index.vue structure) -->
+      <section aria-labelledby="hero-heading" class="relative overflow-hidden">
+        <div
+          class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20 dark:opacity-10"
+          :style="{ backgroundImage: `url('${heroBackground}')` }"
+        />
+        <div class="absolute inset-0 bg-gradient-to-br from-gray-50/95 to-white/95 dark:from-gray-950/95 dark:to-gray-900/95" />
+        <div class="relative z-10 mx-auto max-w-7xl px-6 py-20 sm:py-28 md:flex md:items-center md:justify-between md:gap-x-8 lg:px-8">
+          <div class="max-w-xl md:flex-1 md:py-10">
+            <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-600/15 bg-emerald-600/10 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <Icon name="sparkles" class="h-4 w-4" />
+              Preview mode · actions require an account
+            </div>
+            <h1 id="hero-heading" class="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
+              <span class="block">Discover &amp; Identify</span>
+              <span class="block text-gray-600 dark:text-gray-400">Malaysian Plants</span>
             </h1>
-            <p class="text-lg text-slate-200/80">
-              Explore the experience you get after sign-in: glassy cards, ambient gradients, instant actions, and a calming layout crafted for discovery.
+            <p class="mt-6 text-lg font-semibold leading-8 text-gray-600 dark:text-gray-300">
+              Explore the rich biodiversity of Malaysian flora using our advanced plant identification technology.
             </p>
-          </div>
-          <div class="flex flex-wrap items-center gap-3">
-            <Link :href="route('register')">
-              <Button class="rounded-full bg-white text-slate-900 shadow-lg shadow-white/30 hover:bg-slate-100">
-                Get started free
-              </Button>
-            </Link>
-            <Link :href="route('login')">
-              <Button variant="outline" class="rounded-full border-white/30 bg-white/10 text-white hover:bg-white/20">
-                Continue to sign in
-              </Button>
-            </Link>
-            <span class="text-sm text-slate-300">See the flow before committing.</span>
-          </div>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Card
-              v-for="metric in metrics"
-              :key="metric.label"
-              class="border-white/10 bg-white/5 text-white shadow-lg shadow-black/20 backdrop-blur"
-            >
-              <CardHeader class="pb-3">
-                <div
-                  class="inline-flex items-center rounded-full bg-gradient-to-r px-3 py-1 text-xs font-semibold text-slate-950 shadow-sm"
-                  :class="metric.accent"
+            <div class="mt-10 flex flex-col gap-4 sm:flex-row">
+              <Link :href="route('register')" class="group" aria-label="Create an account to identify plants">
+                <Button
+                  class="w-full rounded-xl bg-gradient-to-r from-gray-900 to-black text-white shadow-lg transition-all duration-200 hover:from-black hover:to-gray-900 dark:from-white dark:to-gray-100 dark:text-gray-900 dark:hover:from-gray-100 dark:hover:to-white"
                 >
-                  {{ metric.label }}
+                  <div class="flex items-center justify-center gap-2">
+                    <Icon name="camera" class="h-4 w-4" />
+                    <span>Identify Plants</span>
+                    <Icon name="lock" class="h-4 w-4 opacity-80" />
+                  </div>
+                </Button>
+              </Link>
+              <Link :href="route('register')" class="group" aria-label="Create an account to browse plants">
+                <Button
+                  variant="outline"
+                  class="w-full rounded-xl border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/50"
+                >
+                  <div class="flex items-center justify-center gap-2">
+                    <Icon name="search" class="h-4 w-4" />
+                    <span>Browse Plants</span>
+                    <Icon name="lock" class="h-4 w-4 opacity-60" />
+                  </div>
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <!-- Plant Image Card (same look as real dashboard) -->
+          <div class="mt-12 flex-1 md:mt-0">
+            <Card class="overflow-hidden rounded-3xl border-0 bg-white/80 shadow-xl ring-1 ring-gray-200 backdrop-blur-md dark:bg-gray-900/80 dark:ring-gray-800">
+              <CardHeader class="relative p-0">
+                <img
+                  v-if="!imgFailed.heroCard"
+                  :src="heroCardImage"
+                  alt="Malaysian plants"
+                  class="h-64 w-full object-cover object-center transition-opacity duration-500"
+                  loading="eager"
+                  decoding="async"
+                  fetchpriority="high"
+                  @load="heroCardLoaded = true"
+                  @error="markImgFailed('heroCard')"
+                  :class="heroCardLoaded ? 'opacity-100' : 'opacity-0'"
+                />
+                <div
+                  v-else
+                  class="flex h-64 w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900"
+                  role="img"
+                  aria-label="Photo unavailable"
+                >
+                  <div class="text-center">
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 text-emerald-700 shadow-sm ring-1 ring-black/5 dark:bg-white/10 dark:text-emerald-200 dark:ring-white/10">
+                      <Icon name="image" class="h-6 w-6" />
+                    </div>
+                    <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-white">Photo unavailable</p>
+                  </div>
                 </div>
+                <div
+                  v-if="!heroCardLoaded && !imgFailed.heroCard"
+                  class="absolute inset-0 animate-pulse bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900"
+                  aria-hidden="true"
+                />
               </CardHeader>
-              <CardContent class="pt-0">
-                <p class="text-3xl font-semibold">{{ metric.value }}</p>
-                <p class="text-sm text-slate-300/80">Updated live</p>
+              <CardContent class="p-4 text-center">
+                <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-500/10 dark:text-green-200">
+                  <Icon name="leaf" class="mr-1 h-3 w-3" />
+                  1000+ Plant Species
+                </span>
               </CardContent>
             </Card>
           </div>
         </div>
-
-        <div
-          class="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/15 via-white/5 to-slate-900/40 p-6 shadow-2xl shadow-emerald-500/20 backdrop-blur lg:p-8"
-        >
-          <div class="absolute inset-0">
-            <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(94,234,212,0.2),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(129,140,248,0.25),transparent_40%)]" />
-          </div>
-          <div class="relative flex flex-col gap-6">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs uppercase tracking-[0.2em] text-emerald-100">Preview</p>
-                <h2 class="text-2xl font-semibold">Ambient insight</h2>
-                <p class="text-sm text-slate-200/70">See what your dashboard looks like once you're in.</p>
-              </div>
-              <span class="rounded-full bg-white/10 px-3 py-1 text-xs text-white">Dark-ready</span>
-            </div>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div class="rounded-2xl bg-white/5 p-4 shadow-inner shadow-black/20 ring-1 ring-white/10">
-                <div class="flex items-center gap-3">
-                  <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-slate-950">
-                    <Icon name="camera" class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p class="text-sm font-semibold text-white">Instant ID</p>
-                    <p class="text-xs text-slate-300/80">AI-backed recognitions in seconds.</p>
-                  </div>
-                </div>
-                <div class="mt-4 h-28 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-300/10 ring-1 ring-white/10" />
-              </div>
-              <div class="rounded-2xl bg-white/5 p-4 shadow-inner shadow-black/20 ring-1 ring-white/10">
-                <div class="flex items-center gap-3">
-                  <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-slate-950">
-                    <Icon name="map" class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p class="text-sm font-semibold text-white">Living map</p>
-                    <p class="text-xs text-slate-300/80">Sightings glow where nature thrives.</p>
-                  </div>
-                </div>
-                <div class="mt-4 h-28 rounded-xl bg-gradient-to-br from-indigo-500/20 to-emerald-300/10 ring-1 ring-white/10" />
-              </div>
-            </div>
-            <div class="rounded-2xl bg-slate-950/70 p-4 ring-1 ring-white/10">
-              <p class="text-sm text-slate-200">
-                "We wanted a calm, cinematic dashboard that showcases flora before you even log in. This preview mirrors the signed-in experience so you know exactly what awaits."
-              </p>
-              <p class="mt-3 text-xs font-semibold text-emerald-100">The FloraFinder Team</p>
-            </div>
-          </div>
-        </div>
       </section>
 
-      <!-- Quick actions -->
-      <section class="space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.2em] text-emerald-100">Jump in</p>
-            <h3 class="text-xl font-semibold text-white">Do more, even before signing in</h3>
-            <p class="text-sm text-slate-300/80">Preview the core flows in one tap.</p>
+      <!-- Plant of the Day -->
+      <section aria-labelledby="potd-heading" class="bg-white px-4 py-16 dark:bg-gray-950 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-5xl">
+          <div class="mb-12 text-center">
+            <h2 id="potd-heading" class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">Plant of the Day</h2>
+            <p class="mt-3 text-gray-500 dark:text-gray-400">Explore a new Malaysian plant each day</p>
           </div>
-          <Link :href="route('register')">
-            <Button variant="outline" class="rounded-full border-white/20 bg-white/5 text-white hover:bg-white/15">
-              Create account
-            </Button>
-          </Link>
-        </div>
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card
-            v-for="action in quickActions"
-            :key="action.title"
-            class="group border-white/10 bg-white/5 text-white shadow-lg shadow-black/20 backdrop-blur transition hover:-translate-y-1 hover:border-white/20 hover:shadow-emerald-500/20"
-          >
-            <CardHeader class="flex flex-row items-start justify-between space-y-0 pb-3">
-              <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
-                <Icon :name="action.icon" class="h-5 w-5 text-emerald-100" />
+
+          <Card class="overflow-hidden rounded-3xl border-0 bg-white/90 shadow-xl ring-1 ring-gray-200 backdrop-blur-md dark:bg-gray-900/80 dark:ring-gray-800">
+            <div class="grid grid-cols-1 md:grid-cols-12">
+              <div class="relative md:col-span-5">
+                <img
+                  v-if="!imgFailed.potd"
+                  :src="plantOfTheDay.image"
+                  :alt="plantOfTheDay.commonName"
+                  class="h-64 w-full object-cover transition-opacity duration-500 md:h-full md:rounded-l-3xl"
+                  loading="lazy"
+                  decoding="async"
+                  sizes="(min-width: 768px) 40vw, 100vw"
+                  @load="potdImageLoaded = true"
+                  @error="markImgFailed('potd')"
+                  :class="potdImageLoaded ? 'opacity-100' : 'opacity-0'"
+                />
+                <div
+                  v-else
+                  class="flex h-64 w-full items-center justify-center bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 md:h-full md:rounded-l-3xl"
+                  role="img"
+                  aria-label="Photo unavailable"
+                >
+                  <div class="text-center">
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 text-emerald-700 shadow-sm ring-1 ring-black/5 dark:bg-white/10 dark:text-emerald-200 dark:ring-white/10">
+                      <Icon name="image" class="h-6 w-6" />
+                    </div>
+                    <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-white">Photo unavailable</p>
+                  </div>
+                </div>
+                <div
+                  v-if="!potdImageLoaded && !imgFailed.potd"
+                  class="absolute inset-0 animate-pulse bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 md:rounded-l-3xl"
+                  aria-hidden="true"
+                />
+                <div class="absolute right-4 top-4">
+                  <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 shadow-sm dark:bg-yellow-500/10 dark:text-yellow-200">
+                    <span class="sr-only">Conservation status:</span>
+                    {{ plantOfTheDay.conservationStatus }}
+                  </span>
+                </div>
               </div>
-              <Link :href="action.href" class="text-xs text-emerald-100 hover:text-emerald-200">Open</Link>
-            </CardHeader>
-            <CardContent class="space-y-2">
-              <CardTitle class="text-lg">{{ action.title }}</CardTitle>
-              <p class="text-sm text-slate-300/80">
-                {{ action.description }}
-              </p>
-            </CardContent>
+              <div class="flex flex-col justify-center p-6 md:col-span-7 md:p-8">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">{{ plantOfTheDay.commonName }}</h3>
+                <p class="mb-4 mt-1 text-sm italic text-gray-500 dark:text-gray-400">{{ plantOfTheDay.name }}</p>
+                <p class="text-base text-gray-600 dark:text-gray-300">{{ plantOfTheDay.description }}</p>
+                <div class="mt-6">
+                  <Link :href="route('register')">
+                    <Button variant="outline" class="rounded-full shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <div class="flex items-center gap-2">
+                        <Icon name="book-open" class="h-4 w-4" />
+                        <span>Learn more</span>
+                        <Icon name="lock" class="h-4 w-4 opacity-60" />
+                      </div>
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
           </Card>
         </div>
       </section>
 
-      <!-- Highlights -->
-      <section class="grid gap-4 lg:grid-cols-3">
-        <Card
-          v-for="highlight in highlights"
-          :key="highlight.title"
-          class="border-white/10 bg-gradient-to-br from-white/5 via-white/5 to-white/0 text-white backdrop-blur"
-        >
-          <CardHeader class="space-y-3">
-            <div class="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-              {{ highlight.tag }}
+      <!-- Features Section -->
+      <section aria-labelledby="features-heading" class="relative overflow-hidden px-4 py-16 sm:px-6 lg:px-8">
+        <div
+          class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20 dark:opacity-10"
+          :style="{ backgroundImage: `url('${featuresBackground}')` }"
+        />
+        <div class="absolute inset-0 bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-950/95 dark:to-gray-900/95" />
+        <div class="relative z-10 mx-auto max-w-5xl">
+          <div class="mb-12 text-center">
+            <h2 id="features-heading" class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">Key Features</h2>
+            <p class="mt-3 text-gray-500 dark:text-gray-400">Everything you need to explore Malaysian flora</p>
+          </div>
+
+          <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+            <div
+              v-for="feature in features"
+              :key="feature.title"
+              class="overflow-hidden rounded-2xl border-0 bg-white/80 p-6 shadow-lg ring-1 ring-gray-200 backdrop-blur-md transition-shadow hover:shadow-xl dark:bg-gray-900/60 dark:ring-gray-800"
+            >
+              <div class="flex flex-col items-center text-center">
+                <div class="mb-4 flex items-center justify-center rounded-full bg-gray-100 p-3 shadow-inner dark:bg-gray-800">
+                  <span class="text-2xl" v-if="feature.icon === 'camera'">📷</span>
+                  <span class="text-2xl" v-else-if="feature.icon === 'book-open'">📚</span>
+                  <span class="text-2xl" v-else-if="feature.icon === 'map'">🗺️</span>
+                  <span class="text-2xl" v-else>🌿</span>
+                </div>
+                <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">{{ feature.title }}</h3>
+                <p class="text-gray-500 dark:text-gray-400">{{ feature.description }}</p>
+              </div>
             </div>
-            <CardTitle class="text-xl">{{ highlight.title }}</CardTitle>
-            <p class="text-sm text-slate-300/80">{{ highlight.copy }}</p>
-          </CardHeader>
-        </Card>
+          </div>
+        </div>
       </section>
 
-      <!-- CTA -->
-      <section
-        class="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-indigo-500/20 p-8 text-center shadow-2xl shadow-emerald-500/20 backdrop-blur"
-      >
-        <div class="mx-auto max-w-3xl space-y-4">
-          <p class="text-xs uppercase tracking-[0.25em] text-white/80">Ready when you are</p>
-          <h4 class="text-2xl font-semibold text-white sm:text-3xl">Sign in to continue where this preview leaves off.</h4>
-          <p class="text-base text-white/80">
-            Your discoveries, maps, and conversations are a tap away. Create an account or sign back in to unlock the full experience.
-          </p>
-          <div class="flex flex-wrap justify-center gap-3">
-            <Link :href="route('login')">
-              <Button class="rounded-full bg-white text-slate-900 shadow-lg shadow-white/30 hover:bg-slate-100">
-                Sign in
-              </Button>
-            </Link>
-            <Link :href="route('register')">
-              <Button variant="outline" class="rounded-full border-white/50 bg-white/10 text-white hover:bg-white/20">
-                Create account
+      <!-- Popular Plants Section -->
+      <section aria-labelledby="popular-heading" class="bg-white px-4 py-16 dark:bg-gray-950 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-5xl">
+          <div class="mb-12 text-center">
+            <h2 id="popular-heading" class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">Popular Malaysian Plants</h2>
+            <p class="mt-3 text-gray-500 dark:text-gray-400">Discover some of Malaysia's most iconic flora</p>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+              v-for="plant in popularPlants"
+              :key="plant.key"
+              class="group relative overflow-hidden rounded-2xl border border-gray-200 shadow-lg transition-all hover:shadow-xl dark:border-gray-800"
+            >
+              <Link
+                :href="route('register')"
+                class="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                aria-label="Create an account to view this plant"
+              >
+                <span class="sr-only">Create an account to view {{ plant.name }}</span>
+              </Link>
+              <div class="relative h-48 overflow-hidden">
+                <img
+                  v-if="!imgFailed[plant.key]"
+                  :src="plant.image"
+                  :alt="plant.name"
+                  class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                  decoding="async"
+                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                  @error="markImgFailed(plant.key)"
+                />
+                <div v-else class="flex h-full w-full items-center justify-center bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+                  <div class="text-center">
+                    <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 text-emerald-700 shadow-sm ring-1 ring-black/5 dark:bg-white/10 dark:text-emerald-200 dark:ring-white/10">
+                      <Icon name="image" class="h-5 w-5" />
+                    </div>
+                    <p class="mt-2 text-xs font-semibold text-gray-900 dark:text-white">Photo unavailable</p>
+                  </div>
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+              </div>
+              <div class="bg-white p-4 dark:bg-gray-900">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 class="font-semibold text-gray-900 dark:text-white">{{ plant.name }}</h4>
+                    <p class="text-xs italic text-gray-500 dark:text-gray-400">{{ plant.scientificName }}</p>
+                  </div>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-gray-900 px-2 py-1 text-[11px] font-semibold text-white dark:bg-white dark:text-gray-900">
+                    <Icon name="lock" class="h-3.5 w-3.5" />
+                    Account
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-10 text-center">
+            <Link :href="route('register')" aria-label="Create an account to explore all plants">
+              <Button class="rounded-full shadow-sm">
+                <div class="flex items-center gap-2">
+                  <span>Explore All Plants</span>
+                  <Icon name="arrow-right" class="h-4 w-4" />
+                </div>
               </Button>
             </Link>
           </div>
         </div>
       </section>
-    </div>
+
+      <!-- CTA Section -->
+      <section aria-labelledby="cta-heading" class="relative overflow-hidden px-4 py-16 sm:px-6 lg:px-8">
+        <div class="absolute inset-0 bg-cover bg-center bg-no-repeat" :style="{ backgroundImage: `url('${ctaBackground}')` }" />
+        <div class="absolute inset-0 bg-gradient-to-r from-gray-900/95 to-black/95 dark:from-black/95 dark:to-gray-900/95" />
+        <div class="relative z-10 mx-auto max-w-5xl text-center">
+          <h2 id="cta-heading" class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Ready to discover Malaysian plants?</h2>
+          <p class="mt-3 text-lg text-white/80">Create an account to start identifying plants and saving your discoveries.</p>
+          <div class="mt-8">
+            <Link :href="route('register')" aria-label="Create an account to start identifying plants">
+              <Button class="rounded-full bg-white text-gray-900 shadow-lg hover:bg-gray-100">
+                <div class="flex items-center gap-2">
+                  <Icon name="camera" class="h-4 w-4" />
+                  <span>Start Identifying</span>
+                </div>
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 </template>
 
+<style scoped>
+/* Intentionally empty: page styling uses Tailwind to stay consistent with Dashboard/Index.vue. */
+</style>
 

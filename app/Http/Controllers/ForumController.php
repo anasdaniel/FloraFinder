@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\ForumThread;
 use App\Models\ForumTag;
 use App\Models\ForumPost;
+use App\Services\SeasonalAlertService;
 use Inertia\Inertia;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
@@ -13,9 +14,9 @@ class ForumController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index()
+    public function index(Request $request, SeasonalAlertService $alertService)
     {
-        $threads = ForumThread::with([
+        $query = ForumThread::with([
             'user',
             'tags',
             'posts' => function ($query) {
@@ -26,13 +27,28 @@ class ForumController extends Controller
                 $q->orderBy('created_at', 'asc');
             },
             'posts.replies.user',
-        ])->withCount('allPosts as posts_count')->latest()->get();
+        ])->withCount('allPosts as posts_count')->latest();
+
+        if ($request->filled('category') && $request->category !== 'all') {
+            $query->where('category', $request->category);
+        }
+
+        $threads = $query->paginate(10)->withQueryString();
 
         $allTags = ForumTag::all();
 
         return Inertia::render('Forum/Index', [
             'threads' => $threads,
             'allTags' => $allTags,
+            'filters' => $request->only(['category']),
+            'seasonalAlerts' => $alertService->getActiveAlerts($request->state),
+        ]);
+    }
+
+    public function tags()
+    {
+        return response()->json([
+            'tags' => ForumTag::all(),
         ]);
     }
 
@@ -120,10 +136,21 @@ class ForumController extends Controller
 
     public function show($id)
     {
-        $thread = ForumThread::with(['posts.user'])->findOrFail($id);
+        $thread = ForumThread::with([
+            'user',
+            'tags',
+            'posts' => function ($q) {
+                $q->whereNull('parent_post_id')->orderBy('created_at', 'asc'); // top-level comments only
+            },
+            'posts.user',
+            'posts.replies' => function ($q) {
+                $q->orderBy('created_at', 'asc'); // replies of each post
+            },
+            'posts.replies.user'
+        ])->findOrFail($id);
 
-        return inertia('Forum/Post', [
-            'thread' => $thread,
+        return Inertia::render('Forum/Post', [
+            'thread' => $thread
         ]);
     }
 
@@ -195,5 +222,38 @@ class ForumController extends Controller
         $thread->tags()->detach($forumTag->id);
 
         return response()->json(['success' => true]);
+    }
+
+    public function toggleLike(ForumThread $thread)
+    {
+        $user = auth()->user();
+
+        if ($thread->likes()->where('user_id', $user->id)->exists()) {
+            // Unlike
+            $thread->likes()->detach($user->id);
+            $thread->decrement('likes_count');
+            $isLiked = false;
+        } else {
+            // Like
+            $thread->likes()->attach($user->id);
+            $thread->increment('likes_count');
+            $isLiked = true;
+        }
+
+        return response()->json([
+            'success' => true,
+            'is_liked' => $isLiked,
+            'likes_count' => $thread->fresh()->likes_count
+        ]);
+    }
+
+    public function incrementShare(ForumThread $thread)
+    {
+        $thread->increment('shares_count');
+
+        return response()->json([
+            'success' => true,
+            'shares_count' => $thread->fresh()->shares_count
+        ]);
     }
 }

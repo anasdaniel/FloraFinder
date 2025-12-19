@@ -467,7 +467,6 @@ const goToPage = (page: number) => {
 
                         <!-- View Mode Selector -->
                         <div class="inline-flex items-center gap-1 bg-gray-100 rounded-full p-1.5 border border-gray-200">
-                            <span class="px-3 text-sm font-medium text-gray-500">View</span>
                             <button
                                 @click="viewMode = 'grid'"
                                 class="px-4 py-2 text-sm font-medium rounded-full transition-all"

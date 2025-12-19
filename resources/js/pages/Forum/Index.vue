@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineProps, ref, computed, reactive } from "vue";
+import { defineProps, ref, computed, reactive, watch } from "vue";
 import { Head, Link, usePage, router } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
 import Heading from "@/components/Heading.vue";
@@ -8,7 +8,7 @@ import type { BreadcrumbItem, ForumThread } from "@/types";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus } from 'lucide-vue-next';
+import { Trash2, MessageCircle, SendHorizontal, Search, Leaf, Users, Plus, Heart, Share2, ChevronLeft, ChevronRight, SearchX, Coffee, ImageIcon, AlertTriangle, Info, FlaskConical, Sparkles } from 'lucide-vue-next';
 
 const activeCommentThread = ref<number | null>(null);
 const newComment = ref("");
@@ -63,21 +63,56 @@ const activeReplyComment = ref<number | null>(null);
 // reactive object keyed by comment id to hold reply input strings
 const newReplies = reactive<Record<number, string>>({});
 
+interface PaginatedThreads {
+    data: ForumThread[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    links: Array<{ url: string | null; label: string; active: boolean }>;
+}
+
 // Props
 const props = defineProps<{
-    threads: ForumThread[];
+    threads: PaginatedThreads;
+    allTags: any[];
+    seasonalAlerts: any[];
+    filters: {
+        category?: string;
+    };
 }>();
 
+// Helper to get icon for alert type
+const getAlertIcon = (type: string) => {
+    if (type === 'peak') return Info;
+    if (type === 'starting') return FlaskConical;
+    return Sparkles;
+};
+
 // Category filter state
-const selectedCategory = ref("general");
+const selectedCategory = ref(props.filters.category || "all");
 
 const filteredThreads = computed(() => {
-    if (selectedCategory.value === "all") {
-        return props.threads;
-    }
-    return props.threads.filter(
-        t => t.category.toLowerCase() === selectedCategory.value.toLowerCase()
-    );
+    return props.threads.data;
+});
+
+const goToPage = (url: string | null) => {
+    if (!url) return;
+    router.get(url, {
+        category: selectedCategory.value !== 'all' ? selectedCategory.value : undefined
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
+};
+
+watch(selectedCategory, (newCategory) => {
+    router.get('/forum', {
+        category: newCategory !== 'all' ? newCategory : undefined
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
 });
 
 // Delete thread
@@ -233,6 +268,65 @@ const deleteComment = (id: number, threadId?: number) => {
     });
 };
 
+// Like/Unlike thread
+const toggleLike = async (thread: ForumThread) => {
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${thread.id}/like`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (!res.ok) {
+            console.error('Failed to toggle like');
+            return;
+        }
+
+        const json = await res.json();
+        thread.is_liked_by_user = json.is_liked;
+        thread.likes_count = json.likes_count;
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+// Share thread
+const shareThread = async (thread: ForumThread) => {
+    try {
+        // Copy thread URL to clipboard
+        const url = `${window.location.origin}/forum/${thread.id}`;
+        await navigator.clipboard.writeText(url);
+
+        // Increment share counter
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${thread.id}/share`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (res.ok) {
+            const json = await res.json();
+            thread.shares_count = json.shares_count;
+        }
+
+        // Optional: Show a toast notification
+        alert('Link copied to clipboard!');
+    } catch (e) {
+        console.error(e);
+        alert('Failed to copy link');
+    }
+};
+
 // Breadcrumbs
 const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 </script>
@@ -240,98 +334,152 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 <template>
     <Head title="Forum" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="w-full max-w-3xl px-4 py-8 mx-auto">
+        <div class="w-full max-w-2xl px-4 py-6 mx-auto">
             <!-- Header -->
-            <div class="flex flex-col items-start justify-between gap-4 mb-6 sm:flex-row sm:items-center">
+            <div class="flex flex-col items-start justify-between gap-3 mb-6 sm:flex-row sm:items-center">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Forum</h1>
-                    <p class="mt-1 text-sm text-gray-500">Ask questions, share knowledge, and connect with the FloraFinder community.</p>
+                    <h1 class="text-2xl font-extrabold text-[#0f172a] tracking-tight">Forum</h1>
+                    <p class="mt-0.5 text-xs text-gray-500 font-medium">Ask questions, share knowledge, and connect with the community.</p>
                 </div>
-                <Link href="/forum/new">
-                    <Button type="button" variant="default" size="sm" class="gap-2 bg-gray-900 hover:bg-gray-800">
-                        <Plus class="w-4 h-4" />
-                        New Post
-                    </Button>
+                <Link
+                    href="/forum/new"
+                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white transition-all bg-gray-900 rounded-xl hover:bg-black shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20"
+                >
+                    <Plus class="w-3.5 h-3.5" />
+                    <span class="font-bold">New Post</span>
                 </Link>
             </div>
 
+            <!-- Seasonal Alerts -->
+            <div v-if="props.seasonalAlerts.length > 0" class="mb-6 bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div class="flex items-center gap-2.5 mb-3">
+                    <div class="p-1 rounded-lg bg-orange-50">
+                        <AlertTriangle class="w-3.5 h-3.5 text-orange-600" />
+                    </div>
+                    <h2 class="text-base font-extrabold text-gray-900 tracking-tight">Seasonal Alerts</h2>
+                </div>
+
+                <div class="space-y-2.5">
+                    <div
+                        v-for="alert in props.seasonalAlerts"
+                        :key="alert.id"
+                        class="group relative overflow-hidden rounded-xl border transition-all duration-300"
+                        :class="[
+                            alert.color === 'orange' ? 'bg-orange-50/50 border-orange-100 hover:border-orange-200' : 'bg-blue-50/50 border-blue-100 hover:border-blue-200'
+                        ]"
+                    >
+                        <div class="p-3 flex items-start gap-3">
+                            <div
+                                class="flex-shrink-0 p-2 rounded-lg shadow-sm border transition-transform group-hover:scale-110"
+                                :class="[
+                                    alert.color === 'orange' ? 'bg-white border-orange-100 text-orange-600' : 'bg-white border-blue-100 text-blue-600'
+                                ]"
+                            >
+                                <component :is="getAlertIcon(alert.type)" class="w-4 h-4" />
+                            </div>
+                            <div class="flex-1">
+                                <h3
+                                    class="text-sm font-bold mb-0.5"
+                                    :class="alert.color === 'orange' ? 'text-orange-900' : 'text-blue-900'"
+                                >
+                                    {{ alert.title }}
+                                </h3>
+                                <p
+                                    class="text-[11px] font-medium leading-relaxed"
+                                    :class="alert.color === 'orange' ? 'text-orange-700/80' : 'text-blue-700/80'"
+                                >
+                                    {{ alert.description }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Category Filter Tabs -->
-            <div class="flex flex-wrap gap-2 mb-8 p-1 bg-gray-100/50 rounded-xl w-fit">
+            <div class="flex flex-wrap gap-2 mb-6">
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
-                    :class="selectedCategory === 'general'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
-                    @click="selectedCategory = 'general'"
+                    class="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-full transition-all border shadow-sm"
+                    :class="selectedCategory === 'all' || selectedCategory === 'general'
+                        ? 'bg-[#0f172a] text-white border-[#0f172a]'
+                        : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'"
+                    @click="selectedCategory = 'all'"
                 >
                     General
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                    class="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-full transition-all border bg-white shadow-sm"
                     :class="selectedCategory === 'identification'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
+                        ? 'ring-2 ring-primary/20 border-primary text-primary'
+                        : 'text-gray-700 border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'identification'"
                 >
-                    <Search class="w-4 h-4" />
+                    <Search class="w-3.5 h-3.5" />
                     Plant Identification
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                    class="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-full transition-all border bg-white shadow-sm"
                     :class="selectedCategory === 'care'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
+                        ? 'ring-2 ring-primary/20 border-primary text-primary'
+                        : 'text-gray-700 border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'care'"
                 >
-                    <Leaf class="w-4 h-4" />
+                    <Leaf class="w-3.5 h-3.5" />
                     Plant Care
                 </button>
 
                 <button
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                    class="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-full transition-all border bg-white shadow-sm"
                     :class="selectedCategory === 'offtopic'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'"
+                        ? 'ring-2 ring-primary/20 border-primary text-primary'
+                        : 'text-gray-700 border-gray-200 hover:bg-gray-50'"
                     @click="selectedCategory = 'offtopic'"
                 >
-                    <Users class="w-4 h-4" />
+                    <Coffee class="w-3.5 h-3.5" />
                     Off Topic
                 </button>
             </div>
 
             <!-- Threads List -->
-            <div class="space-y-6">
+            <div class="space-y-5">
+                <div v-if="filteredThreads.length === 0" class="text-center py-10 bg-white border border-gray-100 rounded-2xl">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-50 mb-3">
+                        <SearchX class="w-7 h-7 text-gray-400" />
+                    </div>
+                    <h3 class="text-base font-semibold text-gray-900">No threads found</h3>
+                    <p class="text-xs text-gray-500">Try adjusting your filters or start a new discussion.</p>
+                </div>
                 <div
                     v-for="thread in filteredThreads"
                     :key="thread.id"
-                    class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200"
+                    class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300"
                 >
                     <!-- Header: Author & Meta -->
                     <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-3">
-                            <Avatar class="h-10 w-10 border border-gray-100">
+                        <div class="flex items-center gap-2.5">
+                            <Avatar class="h-9 w-9 border border-gray-50 shadow-sm">
                                 <AvatarImage :src="thread.user?.avatar" />
-                                <AvatarFallback class="bg-primary/5 text-primary text-xs font-bold">
+                                <AvatarFallback class="bg-emerald-50 text-emerald-700 text-[10px] font-bold">
                                     {{ (thread.user?.name || thread.title).substring(0, 2).toUpperCase() }}
                                 </AvatarFallback>
                             </Avatar>
                             <div>
-                                <div class="font-semibold text-gray-900 text-sm">{{ thread.user?.name || 'Unknown' }}</div>
-                                <div class="text-xs text-gray-500">{{ new Date(thread.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</div>
+                                <div class="font-bold text-gray-900 text-xs">{{ thread.user?.name || 'Unknown' }}</div>
+                                <div class="text-[9px] font-medium text-gray-400">{{ new Date(thread.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</div>
                             </div>
                         </div>
 
-                        <!-- Actions Dropdown or Buttons -->
-                        <div class="flex items-center gap-2">
+                        <!-- Actions -->
+                        <div class="flex items-center gap-1">
                              <button
                                 v-if="isOwner(thread)"
                                 @click="deleteThread(thread.id)"
-                                class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                class="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                 title="Delete Thread"
                             >
-                                <Trash2 class="w-4 h-4" />
+                                <Trash2 class="w-3.5 h-3.5" />
                             </button>
                         </div>
                     </div>
@@ -339,32 +487,36 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                     <!-- Content -->
                     <div class="mb-4">
                         <Link :href="`/forum/${thread.id}`" class="block group/title">
-                            <h3 class="font-bold text-gray-900 text-lg mb-2 leading-tight group-hover/title:text-primary transition-colors">{{ thread.title }}</h3>
+                            <h3 class="font-extrabold text-gray-900 text-lg mb-1.5 leading-tight group-hover/title:text-emerald-600 transition-colors">{{ thread.title }}</h3>
                         </Link>
-                        <p v-if="thread.content" class="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                        <p v-if="thread.content" class="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap line-clamp-3">
                             {{ thread.content }}
                         </p>
                     </div>
 
                     <!-- Image -->
-                     <div v-if="thread.image" class="mb-4 rounded-xl overflow-hidden border border-gray-100">
+                     <div v-if="thread.image" class="mb-4 relative rounded-xl overflow-hidden border border-gray-100 group/image">
                         <img
                             :src="`/storage/${thread.image}`"
-                            class="w-full h-auto max-h-[500px] object-cover"
+                            class="w-full h-auto max-h-[400px] object-cover transition-transform duration-500 group-hover/image:scale-[1.02]"
                         />
+                        <div class="absolute bottom-2.5 right-2.5 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-lg text-[9px] font-semibold flex items-center gap-1">
+                            <ImageIcon class="w-2.5 h-2.5" />
+                            1 Image
+                        </div>
                     </div>
 
                     <!-- Tags -->
-                    <div v-if="thread.tags?.length || isOwner(thread)" class="flex flex-wrap gap-2 mb-4">
+                    <div v-if="thread.tags?.length || isOwner(thread)" class="flex flex-wrap items-center gap-1.5 mb-5">
                         <span
                             v-for="tag in thread.tags"
                             :key="tag.id"
-                            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-gray-50 text-gray-600 rounded-md border border-gray-100"
+                            class="inline-flex items-center gap-1 px-2.5 py-1 text-[9px] font-bold bg-gray-100 text-gray-700 rounded-full border border-transparent hover:bg-gray-200 transition-colors"
                         >
-                            {{ tag.tag_name }}
+                            #{{ tag.tag_name }}
                             <button
                                 v-if="isOwner(thread)"
-                                class="text-gray-400 hover:text-red-500"
+                                class="text-gray-400 hover:text-red-500 ml-0.5"
                                 @click="removeTag(thread.id, tag.id)"
                             >
                                 ×
@@ -373,16 +525,17 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
 
                          <div v-if="isOwner(thread)" class="relative">
                             <button
-                                class="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md border border-dashed border-gray-200 transition-colors"
+                                class="px-2.5 py-1 text-[9px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-full border border-emerald-100 transition-all flex items-center gap-1"
                                 @click="showTagDropdown[thread.id] = !showTagDropdown[thread.id]"
                             >
-                                + Tag
+                                <Plus class="w-2.5 h-2.5" />
+                                Tag
                             </button>
                             <div
                                 v-if="showTagDropdown[thread.id]"
-                                class="absolute left-0 mt-2 bg-white shadow-xl border rounded-lg p-3 z-50 w-48"
+                                class="absolute left-0 mt-1.5 bg-white shadow-2xl border border-gray-100 rounded-xl p-3 z-50 w-48 animate-in fade-in zoom-in duration-200"
                             >
-                                <select v-model="selectedTag" class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm mb-2 focus:ring-2 focus:ring-primary/20 outline-none">
+                                <select v-model="selectedTag" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs mb-2 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none bg-gray-50">
                                     <option disabled value="">Select tag</option>
                                     <option v-for="t in allTags" :key="t.id" :value="t.id">
                                         {{ t.tag_name }}
@@ -390,7 +543,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                 </select>
                                 <Button
                                     size="sm"
-                                    class="w-full"
+                                    class="w-full bg-emerald-600 hover:bg-emerald-700 rounded-lg h-8 text-xs"
                                     @click="addTag(thread.id)"
                                 >
                                     Add Tag
@@ -404,51 +557,51 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                         <div class="flex items-center gap-4">
                              <button
                                 @click="toggleCommentField(thread.id)"
-                                class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                                class="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-gray-900 transition-colors"
                             >
-                                <MessageCircle class="w-5 h-5" />
-                                <span class="font-medium">{{ thread.posts_count || 0 }} Comments</span>
+                                <MessageCircle class="w-3.5 h-3.5" />
+                                <span>{{ thread.posts_count || 0 }}</span>
                             </button>
+
+                            <button
+                                @click="toggleLike(thread)"
+                                class="flex items-center gap-1.5 text-[11px] font-semibold transition-colors"
+                                :class="thread.is_liked_by_user ? 'text-red-500 hover:text-red-600' : 'text-gray-500 hover:text-red-500'"
+                            >
+                                <Heart class="w-3.5 h-3.5" :class="{ 'fill-red-500': thread.is_liked_by_user }" />
+                                <span>{{ thread.likes_count || 0 }}</span>
+                            </button>
+
+                            <button
+                                @click="shareThread(thread)"
+                                class="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+                            >
+                                <Share2 class="w-3.5 h-3.5" />
+                                <span>Share</span>
+                            </button>
+                        </div>
+
+                        <!-- Interaction Avatars -->
+                        <div class="hidden sm:flex -space-x-1 overflow-hidden">
+                            <Avatar v-for="i in 2" :key="i" class="inline-block h-5 w-5 rounded-full ring-2 ring-white">
+                                <AvatarImage :src="`https://i.pravatar.cc/150?u=${thread.id + i}`" />
+                                <AvatarFallback class="text-[8px]">U</AvatarFallback>
+                            </Avatar>
                         </div>
                     </div>
 
                     <!-- Comments Section -->
-                    <div v-if="activeCommentThread === thread.id" class="mt-4 pt-4 border-t border-gray-50 bg-gray-50/50 -mx-6 px-6 pb-6 rounded-b-2xl">
-                         <!-- Input -->
-                        <div class="flex gap-3 mb-6">
-                            <Avatar class="h-8 w-8 hidden sm:block">
-                                <AvatarImage :src="$page.props.auth.user.avatar" />
-                                <AvatarFallback>{{ $page.props.auth.user.name.substring(0,2).toUpperCase() }}</AvatarFallback>
-                            </Avatar>
-                            <div class="flex-1 relative">
-                                <input
-                                    v-model="newComment"
-                                    type="text"
-                                    placeholder="Write a comment..."
-                                    class="w-full border border-gray-200 rounded-full py-2.5 pl-4 pr-12 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 shadow-sm transition-all"
-                                    @focus="activeCommentThread = thread.id"
-                                    @keydown.enter="postComment(thread.id)"
-                                />
-                                <button
-                                    @click="postComment(thread.id)"
-                                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
-                                    :disabled="!newComment.trim()"
-                                >
-                                    <SendHorizontal class="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-
+                    <div v-if="activeCommentThread === thread.id" class="mt-4 pt-5 border-t border-gray-50">
                          <div v-if="commentsLoading" class="text-center py-4">
-                             <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                             <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600 mx-auto"></div>
                         </div>
 
-                        <div v-else class="space-y-6">
+                        <div v-else class="space-y-5 mb-5">
                              <div
                                 v-if="(commentsMap[thread.id] || []).length === 0"
-                                class="text-sm text-gray-500 text-center py-2"
+                                class="text-[10px] text-gray-400 text-center py-2 font-medium"
                             >
-                                Be the first to comment.
+                                No comments yet.
                             </div>
 
                             <div
@@ -456,32 +609,33 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                 :key="comment.id"
                                 class="group"
                             >
-                                <div class="flex gap-3">
-                                    <Avatar class="h-8 w-8 mt-1 border border-gray-200">
+                                <div class="flex gap-2.5">
+                                    <Avatar class="h-7 w-7 mt-0.5 border border-gray-100 shadow-sm">
                                         <AvatarImage :src="comment.user?.avatar" />
-                                        <AvatarFallback class="text-xs bg-white text-gray-700">
+                                        <AvatarFallback class="text-[9px] bg-gray-50 text-gray-600 font-bold">
                                             {{ (comment.user?.name || '?').substring(0, 2).toUpperCase() }}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div class="flex-1">
-                                        <div class="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm inline-block min-w-[200px]">
-                                             <div class="flex justify-between items-start mb-1">
-                                                <span class="font-semibold text-sm text-gray-900">{{ comment.user?.name || 'Unknown' }}</span>
-                                                <span class="text-xs text-gray-400">{{ new Date(comment.created_at).toLocaleDateString() }}</span>
+                                        <div class="bg-gray-50/80 rounded-2xl px-3.5 py-2.5 inline-block min-w-[180px] max-w-full">
+                                             <div class="flex justify-between items-center mb-0.5 gap-2">
+                                                <span class="font-bold text-[11px] text-gray-900">{{ comment.user?.name || 'Unknown' }}</span>
                                              </div>
-                                            <p class="text-sm text-gray-700 leading-relaxed">{{ comment.content }}</p>
+                                            <p class="text-[11px] text-gray-700 leading-relaxed">{{ comment.content }}</p>
                                         </div>
 
-                                        <div class="flex items-center gap-4 mt-1 ml-2">
+                                        <div class="flex items-center gap-3 mt-1 ml-2.5">
+                                            <button class="text-[9px] font-bold text-gray-400 hover:text-gray-900 transition-colors">Like</button>
                                             <button
-                                                class="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                                                class="text-[9px] font-bold text-gray-400 hover:text-gray-900 transition-colors"
                                                 @click="activeReplyComment = (activeReplyComment === comment.id ? null : comment.id)"
                                             >
                                                 Reply
                                             </button>
+                                            <span class="text-[9px] font-medium text-gray-300">{{ new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}</span>
                                              <button
                                                 v-if="comment.user_id === $page.props.auth.user.id"
-                                                class="text-xs font-medium text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                                class="text-[9px] font-bold text-red-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                                                 @click="deleteComment(comment.id, thread.id)"
                                             >
                                                 Delete
@@ -489,41 +643,41 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                         </div>
 
                                         <!-- Reply Input -->
-                                         <div v-if="activeReplyComment === comment.id" class="mt-3 flex gap-2 items-center">
-                                            <div class="h-8 w-0.5 bg-gray-200"></div>
+                                         <div v-if="activeReplyComment === comment.id" class="mt-2.5 flex gap-2 items-center pl-2.5">
+                                            <div class="h-6 w-0.5 bg-emerald-100 rounded-full"></div>
                                             <input
                                                 v-model="newReplies[comment.id]"
                                                 type="text"
                                                 placeholder="Write a reply..."
-                                                class="flex-1 border border-gray-200 rounded-full py-2 px-4 text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                                                class="flex-1 bg-white border border-gray-100 rounded-lg py-1.5 px-3 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 shadow-sm"
                                                 @keydown.enter="postReply(comment.id, thread.id)"
                                             />
                                         </div>
 
                                         <!-- Replies -->
-                                        <div v-if="comment.replies && comment.replies.length" class="mt-3 space-y-3 pl-4 border-l-2 border-gray-200/50">
+                                        <div v-if="comment.replies && comment.replies.length" class="mt-3 space-y-3 pl-4 border-l-2 border-gray-100">
                                             <div
                                                 v-for="reply in comment.replies"
                                                 :key="reply.id"
-                                                class="flex gap-3 group/reply"
+                                                class="flex gap-2 group/reply"
                                             >
-                                                 <Avatar class="h-6 w-6 mt-1 border border-gray-200">
+                                                 <Avatar class="h-6 w-6 mt-0.5 border border-gray-100 shadow-sm">
                                                     <AvatarImage :src="reply.user?.avatar" />
-                                                    <AvatarFallback class="text-[10px] bg-white text-gray-700">
+                                                    <AvatarFallback class="text-[8px] bg-gray-50 text-gray-600 font-bold">
                                                         {{ (reply.user?.name || '?').substring(0, 2).toUpperCase() }}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div>
-                                                    <div class="bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
+                                                    <div class="bg-gray-50/50 rounded-2xl px-3 py-2">
                                                         <div class="flex items-center gap-2 mb-0.5">
-                                                            <span class="font-semibold text-xs text-gray-900">{{ reply.user?.name }}</span>
+                                                            <span class="font-bold text-[10px] text-gray-900">{{ reply.user?.name }}</span>
                                                         </div>
-                                                        <p class="text-xs text-gray-700">{{ reply.content }}</p>
+                                                        <p class="text-[10px] text-gray-700 leading-relaxed">{{ reply.content }}</p>
                                                     </div>
-                                                     <div class="flex items-center gap-4 mt-1 ml-2">
+                                                     <div class="flex items-center gap-3 mt-1 ml-2.5">
                                                          <button
                                                             v-if="reply.user_id === $page.props.auth.user.id"
-                                                            class="text-[10px] font-medium text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover/reply:opacity-100"
+                                                            class="text-[8px] font-bold text-red-300 hover:text-red-500 transition-colors opacity-0 group-hover/reply:opacity-100"
                                                             @click="deleteComment(reply.id, thread.id)"
                                                         >
                                                             Delete
@@ -536,12 +690,68 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Input -->
+                        <div class="flex gap-3">
+                            <Avatar class="h-8 w-8 hidden sm:block border border-gray-100">
+                                <AvatarImage :src="$page.props.auth.user.avatar" />
+                                <AvatarFallback class="bg-gray-50 text-gray-600 text-[10px] font-bold">{{ $page.props.auth.user.name.substring(0,2).toUpperCase() }}</AvatarFallback>
+                            </Avatar>
+                            <div class="flex-1 relative group/input">
+                                <input
+                                    v-model="newComment"
+                                    type="text"
+                                    placeholder="Write a comment..."
+                                    class="w-full bg-gray-50 border-transparent rounded-xl py-2 pl-4 pr-10 text-[11px] focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all shadow-inner"
+                                    @focus="activeCommentThread = thread.id"
+                                    @keydown.enter="postComment(thread.id)"
+                                />
+                                <button
+                                    @click="postComment(thread.id)"
+                                    class="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    :disabled="!newComment.trim()"
+                                >
+                                    <SendHorizontal class="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            <!-- Pagination -->
+            <div v-if="threads.last_page > 1" class="flex justify-center mt-6">
+                <nav class="flex items-center space-x-1.5">
+                    <button
+                        @click="goToPage(threads.links[0]?.url)"
+                        :disabled="threads.current_page === 1"
+                        class="px-2 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <ChevronLeft class="w-3.5 h-3.5" />
+                    </button>
 
-            <div class="mt-10 text-xs text-center text-muted-foreground">
+                    <template v-for="(link, index) in threads.links.slice(1, -1)" :key="index">
+                        <button
+                            v-if="link.url"
+                            @click="goToPage(link.url)"
+                            class="px-2.5 py-1.5 text-xs font-medium transition-colors duration-200 rounded-lg"
+                            :class="link.active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100'"
+                            v-html="link.label"
+                        ></button>
+                        <span v-else class="px-2.5 py-1.5 text-xs font-medium text-gray-400" v-html="link.label"></span>
+                    </template>
+
+                    <button
+                        @click="goToPage(threads.links[threads.links.length - 1]?.url)"
+                        :disabled="threads.current_page === threads.last_page"
+                        class="px-2 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <ChevronRight class="w-3.5 h-3.5" />
+                    </button>
+                </nav>
+            </div>
+
+            <div class="mt-12 pb-8 text-[10px] text-center text-gray-400 font-medium tracking-wide">
                 <span>Powered by FloraFinder Community</span>
             </div>
         </div>
