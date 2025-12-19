@@ -366,6 +366,7 @@ export function usePlantIdentification({
           powoId: result.powo?.id,
           iucnCategory: result.iucn?.category,
           imageUrl: result.images?.[0]?.url?.m || result.images?.[0]?.url?.o,
+          referenceImages: result.images?.map(img => img.url?.m || img.url?.o).filter(Boolean),
         });
       }
     }
@@ -486,6 +487,7 @@ export function usePlantIdentification({
         powoId: match.powo?.id,
         iucnCategory: match.iucn?.category,
         imageUrl: match.images?.[0]?.url?.m || match.images?.[0]?.url?.o,
+        referenceImages: match.images?.map(img => img.url?.m || img.url?.o).filter(Boolean),
       });
     }
   };

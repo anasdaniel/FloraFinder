@@ -82,6 +82,9 @@ const props = defineProps<{
 
 const user = computed(() => usePage<SharedData>().props.auth.user);
 
+// Chart state
+const hoveredPoint = ref<number | null>(null);
+
 // Map references
 const mapContainer = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
@@ -212,47 +215,55 @@ onUnmounted(() => {
 // Generate SVG path for activity chart
 const chartPath = computed(() => {
   if (!props.activityData || props.activityData.length === 0) {
-    return { line: "", area: "", points: [] };
+    return { sightings: { line: "", area: "", points: [] }, species: { line: "", points: [] } };
   }
 
   const data = props.activityData;
-  const maxSightings = Math.max(...data.map((d) => d.sightings), 1);
-  const width = 300;
-  const height = 150;
-  const padding = 10;
+  const maxVal = Math.max(...data.map((d) => Math.max(d.sightings, d.newSpecies)), 1);
+  const width = 800;
+  const height = 300;
+  const paddingX = 0;
+  const paddingY = 0;
 
-  // Calculate points
-  const points = data.map((d, i) => ({
-    x: (i / (data.length - 1)) * (width - padding * 2) + padding,
-    y: height - padding - (d.sightings / maxSightings) * (height - padding * 2),
-    sightings: d.sightings,
-    month: d.month,
-  }));
+  const getPoints = (key: 'sightings' | 'newSpecies') => {
+    return data.map((d, i) => ({
+      x: (i / (data.length - 1)) * width,
+      y: height - (d[key] / maxVal) * height,
+      value: d[key],
+      month: d.month,
+    }));
+  };
 
-  // Create smooth curve using cubic bezier
-  let linePath = `M${points[0].x},${points[0].y}`;
+  const generateSmoothPath = (points: any[]) => {
+    if (points.length === 0) return "";
+    let path = `M${points[0].x},${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const controlX = (p1.x + p2.x) / 2;
+      path += ` C${controlX},${p1.y} ${controlX},${p2.y} ${p2.x},${p2.y}`;
+    }
+    return path;
+  };
 
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[Math.max(i - 1, 0)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(i + 2, points.length - 1)];
+  const sightingPoints = getPoints('sightings');
+  const speciesPoints = getPoints('newSpecies');
 
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
+  const sightingLine = generateSmoothPath(sightingPoints);
+  const speciesLine = generateSmoothPath(speciesPoints);
 
-    linePath += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
-  }
-
-  // Create area path (close to bottom)
-  const areaPath = `${linePath} L${points[points.length - 1].x},${height} L${points[0].x},${height} Z`;
+  const sightingArea = `${sightingLine} L${sightingPoints[sightingPoints.length - 1].x},${height} L${sightingPoints[0].x},${height} Z`;
 
   return {
-    line: linePath,
-    area: areaPath,
-    points,
+    sightings: {
+      line: sightingLine,
+      area: sightingArea,
+      points: sightingPoints,
+    },
+    species: {
+      line: speciesLine,
+      points: speciesPoints,
+    },
   };
 });
 
@@ -266,677 +277,412 @@ const chartMonths = computed(() => {
 const alerts: Alert[] = [
   {
     title: "Rafflesia Season Ending",
-    description: "Sightings in Perak region are decreasing as the blooming season ends this week.",
+    description: "Sightings in Perak region are decreasing as the blooming season ends.",
     time: "2 hours ago",
     type: "warning",
   },
   {
-    title: "Taxonomy Update",
-    description: "Scientific names updated for the Dipterocarpaceae family. Check your library.",
+    title: "New Data Available",
+    description: "Scientific names updated for the Dipterocarpaceae family.",
     time: "1 day ago",
     type: "info",
-  },
-  {
-    title: "New Conservation Zone",
-    description: "Mossy Forest area expanded. New reporting guidelines available.",
-    time: "2 days ago",
-    type: "success",
   },
 ];
 
 const quickActions: QuickAction[] = [
-  { label: "New Scan", icon: "scan", href: "/plant-identifier", color: "text-emerald-600" },
-  { label: "Export CSV", icon: "download", href: "#", color: "text-blue-600" },
-  { label: "Profile", icon: "user", href: "/settings/profile", color: "text-purple-600" },
-  { label: "Community", icon: "message-square", href: "/forum", color: "text-amber-600" },
+  { label: "Export CSV", icon: "download", href: "#", color: "text-gray-500" },
+  { label: "Edit Profile", icon: "user", href: "/settings/profile", color: "text-gray-500" },
+  { label: "Scan QR", icon: "qr-code", href: "/plant-identifier", color: "text-gray-500" },
+  { label: "Help Center", icon: "help-circle", href: "#", color: "text-gray-500" },
 ];
 </script>
 
 <template>
   <AppLayout title="Dashboard">
-    <div class="min-h-screen pb-12 font-sans text-gray-900 bg-gray-50">
+    <div class="min-h-screen pb-12 font-sans text-gray-900 bg-[#F3F4F6] dark:bg-[#111827] transition-colors duration-200">
       <!-- Header Section -->
-      <div class="bg-white border-b border-gray-200">
-        <div class="px-4 py-8 mx-auto max-w-7xl sm:px-6 lg:px-8">
-          <div class="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <div>
-              <div
-                class="flex items-center gap-2 mb-2 text-sm font-medium text-emerald-600"
-              >
-                <span
-                  class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs uppercase tracking-wide font-bold"
-                  >{{ greeting }}</span
-                >
-                <span class="text-gray-300">|</span>
-                <span class="text-gray-500"
-                  >{{ currentDate.day }}, {{ currentDate.date }}</span
-                >
-              </div>
-              <h1 class="text-3xl font-bold tracking-tight text-gray-900">
-                Welcome back, {{ user?.name || "Explorer" }}
-              </h1>
-              <p class="mt-2 text-lg text-gray-500">
-                Your contribution to Malaysian flora identification has grown by
-                <span
-                  :class="growthPercentage >= 0 ? 'text-emerald-600' : 'text-rose-600'"
-                  class="font-semibold"
-                  >{{ growthPercentage >= 0 ? "+" : "" }}{{ growthPercentage }}%</span
-                >
-                this month.
-              </p>
-            </div>
-            <div class="flex items-center gap-3">
+      <div class="px-4 py-10 mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+              Welcome back, {{ user?.name || "Explorer" }}
+            </h1>
+            <p class="mt-1 text-gray-500 dark:text-gray-400">
+              Here's what's happening with your Malaysian flora discoveries.
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <Button
+              variant="outline"
+              class="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Icon name="upload" class="w-4 h-4" />
+              Import Data
+            </Button>
+            <Link href="/plant-identifier">
               <Button
-                variant="outline"
-                class="gap-2 text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 hover:text-gray-900"
+                class="bg-[#0f172a] hover:bg-[#1e293b] text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-md transition-colors"
               >
-                <Icon name="settings" class="w-4 h-4" />
-                Customize Widgets
+                <Icon name="camera" class="w-4 h-4" />
+                Report Sighting
               </Button>
-              <Link href="/plant-identifier">
-                <Button
-                  class="gap-2 text-white transition-all shadow-md bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 hover:shadow-lg hover:shadow-emerald-200"
-                >
-                  <Icon name="plus" class="w-4 h-4" />
-                  New Sighting
-                </Button>
-              </Link>
-            </div>
+            </Link>
           </div>
         </div>
-      </div>
 
-      <div class="px-4 py-8 mx-auto space-y-8 max-w-7xl sm:px-6 lg:px-8">
         <!-- Stats Grid -->
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card
+        <div class="grid grid-cols-1 gap-6 mt-8 md:grid-cols-2 lg:grid-cols-4">
+          <div
             v-for="(stat, index) in stats"
             :key="index"
-            class="transition-shadow duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md"
+            class="p-6 bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm"
           >
-            <CardContent class="p-6">
-              <div class="flex items-start justify-between">
-                <div>
-                  <p class="text-sm font-medium text-gray-500">{{ stat.label }}</p>
-                  <div class="flex items-baseline gap-2 mt-2">
-                    <span class="text-3xl font-bold text-gray-900">{{ stat.value }}</span>
-                    <span :class="stat.subtextClass">{{ stat.subtext }}</span>
-                  </div>
-                </div>
-                <div :class="`p-3 rounded-xl ${stat.bgColor}`">
-                  <Icon :name="stat.icon" :class="`w-6 h-6 ${stat.color}`" />
-                </div>
+            <div class="flex items-start justify-between mb-4">
+              <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ stat.label }}</h3>
+              <div :class="`p-2.5 rounded-xl ${stat.bgColor} dark:bg-opacity-10`">
+                <Icon :name="stat.icon" :class="`w-5 h-5 ${stat.color}`" />
               </div>
-              <div class="mt-4 w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                <div
-                  :class="[
-                    'h-full rounded-full transition-all duration-500',
-                    index === 0
-                      ? 'bg-emerald-500'
-                      : index === 1
-                      ? 'bg-amber-500'
-                      : index === 2
-                      ? 'bg-blue-500'
-                      : 'bg-rose-500',
-                  ]"
-                  :style="{ width: `${stat.progress}%` }"
-                ></div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div class="flex items-end gap-2">
+              <span class="text-4xl font-bold text-gray-900 dark:text-white">{{ stat.value }}</span>
+            </div>
+            <div
+              class="flex items-center gap-1 mt-1.5 text-xs font-medium"
+              :class="stat.subtextClass"
+            >
+              <Icon
+                v-if="index === 0"
+                name="trending-up"
+                class="w-3.5 h-3.5"
+              />
+              {{ stat.subtext }}
+            </div>
+          </div>
         </div>
 
-        <!-- Middle Section: Map & Chart -->
-        <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          <!-- Discovery Map -->
-          <div class="lg:col-span-2">
-            <Card
-              class="flex flex-col h-full overflow-hidden transition-shadow duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md"
-            >
-              <CardHeader
-                class="flex flex-row items-center justify-between px-6 py-4 border-b border-gray-100"
-              >
-                <div>
-                  <CardTitle class="text-lg font-bold text-gray-900"
-                    >Latest Sighting</CardTitle
-                  >
-                  <p class="mt-1 text-sm text-gray-500">Most recent plant discovery</p>
-                </div>
-                <div class="flex gap-2">
-                  <Link href="/plant-map">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      class="h-8 gap-1.5 text-gray-600 text-xs font-medium"
-                    >
-                      <Icon name="maximize-2" class="w-3.5 h-3.5" />
-                      View All
-                    </Button>
-                  </Link>
-                </div>
-              </CardHeader>
-              <div class="flex-1 bg-gray-50 relative min-h-[320px] overflow-hidden">
-                <!-- Leaflet Map Container -->
-                <div ref="mapContainer" class="absolute inset-0 z-0"></div>
-
-                <!-- Map Controls -->
-                <div class="absolute bottom-4 right-4 flex flex-col gap-1.5 z-[1000]">
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    class="w-8 h-8 bg-white border border-gray-100 shadow-sm hover:bg-gray-50"
-                    @click="zoomIn"
-                  >
-                    <Icon name="plus" class="w-4 h-4 text-gray-600" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    class="w-8 h-8 bg-white border border-gray-100 shadow-sm hover:bg-gray-50"
-                    @click="zoomOut"
-                  >
-                    <Icon name="minus" class="w-4 h-4 text-gray-600" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    class="w-8 h-8 bg-white border border-gray-100 shadow-sm hover:bg-gray-50"
-                    @click="centerMap"
-                  >
-                    <Icon name="locate" class="w-4 h-4 text-gray-600" />
-                  </Button>
-                </div>
-
-                <!-- Sightings count badge -->
-                <div v-if="latestSighting" class="absolute top-4 left-4 z-[1000]">
-                  <div
-                    class="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-sm border border-gray-100"
-                  >
-                    <div class="flex items-center gap-2 mb-1">
-                      <div
-                        class="w-2.5 h-2.5 rounded-full animate-pulse"
-                        :style="{
-                          backgroundColor: getConservationStatusColor(
-                            latestSighting.conservationStatus
-                          ),
-                        }"
-                      ></div>
-                      <span class="text-xs font-semibold text-gray-900"
-                        >Latest Sighting</span
-                      >
-                    </div>
-                    <p class="text-xs text-gray-600 truncate max-w-[150px]">
-                      {{
-                        latestSighting.commonName ||
-                        latestSighting.scientificName ||
-                        "Unknown"
-                      }}
-                    </p>
+        <!-- Middle Section: Chart & Map -->
+        <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-3">
+          <!-- Sighting Trends Chart -->
+          <div class="p-6 bg-white border border-gray-200 lg:col-span-2 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-lg font-bold text-gray-900 dark:text-white">Sighting Trends</h2>
+              <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3 text-xs">
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    <span class="text-gray-600 dark:text-gray-400">Sightings</span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-3 h-3 rounded-full bg-gray-900 dark:bg-gray-400"></span>
+                    <span class="text-gray-600 dark:text-gray-400">New Species</span>
                   </div>
                 </div>
-
-                <!-- Empty state overlay -->
-                <div
-                  v-if="!mapSightings || mapSightings.length === 0"
-                  class="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-[500]"
-                >
-                  <div class="text-center">
-                    <div
-                      class="inline-flex items-center justify-center p-4 mb-3 bg-white rounded-full shadow-sm"
-                    >
-                      <Icon name="map" class="w-8 h-8 text-gray-300" />
-                    </div>
-                    <p class="font-medium text-gray-500">No sightings yet</p>
-                    <Link
-                      href="/plant-identifier"
-                      class="inline-block mt-2 text-sm font-medium text-emerald-600 hover:underline"
-                    >
-                      Add your first sighting →
-                    </Link>
-                  </div>
-                </div>
+                <button class="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-500 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md">
+                  Last 6 Months
+                  <Icon name="chevron-down" class="w-3.5 h-3.5" />
+                </button>
               </div>
+            </div>
+
+            <div class="relative w-full h-64 group">
+              <svg
+                class="w-full h-full overflow-visible"
+                viewBox="0 0 800 300"
+                preserveAspectRatio="none"
+                @mouseleave="hoveredPoint = null"
+              >
+                <defs>
+                  <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="#10B981" stop-opacity="0.2" />
+                    <stop offset="100%" stop-color="#10B981" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+
+                <!-- Grid lines -->
+                <g class="grid-lines">
+                  <line x1="0" y1="300" x2="800" y2="300" stroke="#E5E7EB" class="dark:stroke-gray-700" stroke-width="1" />
+                  <line x1="0" y1="225" x2="800" y2="225" stroke="#E5E7EB" class="dark:stroke-gray-700" stroke-width="1" stroke-dasharray="4 4" />
+                  <line x1="0" y1="150" x2="800" y2="150" stroke="#E5E7EB" class="dark:stroke-gray-700" stroke-width="1" stroke-dasharray="4 4" />
+                  <line x1="0" y1="75" x2="800" y2="75" stroke="#E5E7EB" class="dark:stroke-gray-700" stroke-width="1" stroke-dasharray="4 4" />
+                  <line x1="0" y1="0" x2="800" y2="0" stroke="#E5E7EB" class="dark:stroke-gray-700" stroke-width="1" stroke-dasharray="4 4" />
+                </g>
+
+                <!-- Hover Vertical Line -->
+                <line
+                  v-if="hoveredPoint !== null"
+                  :x1="(hoveredPoint / (activityData.length - 1)) * 800"
+                  y1="0"
+                  :x2="(hoveredPoint / (activityData.length - 1)) * 800"
+                  y2="300"
+                  stroke="#e2e8f0"
+                  class="dark:stroke-gray-600"
+                  stroke-width="1"
+                />
+
+                <!-- Sightings Area -->
+                <path
+                  :d="chartPath.sightings.area"
+                  fill="url(#chartGradient)"
+                  class="transition-all duration-500"
+                />
+
+                <!-- Sightings Line -->
+                <path
+                  :d="chartPath.sightings.line"
+                  fill="none"
+                  stroke="#10B981"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="transition-all duration-500"
+                />
+
+                <!-- New Species Line -->
+                <path
+                  :d="chartPath.species.line"
+                  fill="none"
+                  stroke="#1F2937"
+                  stroke-width="2"
+                  stroke-dasharray="6 4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="transition-all duration-500 dark:stroke-gray-400"
+                />
+
+                <!-- Points for interaction -->
+                <g v-for="(point, idx) in activityData" :key="idx">
+                  <rect
+                    :x="(idx / (activityData.length - 1)) * 800 - 20"
+                    y="0"
+                    width="40"
+                    height="300"
+                    fill="transparent"
+                    class="cursor-pointer"
+                    @mouseenter="hoveredPoint = idx"
+                  />
+                </g>
+              </svg>
+
+              <!-- Tooltip Overlay -->
               <div
-                class="flex flex-wrap items-center justify-between gap-2 px-6 py-3 bg-white border-t border-gray-100"
+                v-if="hoveredPoint !== null"
+                class="absolute z-10 p-3 transition-all duration-200 -translate-x-1/2 bg-white border border-gray-100 shadow-lg dark:bg-gray-800 dark:border-gray-700 pointer-events-none rounded-xl min-w-[120px]"
+                :style="{
+                  left: `${(hoveredPoint / (activityData.length - 1)) * 100}%`,
+                  top: '20px'
+                }"
               >
-                <!-- Status Legend -->
-                <div class="flex items-center gap-1 text-xs text-gray-500">
-                  <span class="mr-2 font-medium text-gray-600">Status:</span>
-                  <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-red-50">
-                    <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                    <span class="text-red-700">Endangered</span>
+                <div class="text-xs font-bold text-gray-400 uppercase mb-1.5">
+                  {{ activityData[hoveredPoint].month }}
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <div class="flex items-center justify-between gap-4">
+                    <span class="text-xs text-gray-600 dark:text-gray-400">Sightings</span>
+                    <span class="text-xs font-bold text-gray-900 dark:text-white">{{ activityData[hoveredPoint].sightings }}</span>
                   </div>
-                  <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-50">
-                    <div class="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
-                    <span class="text-orange-700">Vulnerable</span>
-                  </div>
-                  <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-green-50">
-                    <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                    <span class="text-green-700">Least Concern</span>
+                  <div class="flex items-center justify-between gap-4">
+                    <span class="text-xs text-gray-600 dark:text-gray-400">New Species</span>
+                    <span class="text-xs font-bold text-emerald-600">{{ activityData[hoveredPoint].newSpecies }}</span>
                   </div>
                 </div>
-
-                <!-- View all link -->
-                <Link
-                  href="/plant-map"
-                  class="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:underline"
-                >
-                  View all on map
-                  <Icon name="arrow-right" class="w-3 h-3" />
-                </Link>
               </div>
-            </Card>
+            </div>
+
+            <!-- X-Axis Labels -->
+            <div class="flex justify-between mt-6">
+              <span
+                v-for="(month, idx) in chartMonths"
+                :key="idx"
+                class="text-xs font-medium text-gray-400 uppercase"
+              >
+                {{ month }}
+              </span>
+            </div>
           </div>
 
-          <!-- Activity Chart -->
-          <div class="lg:col-span-1">
-            <Card
-              class="flex flex-col h-full transition-shadow duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md"
-            >
-              <CardHeader
-                class="flex flex-row items-center justify-between px-6 py-4 border-b border-gray-50"
-              >
-                <div>
-                  <CardTitle class="text-lg font-bold text-gray-900">Activity</CardTitle>
-                  <p class="mt-1 text-sm text-gray-500">Sightings over time</p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <div class="flex items-center gap-1.5 text-xs text-gray-500">
-                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                    <span>Sightings</span>
+          <!-- Recent Discovery Map -->
+          <div class="flex flex-col overflow-hidden bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+            <div class="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+              <h2 class="text-base font-bold text-gray-900 dark:text-white">Recent Discovery Map</h2>
+              <Link href="/plant-map" class="text-xs font-medium text-emerald-600 hover:text-emerald-700">View Full Map</Link>
+            </div>
+            <div class="relative flex-grow bg-gray-100 dark:bg-gray-900 min-h-[300px]">
+              <!-- Leaflet Map Container -->
+              <div ref="mapContainer" class="absolute inset-0 z-0"></div>
+
+              <!-- Map Overlay Card -->
+              <div v-if="latestSighting" class="absolute bottom-4 left-4 right-4 z-[1000] bg-white dark:bg-gray-800 p-3 rounded-xl shadow-lg flex items-center gap-3 border border-gray-100 dark:border-gray-700">
+                <div class="w-12 h-12 overflow-hidden rounded-lg bg-gray-100 shrink-0">
+                  <img
+                    v-if="latestSighting.image"
+                    :src="latestSighting.image"
+                    class="object-cover w-full h-full"
+                    :alt="latestSighting.commonName || 'Plant'"
+                  />
+                  <div v-else class="flex items-center justify-center h-full">
+                    <Icon name="image" class="w-6 h-6 text-gray-300" />
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent class="flex flex-col justify-end flex-1 p-6">
-                <!-- Chart container with hover effects -->
-                <div class="h-[200px] w-full relative group">
-                  <svg
-                    class="w-full h-full overflow-visible"
-                    viewBox="0 0 300 150"
-                    preserveAspectRatio="none"
-                  >
-                    <defs>
-                      <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.3" />
-                        <stop offset="50%" stop-color="#10b981" stop-opacity="0.1" />
-                        <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
-                      </linearGradient>
-                      <filter id="glow">
-                        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                        <feMerge>
-                          <feMergeNode in="coloredBlur" />
-                          <feMergeNode in="SourceGraphic" />
-                        </feMerge>
-                      </filter>
-                    </defs>
-
-                    <!-- Grid lines -->
-                    <line
-                      x1="0"
-                      y1="150"
-                      x2="300"
-                      y2="150"
-                      stroke="#e5e7eb"
-                      stroke-width="1"
-                    />
-                    <line
-                      x1="0"
-                      y1="112.5"
-                      x2="300"
-                      y2="112.5"
-                      stroke="#f3f4f6"
-                      stroke-width="1"
-                      stroke-dasharray="4 4"
-                    />
-                    <line
-                      x1="0"
-                      y1="75"
-                      x2="300"
-                      y2="75"
-                      stroke="#f3f4f6"
-                      stroke-width="1"
-                      stroke-dasharray="4 4"
-                    />
-                    <line
-                      x1="0"
-                      y1="37.5"
-                      x2="300"
-                      y2="37.5"
-                      stroke="#f3f4f6"
-                      stroke-width="1"
-                      stroke-dasharray="4 4"
-                    />
-
-                    <!-- Dynamic Area -->
-                    <path
-                      :d="chartPath.area"
-                      fill="url(#chartGradient)"
-                      class="transition-all duration-500"
-                    />
-
-                    <!-- Dynamic Line -->
-                    <path
-                      :d="chartPath.line"
-                      fill="none"
-                      stroke="#10b981"
-                      stroke-width="2.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      class="transition-all duration-500"
-                      filter="url(#glow)"
-                    />
-
-                    <!-- Dynamic Points with tooltips -->
-                    <g v-for="(point, idx) in chartPath.points" :key="idx">
-                      <circle
-                        :cx="point.x"
-                        :cy="point.y"
-                        r="4"
-                        fill="#ffffff"
-                        stroke="#10b981"
-                        stroke-width="2"
-                        class="transition-all duration-300 cursor-pointer hover:r-6"
-                      />
-                      <!-- Hover area for tooltip -->
-                      <circle
-                        :cx="point.x"
-                        :cy="point.y"
-                        r="12"
-                        fill="transparent"
-                        class="cursor-pointer"
-                      >
-                        <title>{{ point.month }}: {{ point.sightings }} sightings</title>
-                      </circle>
-                    </g>
-                  </svg>
-
-                  <!-- Empty state overlay -->
-                  <div
-                    v-if="!activityData || activityData.every((d) => d.sightings === 0)"
-                    class="absolute inset-0 flex items-center justify-center rounded-lg bg-gray-50/80"
-                  >
-                    <div class="text-center">
-                      <Icon
-                        name="bar-chart-2"
-                        class="w-8 h-8 mx-auto mb-2 text-gray-300"
-                      />
-                      <p class="text-sm text-gray-500">No activity yet</p>
-                      <p class="text-xs text-gray-400">Start adding sightings!</p>
-                    </div>
-                  </div>
+                <div class="flex-grow min-w-0">
+                  <h4 class="text-sm font-bold text-gray-900 truncate dark:text-white">
+                    {{ latestSighting.commonName || latestSighting.scientificName || "Unknown Plant" }}
+                  </h4>
+                  <p class="text-xs text-gray-500 truncate dark:text-gray-400">
+                    {{ latestSighting.location }} • {{ latestSighting.date }}
+                  </p>
                 </div>
+              </div>
 
-                <!-- Dynamic month labels -->
-                <div
-                  class="flex justify-between mt-4 text-xs font-medium tracking-wider text-gray-400 uppercase"
+              <!-- Map Controls -->
+              <div class="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
+                <button
+                  @click="zoomIn"
+                  class="p-2 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
-                  <span v-for="month in chartMonths" :key="month">{{ month }}</span>
-                </div>
-
-                <!-- Summary stats -->
-                <div
-                  class="flex items-center justify-between pt-4 mt-4 border-t border-gray-100"
+                  <Icon name="plus" class="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                </button>
+                <button
+                  @click="zoomOut"
+                  class="p-2 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
-                  <div class="text-xs text-gray-500">
-                    <span class="font-semibold text-gray-900">{{
-                      activityData?.reduce((sum, d) => sum + d.sightings, 0) || 0
-                    }}</span>
-                    total sightings
-                  </div>
-                  <div class="text-xs text-gray-500">
-                    <span class="font-semibold text-gray-900">{{
-                      activityData?.reduce((sum, d) => sum + d.newSpecies, 0) || 0
-                    }}</span>
-                    new species
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <Icon name="minus" class="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Bottom Grid -->
-        <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          <!-- Recent Sightings -->
-          <div class="lg:col-span-2">
-            <Card
-              class="h-full overflow-hidden transition-shadow duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md"
-            >
-              <CardHeader
-                class="flex flex-row items-center justify-between px-6 py-5 border-b border-gray-100"
-              >
-                <div>
-                  <CardTitle class="text-lg font-bold text-gray-900"
-                    >Recent Sightings</CardTitle
-                  >
-                  <p class="mt-1 text-sm text-gray-500">Your latest contributions</p>
-                </div>
-                <Link
-                  href="/sightings"
-                  class="flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
-                >
-                  View All History
-                  <Icon name="arrow-right" class="w-3.5 h-3.5" />
-                </Link>
-              </CardHeader>
-              <div class="overflow-x-auto">
-                <table
-                  v-if="recentSightings && recentSightings.length > 0"
-                  class="w-full text-sm text-left"
-                >
-                  <thead
-                    class="text-xs font-semibold tracking-wider text-gray-500 uppercase bg-gray-50"
-                  >
-                    <tr>
-                      <th class="px-6 py-4">Plant Species</th>
-                      <th class="px-6 py-4">Family</th>
-                      <th class="px-6 py-4">Location</th>
-                      <th class="px-6 py-4">Status</th>
-                      <th class="px-6 py-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-gray-100">
-                    <tr
-                      v-for="sighting in recentSightings"
-                      :key="sighting.id"
-                      class="transition-colors hover:bg-gray-50/80 group"
-                    >
-                      <td class="px-6 py-4">
-                        <div class="flex items-center gap-3">
-                          <div
-                            class="flex items-center justify-center w-10 h-10 overflow-hidden bg-gray-100 border border-gray-200 rounded-lg shrink-0"
-                          >
-                            <img
-                              v-if="sighting.image"
-                              :src="sighting.image"
-                              class="object-cover w-full h-full"
-                              :alt="sighting.name"
-                            />
-                            <Icon v-else name="image" class="w-5 h-5 text-gray-400" />
-                          </div>
-                          <div>
-                            <p
-                              class="font-semibold text-gray-900 transition-colors group-hover:text-emerald-700"
-                            >
-                              {{ sighting.name }}
-                            </p>
-                            <p class="text-xs text-gray-500">{{ sighting.date }}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 text-gray-600">
-                        <span
-                          class="bg-gray-100 text-gray-700 px-2.5 py-1 rounded text-xs font-medium"
-                          >{{ sighting.family }}</span
-                        >
-                      </td>
-                      <td class="px-6 py-4 text-gray-600">
-                        <div class="flex items-center gap-1.5">
-                          <Icon name="map-pin" class="w-3.5 h-3.5 text-gray-400" />
-                          {{ sighting.location }}
-                        </div>
-                      </td>
-                      <td class="px-6 py-4">
-                        <div
-                          class="flex items-center gap-2 text-xs font-medium"
-                          :class="sighting.statusClass"
-                        >
-                          <div
-                            class="w-2 h-2 bg-current rounded-full ring-2 ring-current ring-opacity-20"
-                          ></div>
-                          {{ sighting.status }}
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 text-right">
-                        <Link :href="`/sightings/${sighting.id}`">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            class="w-8 h-8 text-gray-400 hover:text-gray-900 hover:bg-gray-100"
-                          >
-                            <Icon name="eye" class="w-4 h-4" />
-                          </Button>
-                        </Link>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <!-- Empty state -->
-                <div v-else class="px-6 py-12 text-center">
-                  <div
-                    class="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-gray-50"
-                  >
-                    <Icon name="flower-2" class="w-8 h-8 text-gray-300" />
-                  </div>
-                  <h3 class="mb-1 text-sm font-semibold text-gray-900">
-                    No sightings yet
-                  </h3>
-                  <p class="mb-4 text-sm text-gray-500">
-                    Start exploring and log your first plant sighting!
-                  </p>
-                  <Link href="/plant-identifier">
-                    <Button class="gap-2 text-white bg-emerald-600 hover:bg-emerald-700">
-                      <Icon name="plus" class="w-4 h-4" />
-                      Add Your First Sighting
-                    </Button>
-                  </Link>
-                </div>
+        <!-- Recent Sightings Table -->
+        <div class="mt-8 overflow-hidden bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+          <div class="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Recent Sightings</h2>
+            <div class="flex items-center gap-3">
+              <div class="flex p-1 bg-gray-100 rounded-lg dark:bg-gray-900">
+                <button class="p-1.5 rounded bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white">
+                  <Icon name="layout-grid" class="w-4 h-4" />
+                </button>
+                <button class="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                  <Icon name="list" class="w-4 h-4" />
+                </button>
               </div>
-            </Card>
+              <Link href="/sightings" class="text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">View All</Link>
+            </div>
           </div>
-
-          <!-- Right Sidebar: Alerts & Actions -->
-          <div class="space-y-6">
-            <!-- Alerts -->
-            <Card
-              class="transition-shadow duration-200 bg-white border border-gray-100 shadow-sm hover:shadow-md"
-            >
-              <CardHeader
-                class="flex flex-row items-center justify-between px-6 py-5 pb-2"
-              >
-                <CardTitle class="text-lg font-bold text-gray-900"
-                  >Alerts & News</CardTitle
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead class="text-xs font-medium uppercase bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400">
+                <tr>
+                  <th class="px-6 py-4">Plant Name</th>
+                  <th class="px-6 py-4">Family</th>
+                  <th class="px-6 py-4">Location</th>
+                  <th class="px-6 py-4">Date</th>
+                  <th class="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                <tr
+                  v-for="sighting in recentSightings"
+                  :key="sighting.id"
+                  class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
                 >
-                <Link
-                  href="#"
-                  class="text-xs font-semibold text-gray-500 hover:text-gray-900 hover:underline"
-                  >View All</Link
-                >
-              </CardHeader>
-              <CardContent class="p-0">
-                <div class="divide-y divide-gray-100">
-                  <div
-                    v-for="(alert, index) in alerts"
-                    :key="index"
-                    class="p-4 transition-colors cursor-pointer hover:bg-gray-50 group"
-                  >
-                    <div class="flex gap-4">
-                      <div class="mt-0.5 shrink-0">
-                        <div
-                          :class="`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${
-                            alert.type === 'warning'
-                              ? 'bg-amber-100 text-amber-600'
-                              : alert.type === 'success'
-                              ? 'bg-emerald-100 text-emerald-600'
-                              : 'bg-blue-100 text-blue-600'
-                          }`"
-                        >
-                          <Icon
-                            :name="
-                              alert.type === 'warning'
-                                ? 'alert-triangle'
-                                : alert.type === 'success'
-                                ? 'tree-pine'
-                                : 'info'
-                            "
-                            class="w-5 h-5"
-                          />
+                  <td class="px-6 py-5">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-900 shrink-0">
+                        <img
+                          v-if="sighting.image"
+                          :src="sighting.image"
+                          class="object-cover w-full h-full"
+                          :alt="sighting.name"
+                        />
+                        <div v-else class="flex items-center justify-center h-full">
+                          <Icon name="spa" class="w-5 h-5 text-emerald-600" />
                         </div>
                       </div>
                       <div>
-                        <h4
-                          class="text-sm font-semibold text-gray-900 transition-colors group-hover:text-emerald-700"
-                        >
-                          {{ alert.title }}
-                        </h4>
-                        <p class="mt-1 text-xs leading-relaxed text-gray-500">
-                          {{ alert.description }}
-                        </p>
-                        <p
-                          class="text-[10px] text-gray-400 mt-2 font-medium uppercase tracking-wide"
-                        >
-                          {{ alert.time }}
-                        </p>
+                        <div class="text-sm font-bold text-gray-900 dark:text-white">{{ sighting.name }}</div>
+                        <div class="text-xs italic text-gray-500 dark:text-gray-400">{{ sighting.common_name || sighting.name }}</div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <!-- Quick Actions (Light Mode) -->
-            <Card
-              class="relative overflow-hidden transition-shadow duration-200 bg-white border border-gray-200 shadow-sm hover:shadow-md"
-            >
-              <div
-                class="absolute inset-0 opacity-50 bg-gradient-to-br from-gray-50 to-white"
-              ></div>
-              <CardHeader
-                class="relative z-10 flex flex-row items-center justify-between px-6 py-5 border-b border-gray-100"
-              >
-                <CardTitle class="text-base font-bold text-gray-900"
-                  >Quick Actions</CardTitle
-                >
-                <div class="bg-amber-100 p-1.5 rounded-full">
-                  <Icon name="zap" class="w-3.5 h-3.5 text-amber-600" />
-                </div>
-              </CardHeader>
-              <CardContent class="relative z-10 p-6">
-                <div class="grid grid-cols-2 gap-4">
-                  <Link
-                    v-for="action in quickActions"
-                    :key="action.label"
-                    :href="action.href"
-                    class="block group"
-                  >
-                    <div
-                      class="flex flex-col items-center justify-center h-full gap-3 p-4 text-center transition-all duration-200 border border-gray-100 rounded-xl bg-gray-50 hover:bg-white hover:border-emerald-200 hover:shadow-md"
+                  </td>
+                  <td class="px-6 py-5">
+                    <span
+                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      :class="sighting.status === 'Endangered' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'"
                     >
-                      <div
-                        :class="`p-2.5 rounded-full bg-white shadow-sm ring-1 ring-gray-100 group-hover:ring-emerald-100 ${action.color}`"
-                      >
-                        <Icon :name="action.icon" class="w-5 h-5" />
-                      </div>
-                      <span
-                        class="text-xs font-semibold text-gray-700 group-hover:text-gray-900"
-                        >{{ action.label }}</span
-                      >
+                      {{ sighting.family }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-5 text-sm text-gray-600 dark:text-gray-300">
+                    <div class="flex items-center gap-1">
+                      <Icon name="map-pin" class="w-3.5 h-3.5 text-gray-400" />
+                      {{ sighting.location }}
                     </div>
-                  </Link>
+                  </td>
+                  <td class="px-6 py-5 text-sm text-gray-600 dark:text-gray-300">{{ sighting.date }}</td>
+                  <td class="px-6 py-5 text-right">
+                    <Link :href="`/sightings/${sighting.id}`">
+                      <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <Icon name="more-vertical" class="w-5 h-5" />
+                      </button>
+                    </Link>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Bottom Section: Alerts & Actions -->
+        <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
+          <!-- Conservation Alerts -->
+          <div class="p-6 bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+            <h2 class="flex items-center gap-2 mb-4 text-lg font-bold text-gray-900 dark:text-white">
+              <Icon name="alert-triangle" class="w-5 h-5 text-orange-500" />
+              Conservation Alerts
+            </h2>
+            <div class="space-y-3">
+              <div
+                v-for="(alert, index) in alerts"
+                :key="index"
+                :class="`p-4 border rounded-xl flex items-start gap-3 ${
+                  alert.type === 'warning'
+                    ? 'bg-orange-50 border-orange-100 dark:bg-orange-900/10 dark:border-orange-900/30'
+                    : 'bg-blue-50 border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/30'
+                }`"
+              >
+                <Icon
+                  :name="alert.type === 'warning' ? 'info' : 'flask-conical'"
+                  :class="`w-5 h-5 mt-0.5 ${alert.type === 'warning' ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`"
+                />
+                <div>
+                  <h4 :class="`text-sm font-bold ${alert.type === 'warning' ? 'text-orange-800 dark:text-orange-300' : 'text-blue-800 dark:text-blue-300'}`">
+                    {{ alert.title }}
+                  </h4>
+                  <p :class="`text-xs mt-1 ${alert.type === 'warning' ? 'text-orange-700 dark:text-orange-400' : 'text-blue-700 dark:text-blue-400'}`">
+                    {{ alert.description }}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="p-6 bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-2xl shadow-sm">
+            <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">Quick Actions</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <Link
+                v-for="action in quickActions"
+                :key="action.label"
+                :href="action.href"
+                class="flex flex-col items-center justify-center p-6 transition-colors bg-gray-50 dark:bg-gray-900 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 group"
+              >
+                <Icon
+                  :name="action.icon"
+                  class="w-6 h-6 mb-2 text-gray-500 transition-colors group-hover:text-emerald-600 dark:text-gray-400 dark:group-hover:text-white"
+                />
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ action.label }}</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>

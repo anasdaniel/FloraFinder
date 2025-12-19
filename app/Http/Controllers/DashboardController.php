@@ -33,15 +33,16 @@ class DashboardController extends Controller
             ? round((($lastMonthSightings - $previousMonthSightings) / $previousMonthSightings) * 100)
             : ($lastMonthSightings > 0 ? 100 : 0);
 
-        // Get unique species/plants logged by user
-        $uniqueSpecies = PlantIdentification::where('user_id', $userId)
+        // Get unique species/plants logged by user (from their actual sightings)
+        $uniqueSpecies = Sighting::where('user_id', $userId)
             ->distinct()
             ->count('scientific_name');
 
-        // Get unique families
-        $uniqueFamilies = PlantIdentification::where('user_id', $userId)
+        // Get unique families from sightings
+        $uniqueFamilies = Sighting::where('user_id', $userId)
+            ->join('plants', 'sightings.plant_id', '=', 'plants.id')
             ->distinct()
-            ->count('family');
+            ->count('plants.family');
 
         // Get unique regions explored
         $regionsExplored = Sighting::where('user_id', $userId)
@@ -56,10 +57,12 @@ class DashboardController extends Controller
             ->orderByDesc('count')
             ->first();
 
-        // Get conservation impact - count endangered species identified
-        $endangeredCount = PlantIdentification::where('user_id', $userId)
-            ->whereIn('iucn_category', ['EN', 'CR', 'VU']) // Endangered, Critically Endangered, Vulnerable
-            ->count();
+        // Get conservation impact - count unique endangered species found in sightings
+        $endangeredCount = Sighting::where('user_id', $userId)
+            ->join('plants', 'sightings.plant_id', '=', 'plants.id')
+            ->whereIn('plants.iucn_category', ['EN', 'CR', 'VU']) // Endangered, Critically Endangered, Vulnerable
+            ->distinct()
+            ->count('plants.scientific_name');
 
         $conservationImpact = $endangeredCount > 3 ? 'High' : ($endangeredCount > 0 ? 'Medium' : 'Low');
 
@@ -94,11 +97,10 @@ class DashboardController extends Controller
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->count();
 
-            $newSpeciesCount = PlantIdentification::where('user_id', $userId)
+            $newSpeciesCount = Sighting::where('user_id', $userId)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->select('scientific_name')
                 ->distinct()
-                ->count();
+                ->count('scientific_name');
 
             $activityData[] = [
                 'month' => $month->format('M'),
@@ -112,42 +114,40 @@ class DashboardController extends Controller
             [
                 'label' => 'Total Sightings',
                 'value' => (string) $totalSightings,
-                'subtext' => ($sightingsGrowth >= 0 ? '+' : '') . $sightingsGrowth . '%',
-                'subtextClass' => $sightingsGrowth >= 0
-                    ? 'text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-xs font-medium'
-                    : 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full text-xs font-medium',
+                'subtext' => ($sightingsGrowth >= 0 ? '+' : '') . $sightingsGrowth . '% this month',
+                'subtextClass' => $sightingsGrowth >= 0 ? 'text-emerald-600' : 'text-rose-600',
                 'icon' => 'eye',
-                'color' => 'text-emerald-600',
-                'bgColor' => 'bg-emerald-50',
-                'progress' => min(100, $totalSightings * 2), // Scale for visual
+                'color' => 'text-gray-600',
+                'bgColor' => 'bg-gray-50',
+                'progress' => min(100, $totalSightings * 2),
             ],
             [
                 'label' => 'Species Logged',
                 'value' => (string) $uniqueSpecies,
                 'subtext' => 'Across ' . $uniqueFamilies . ' families',
-                'subtextClass' => 'text-gray-500 text-xs',
-                'icon' => 'flower-2',
-                'color' => 'text-amber-500',
+                'subtextClass' => 'text-gray-500',
+                'icon' => 'leaf',
+                'color' => 'text-amber-600',
                 'bgColor' => 'bg-amber-50',
                 'progress' => min(100, $uniqueSpecies * 5),
             ],
             [
                 'label' => 'Regions Explored',
                 'value' => (string) $regionsExplored->count(),
-                'subtext' => $topRegion ? 'Top: ' . $topRegion->region : 'None yet',
-                'subtextClass' => 'text-blue-500 text-xs',
+                'subtext' => $topRegion ? 'Mostly in ' . $topRegion->region : 'None yet',
+                'subtextClass' => 'text-gray-500',
                 'icon' => 'map',
-                'color' => 'text-blue-500',
+                'color' => 'text-blue-600',
                 'bgColor' => 'bg-blue-50',
                 'progress' => min(100, $regionsExplored->count() * 20),
             ],
             [
-                'label' => 'Conservation Impact',
-                'value' => $conservationImpact,
-                'subtext' => $endangeredCount . ' Endangered',
-                'subtextClass' => 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full text-xs font-medium',
+                'label' => 'Conservation',
+                'value' => (string) $endangeredCount,
+                'subtext' => 'Endangered Found',
+                'subtextClass' => 'text-rose-600',
                 'icon' => 'shield-check',
-                'color' => 'text-rose-500',
+                'color' => 'text-rose-600',
                 'bgColor' => 'bg-rose-50',
                 'progress' => $conservationImpact === 'High' ? 85 : ($conservationImpact === 'Medium' ? 50 : 20),
             ],
