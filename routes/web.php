@@ -253,7 +253,7 @@ Route::get('plant-identifier/identify', function () {
     return redirect()->route('plant-identifier');
 });
 
-Route::get(
+Route::post(
     '/plant-identifier/care-details',
     [PlantIdentifierController::class, 'getCareDetails']
 )->name('plant-identifier.care-details');

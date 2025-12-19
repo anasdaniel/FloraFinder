@@ -79,6 +79,16 @@ class PlantIdentifierController extends Controller
                 try {
                     $topResult = $plantData['data']['results'][0];
                     $species = $topResult['species'] ?? [];
+                    $imageUrl = $topResult['images'][0]['url']['m'] ?? $topResult['images'][0]['url']['o'] ?? null;
+
+                    // Collect all reference images from the API
+                    $referenceImages = [];
+                    if (!empty($topResult['images'])) {
+                        foreach ($topResult['images'] as $img) {
+                            $referenceImages[] = $img['url']['m'] ?? $img['url']['o'] ?? null;
+                        }
+                    }
+                    $referenceImages = array_filter($referenceImages);
 
                     $this->plantCacheService->findOrCreateWithCare(
                         $species['scientificName'] ?? $species['scientificNameWithoutAuthor'] ?? 'Unknown',
@@ -87,7 +97,9 @@ class PlantIdentifierController extends Controller
                         $species['genus']['scientificNameWithoutAuthor'] ?? null,
                         $topResult['gbif']['id'] ?? null,
                         $topResult['powo']['id'] ?? null,
-                        $topResult['iucn']['category'] ?? null
+                        $topResult['iucn']['category'] ?? null,
+                        $imageUrl,
+                        $referenceImages
                     );
                 } catch (\Exception $e) {
                     // Log but don't fail the identification request
@@ -225,6 +237,8 @@ class PlantIdentifierController extends Controller
             'gbifId' => 'nullable|string|max:255',
             'powoId' => 'nullable|string|max:255',
             'iucnCategory' => 'nullable|string|max:255',
+            'imageUrl' => 'nullable|string|max:1000',
+            'referenceImages' => 'nullable|array',
             'provider' => 'nullable|string|in:gemini,trefle',
             'forceRefresh' => 'nullable|boolean',
         ]);
@@ -237,6 +251,8 @@ class PlantIdentifierController extends Controller
             $gbifId = $request->input('gbifId');
             $powoId = $request->input('powoId');
             $iucnCategory = $request->input('iucnCategory');
+            $imageUrl = $request->input('imageUrl');
+            $referenceImages = $request->input('referenceImages');
             $provider = $request->input('provider', 'gemini'); // Default to gemini
             $forceRefresh = $request->boolean('forceRefresh', false);
 
@@ -249,6 +265,8 @@ class PlantIdentifierController extends Controller
                 $gbifId,
                 $powoId,
                 $iucnCategory,
+                $imageUrl,
+                $referenceImages,
                 $provider,
                 $forceRefresh
             );

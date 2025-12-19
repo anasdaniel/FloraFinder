@@ -29,7 +29,9 @@ class PlantCacheService
         ?string $genus = null,
         ?string $gbifId = null,
         ?string $powoId = null,
-        ?string $iucnCategory = null
+        ?string $iucnCategory = null,
+        ?string $imageUrl = null,
+        ?array $referenceImages = null
     ): Plant {
         // Try to find existing plant
         $plant = Plant::where('scientific_name', $scientificName)->first();
@@ -44,6 +46,8 @@ class PlantCacheService
                 'gbif_id' => $gbifId,
                 'powo_id' => $powoId,
                 'iucn_category' => $iucnCategory,
+                'image_url' => $imageUrl,
+                'reference_images' => $referenceImages,
             ]);
         } else {
             // Update fields if provided and currently missing
@@ -51,6 +55,14 @@ class PlantCacheService
 
             if ($commonName && !$plant->common_name) {
                 $plant->common_name = $commonName;
+                $updated = true;
+            }
+            if ($imageUrl && !$plant->image_url) {
+                $plant->image_url = $imageUrl;
+                $updated = true;
+            }
+            if ($referenceImages && empty($plant->reference_images)) {
+                $plant->reference_images = $referenceImages;
                 $updated = true;
             }
             if ($family && !$plant->family) {
@@ -131,6 +143,8 @@ class PlantCacheService
         ?string $gbifId = null,
         ?string $powoId = null,
         ?string $iucnCategory = null,
+        ?string $imageUrl = null,
+        ?array $referenceImages = null,
         string $preferredProvider = 'gemini',
         bool $forceRefresh = false
     ): array {
@@ -141,7 +155,9 @@ class PlantCacheService
             $genus,
             $gbifId,
             $powoId,
-            $iucnCategory
+            $iucnCategory,
+            $imageUrl,
+            $referenceImages
         );
 
         if ($forceRefresh || $plant->needsCareRefresh() || ($preferredProvider !== $plant->getCareSource() && $preferredProvider !== 'none')) {

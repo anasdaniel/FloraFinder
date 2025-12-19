@@ -207,6 +207,8 @@ export function usePlantIdentification({
               gbifId: topResult.gbif?.id,
               powoId: topResult.powo?.id,
               iucnCategory: topResult.iucn?.category,
+              imageUrl: topResult.images?.[0]?.url?.m || topResult.images?.[0]?.url?.o,
+              referenceImages: topResult.images?.map(img => img.url?.m || img.url?.o).filter(Boolean),
             });
           }, 500);
 
@@ -243,21 +245,22 @@ export function usePlantIdentification({
     fetchingCareDetails.value = true;
     careSource.value = null;
     try {
-      const url = new URL(route('plant-identifier.care-details'));
-      url.searchParams.append('scientificName', scientificName);
-      url.searchParams.append('provider', preferredProvider.value);
+      const payload = {
+        scientificName,
+        provider: preferredProvider.value,
+        ...additionalData,
+        forceRefresh: forceRefresh ? 1 : 0,
+      };
 
-      if (additionalData.commonName) url.searchParams.append('commonName', additionalData.commonName);
-      if (additionalData.family) url.searchParams.append('family', additionalData.family);
-      if (additionalData.genus) url.searchParams.append('genus', additionalData.genus);
-      if (additionalData.gbifId) url.searchParams.append('gbifId', additionalData.gbifId);
-      if (additionalData.powoId) url.searchParams.append('powoId', additionalData.powoId);
-      if (additionalData.iucnCategory) url.searchParams.append('iucnCategory', additionalData.iucnCategory);
+      const res = await fetch(route('plant-identifier.care-details'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+        },
+        body: JSON.stringify(payload),
+      });
 
-      if (forceRefresh) {
-        url.searchParams.append('forceRefresh', '1');
-      }
-      const res = await fetch(url.toString());
       const data = await res.json();
       if (data.success) {
         careDetails.value = data.data;
@@ -362,6 +365,7 @@ export function usePlantIdentification({
           gbifId: result.gbif?.id,
           powoId: result.powo?.id,
           iucnCategory: result.iucn?.category,
+          imageUrl: result.images?.[0]?.url?.m || result.images?.[0]?.url?.o,
         });
       }
     }
@@ -481,6 +485,7 @@ export function usePlantIdentification({
         gbifId: match.gbif?.id,
         powoId: match.powo?.id,
         iucnCategory: match.iucn?.category,
+        imageUrl: match.images?.[0]?.url?.m || match.images?.[0]?.url?.o,
       });
     }
   };

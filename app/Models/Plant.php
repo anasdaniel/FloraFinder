@@ -13,6 +13,7 @@ class Plant extends Model
     protected $fillable = [
         'common_name',
         'scientific_name',
+        'image_url',
         'family',
         'genus',
         'habitat',
@@ -53,12 +54,14 @@ class Plant extends Model
         'care_cached_at',
         'care_source',
         'planting_recommendation_id',
+        'reference_images',
     ];
 
     protected $casts = [
         'growth_months' => 'array',
         'bloom_months' => 'array',
         'fruit_months' => 'array',
+        'reference_images' => 'array',
         'ph_minimum' => 'decimal:1',
         'ph_maximum' => 'decimal:1',
         'care_cached_at' => 'datetime',

@@ -33,6 +33,7 @@ interface Plant {
   id: number;
   scientific_name: string;
   common_name: string | null;
+  image_url: string | null;
   family: string | null;
   genus: string | null;
   habitat: string | null;
@@ -69,6 +70,7 @@ interface Plant {
   care_tips: string | null;
   care_source: "gemini" | "trefle" | null;
   care_cached_at: string | null;
+  reference_images: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,10 +79,13 @@ const props = defineProps<{
   plant: Plant;
   sightingCount: number;
   recentSightings: Sighting[];
+  sightingImages: string[];
 }>();
 
 const isRefreshing = ref(false);
 const selectedProvider = ref<'gemini' | 'trefle'>('gemini');
+const activeImageIndex = ref(0);
+const visibleCount = ref(8); // Initial number of images to show
 
 const refreshCareDetails = () => {
   isRefreshing.value = true;
@@ -224,10 +229,48 @@ const parsedCareTips = computed(() => {
   return parseCareText(props.plant.care_tips);
 });
 
-const mainImage = computed(() => {
-  const sightingWithImage = props.recentSightings.find((s) => s.image_url);
-  return sightingWithImage?.image_url || null;
+const galleryImages = computed(() => {
+  const images = [];
+  if (props.plant.image_url) {
+    images.push(props.plant.image_url);
+  }
+
+  // Add reference images from API if available
+  if (props.plant.reference_images && Array.isArray(props.plant.reference_images)) {
+    props.plant.reference_images.forEach((img) => {
+      if (img !== props.plant.image_url) {
+        images.push(img);
+      }
+    });
+  }
+
+  if (props.sightingImages && props.sightingImages.length > 0) {
+    // Filter out duplicates
+    const sightingImages = props.sightingImages.filter(
+      (img) =>
+        img !== props.plant.image_url &&
+        (!props.plant.reference_images || !props.plant.reference_images.includes(img))
+    );
+    images.push(...sightingImages);
+  }
+  return images;
 });
+
+const mainImage = computed(() => {
+  return galleryImages.value[activeImageIndex.value] || galleryImages.value[0] || null;
+});
+
+const displayedImages = computed(() => {
+  return galleryImages.value.slice(0, visibleCount.value);
+});
+
+const hasMoreImages = computed(() => {
+  return visibleCount.value < galleryImages.value.length;
+});
+
+const showMore = () => {
+  visibleCount.value += 8;
+};
 
 const getIucnCategoryInfo = (category: string | null): { label: string; color: string; bgColor: string } | null => {
   if (!category) return null;
@@ -293,7 +336,7 @@ const getConservationMessage = (category: string | null): string => {
         </div>
 
         <div class="relative px-4 py-12 mx-auto max-w-7xl sm:px-6 lg:px-8 sm:py-20">
-          <div class="flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
+          <div class="flex flex-col items-center justify-between gap-8 md:flex-row md:items-end">
             <div class="flex-1">
               <Link
                 :href="route('plants.index')"
@@ -345,6 +388,17 @@ const getConservationMessage = (category: string | null): string => {
               <p class="font-serif text-xl italic text-gray-300">
                 {{ plant.scientific_name }}
               </p>
+            </div>
+
+            <div v-if="mainImage" class="w-full md:w-64 lg:w-80 shrink-0">
+              <div class="relative overflow-hidden shadow-2xl aspect-square rounded-2xl border-4 border-white/10 group">
+                <img
+                  :src="mainImage"
+                  class="object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
+                  :alt="plant.common_name || plant.scientific_name"
+                />
+                <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -412,6 +466,44 @@ const getConservationMessage = (category: string | null): string => {
                 About this Plant
               </h2>
               <p class="text-lg leading-relaxed text-gray-600">{{ plant.description }}</p>
+            </div>
+
+            <!-- Image Gallery -->
+            <div
+              v-if="galleryImages.length > 0"
+              class="p-8 bg-white border border-gray-100 shadow-sm rounded-2xl"
+            >
+              <h2 class="flex items-center gap-2 mb-6 text-xl font-bold text-gray-900">
+                <span class="w-1 h-6 bg-green-500 rounded-full"></span>
+                Photo Gallery
+              </h2>
+              <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                <div
+                  v-for="(image, index) in displayedImages"
+                  :key="index"
+                  class="relative overflow-hidden aspect-square rounded-xl group cursor-pointer border-2 transition-all"
+                  :class="activeImageIndex === index ? 'border-green-500 ring-2 ring-green-500/20' : 'border-transparent hover:border-gray-200'"
+                  @click="activeImageIndex = index"
+                >
+                  <img
+                    :src="image"
+                    class="object-cover w-full h-full transition-transform duration-500 group-hover:scale-110"
+                    :alt="`${plant.common_name || plant.scientific_name} gallery image ${index + 1}`"
+                  />
+                  <div class="absolute inset-0 transition-opacity opacity-0 bg-black/20 group-hover:opacity-100"></div>
+                </div>
+              </div>
+
+              <!-- Show More Button -->
+              <div v-if="hasMoreImages" class="mt-8 flex justify-center">
+                <button
+                  @click="showMore"
+                  class="flex items-center gap-2 px-6 py-3 text-sm font-semibold text-green-700 transition-all bg-green-50 border border-green-100 rounded-xl hover:bg-green-100 hover:border-green-200"
+                >
+                  <RefreshCw class="w-4 h-4" />
+                  Show More Photos ({{ galleryImages.length - visibleCount }} remaining)
+                </button>
+              </div>
             </div>
 
             <!-- Conservation Notice for Threatened Plants -->

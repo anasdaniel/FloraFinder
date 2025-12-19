@@ -42,14 +42,14 @@ class PlantController extends Controller
 
         $plants = $query->orderBy('scientific_name')->paginate(20);
 
-        // Load the latest sighting image for each plant
+        // Load the latest sighting image for each plant, or use the API image as fallback
         $plants->getCollection()->transform(function ($plant) {
             $latestSighting = $plant->sightings()
                 ->whereNotNull('image_url')
                 ->latest('sighted_at')
                 ->first();
 
-            $plant->latest_image = $latestSighting?->image_url;
+            $plant->latest_image = $latestSighting?->image_url ?? $plant->image_url;
             return $plant;
         });
 
@@ -88,10 +88,17 @@ class PlantController extends Controller
             ->take(5)
             ->get();
 
+        // Get all sighting images for this plant
+        $sightingImages = \App\Models\SightingImage::whereIn('sighting_id', $plant->sightings()->pluck('id'))
+            ->latest()
+            ->pluck('image_url')
+            ->toArray();
+
         return Inertia::render('Plants/Show', [
             'plant' => $plant,
             'sightingCount' => $sightingCount,
             'recentSightings' => $recentSightings,
+            'sightingImages' => $sightingImages,
         ]);
     }
 
