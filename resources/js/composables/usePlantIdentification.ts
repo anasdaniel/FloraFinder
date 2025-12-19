@@ -200,7 +200,14 @@ export function usePlantIdentification({
           fetchThreatStatus(topResult.species.scientificName, 0);
           // Small delay to avoid simultaneous Gemini API calls (rate limiting)
           setTimeout(() => {
-            fetchCareDetails(topResult.species.scientificName);
+            fetchCareDetails(topResult.species.scientificName, false, {
+              commonName: topResult.species.commonNames?.[0],
+              family: topResult.species.family?.scientificNameWithoutAuthor,
+              genus: topResult.species.genus?.scientificNameWithoutAuthor,
+              gbifId: topResult.gbif?.id,
+              powoId: topResult.powo?.id,
+              iucnCategory: topResult.iucn?.category,
+            });
           }, 500);
 
           toast({
@@ -228,13 +235,25 @@ export function usePlantIdentification({
     }
   };
 
-  const fetchCareDetails = async (scientificName: string, forceRefresh = false) => {
+  const fetchCareDetails = async (
+    scientificName: string,
+    forceRefresh = false,
+    additionalData: any = {},
+  ) => {
     fetchingCareDetails.value = true;
     careSource.value = null;
     try {
       const url = new URL(route('plant-identifier.care-details'));
       url.searchParams.append('scientificName', scientificName);
       url.searchParams.append('provider', preferredProvider.value);
+
+      if (additionalData.commonName) url.searchParams.append('commonName', additionalData.commonName);
+      if (additionalData.family) url.searchParams.append('family', additionalData.family);
+      if (additionalData.genus) url.searchParams.append('genus', additionalData.genus);
+      if (additionalData.gbifId) url.searchParams.append('gbifId', additionalData.gbifId);
+      if (additionalData.powoId) url.searchParams.append('powoId', additionalData.powoId);
+      if (additionalData.iucnCategory) url.searchParams.append('iucnCategory', additionalData.iucnCategory);
+
       if (forceRefresh) {
         url.searchParams.append('forceRefresh', '1');
       }
@@ -335,7 +354,15 @@ export function usePlantIdentification({
       // Re-fetch care details with new provider if we have a selected result
       // Use cached data if available (false = don't force refresh)
       if (selectedResult.value?.species?.scientificName) {
-        fetchCareDetails(selectedResult.value.species.scientificName, false);
+        const result = selectedResult.value;
+        fetchCareDetails(result.species.scientificName, false, {
+          commonName: result.species.commonNames?.[0],
+          family: result.species.family?.scientificNameWithoutAuthor,
+          genus: result.species.genus?.scientificNameWithoutAuthor,
+          gbifId: result.gbif?.id,
+          powoId: result.powo?.id,
+          iucnCategory: result.iucn?.category,
+        });
       }
     }
   };
@@ -447,7 +474,14 @@ export function usePlantIdentification({
     chatMessages.value = [];
     const match = results.value?.data?.results[index];
     if (match) {
-      fetchCareDetails(match.species.scientificName);
+      fetchCareDetails(match.species.scientificName, false, {
+        commonName: match.species.commonNames?.[0],
+        family: match.species.family?.scientificNameWithoutAuthor,
+        genus: match.species.genus?.scientificNameWithoutAuthor,
+        gbifId: match.gbif?.id,
+        powoId: match.powo?.id,
+        iucnCategory: match.iucn?.category,
+      });
     }
   };
 

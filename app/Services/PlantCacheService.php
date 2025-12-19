@@ -130,7 +130,9 @@ class PlantCacheService
         ?string $genus = null,
         ?string $gbifId = null,
         ?string $powoId = null,
-        ?string $iucnCategory = null
+        ?string $iucnCategory = null,
+        string $preferredProvider = 'gemini',
+        bool $forceRefresh = false
     ): array {
         $plant = $this->findOrCreateWithCare(
             $scientificName,
@@ -141,7 +143,17 @@ class PlantCacheService
             $powoId,
             $iucnCategory
         );
-        return $plant->getCareDetails();
+
+        if ($forceRefresh || $plant->needsCareRefresh() || ($preferredProvider !== $plant->getCareSource() && $preferredProvider !== 'none')) {
+            $this->refreshCareDetails($plant, $preferredProvider);
+            $plant->refresh();
+        }
+
+        return [
+            'success' => $plant->hasCareDetails(),
+            'source' => $plant->getCareSource(),
+            'data' => $plant->getCareDetails(),
+        ];
     }
 
     /**

@@ -74,6 +74,27 @@ class PlantIdentifierController extends Controller
                 $plantData = $result;
             }
 
+            // Automatically add the top result to the plant library if successful
+            if ($plantData['success'] && !empty($plantData['data']['results'])) {
+                try {
+                    $topResult = $plantData['data']['results'][0];
+                    $species = $topResult['species'] ?? [];
+
+                    $this->plantCacheService->findOrCreateWithCare(
+                        $species['scientificName'] ?? $species['scientificNameWithoutAuthor'] ?? 'Unknown',
+                        $species['commonNames'][0] ?? null,
+                        $species['family']['scientificNameWithoutAuthor'] ?? null,
+                        $species['genus']['scientificNameWithoutAuthor'] ?? null,
+                        $topResult['gbif']['id'] ?? null,
+                        $topResult['powo']['id'] ?? null,
+                        $topResult['iucn']['category'] ?? null
+                    );
+                } catch (\Exception $e) {
+                    // Log but don't fail the identification request
+                    Log::warning('Failed to auto-add top result to library: ' . $e->getMessage());
+                }
+            }
+
             return Inertia::render('Identifier/Index', [
                 'plantData' => $plantData
             ]);
@@ -200,6 +221,10 @@ class PlantIdentifierController extends Controller
             'scientificName' => 'required|string|max:255',
             'commonName' => 'nullable|string|max:255',
             'family' => 'nullable|string|max:255',
+            'genus' => 'nullable|string|max:255',
+            'gbifId' => 'nullable|string|max:255',
+            'powoId' => 'nullable|string|max:255',
+            'iucnCategory' => 'nullable|string|max:255',
             'provider' => 'nullable|string|in:gemini,trefle',
             'forceRefresh' => 'nullable|boolean',
         ]);
@@ -208,14 +233,22 @@ class PlantIdentifierController extends Controller
             $scientificName = $request->input('scientificName');
             $commonName = $request->input('commonName');
             $family = $request->input('family');
+            $genus = $request->input('genus');
+            $gbifId = $request->input('gbifId');
+            $powoId = $request->input('powoId');
+            $iucnCategory = $request->input('iucnCategory');
             $provider = $request->input('provider', 'gemini'); // Default to gemini
             $forceRefresh = $request->boolean('forceRefresh', false);
 
-            // Use CareDetailsService to get care details with provider preference
-            $result = $this->careDetailsService->getCareDetails(
+            // Use PlantCacheService to get care details and ensure plant is in library
+            $result = $this->plantCacheService->getCareDetails(
                 $scientificName,
                 $commonName,
                 $family,
+                $genus,
+                $gbifId,
+                $powoId,
+                $iucnCategory,
                 $provider,
                 $forceRefresh
             );

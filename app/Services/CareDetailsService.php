@@ -265,6 +265,11 @@ EOT;
             ]
         );
 
+        // Update common_name from Gemini if not already set and Gemini provided one
+        if (!$plant->common_name && !empty($careData['common_name']) && $careData['common_name'] !== 'null') {
+            $plant->common_name = $careData['common_name'];
+        }
+
         // Update care details
         $plant->update([
             'description' => $careData['description'] ?? null,
@@ -558,9 +563,9 @@ EOT;
 You are a botanical expert. Provide care guidance for: {$plantIdentification}{$familyInfo}.
 
 Return ONLY valid JSON (no markdown, no backticks):
-{"description":"1-2 sentences about the plant","watering_guide":"watering frequency and tips","sunlight_guide":"light requirements","soil_guide":"soil type and pH","temperature_guide":"temperature range and humidity","care_summary":"key care point in 1 sentence","care_tips":"2-3 practical tips"}
+{"common_name":"the most widely used common/vernacular name for this plant, or null if unknown","description":"1-2 sentences about the plant","watering_guide":"watering frequency and tips","sunlight_guide":"light requirements","soil_guide":"soil type and pH","temperature_guide":"temperature range and humidity","care_summary":"key care point in 1 sentence","care_tips":"2-3 practical tips"}
 
-Be concise but informative. Never leave fields empty.
+Be concise but informative. Never leave fields empty. For common_name, provide the most recognized English common name if one exists.
 PROMPT;
 
             // Use Saloon connector/request for Gemini instead of direct HTTP

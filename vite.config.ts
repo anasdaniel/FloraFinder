@@ -23,22 +23,22 @@ export default defineConfig({
         }),
     ],
     // ADD THIS SECTION BELOW
-    server: {
-        host: '0.0.0.0', // Important for mobile devices
-        cors: true,      // Tells Vite to allow all requests
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-            "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization"
-        }
-    },
+    // server: {
+    //     host: '0.0.0.0', // Important for mobile devices
+    //     cors: true,      // Tells Vite to allow all requests
+    //     headers: {
+    //         "Access-Control-Allow-Origin": "*",
+    //         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+    //         "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization"
+    //     }
+    // },
 
-    resolve: {
-        alias: {
-            '@': path.resolve(__dirname, './resources/js'),
-            'ziggy-js': resolve(__dirname, 'vendor/tightenco/ziggy'),
-        },
-    },
+    // resolve: {
+    //     alias: {
+    //         '@': path.resolve(__dirname, './resources/js'),
+    //         'ziggy-js': resolve(__dirname, 'vendor/tightenco/ziggy'),
+    //     },
+    // },
     css: {
         postcss: {
             plugins: [tailwindcss, autoprefixer],
