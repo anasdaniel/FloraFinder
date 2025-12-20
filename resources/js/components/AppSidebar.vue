@@ -3,12 +3,12 @@ import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
-import { type NavItem } from '@/types';
+import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import { BookOpen, Eye, Folder, LeafIcon, Map, SearchIcon, UsersRoundIcon, ShieldCheck, Users, MessageSquare, MapPin } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
-const page = usePage();
+const page = usePage<SharedData>();
 const user = page.props.auth.user;
 
 const mainNavItems: NavItem[] = [
@@ -17,10 +17,37 @@ const mainNavItems: NavItem[] = [
         href: '/welcome-plant',
         icon: LeafIcon,
     },
+    {
+        title: 'Identify Plant',
+        href: '/plant-identifier',
+        icon: SearchIcon,
+    },
+    {
+        title: 'My Sightings',
+        href: '/sightings',
+        icon: Eye,
+    },
+    {
+        title: 'Plant Library',
+        href: '/plants',
+        icon: BookOpen,
+    },
+    {
+        title: 'Sightings Map',
+        href: '/sightings-map',
+        icon: Map,
+    },
+    {
+        title: 'Forum',
+        href: '/forum',
+        icon: UsersRoundIcon,
+    },
 ];
 
+const adminNavItems: NavItem[] = [];
+
 if (user && user.is_admin) {
-    mainNavItems.push(
+    adminNavItems.push(
         {
             title: 'Admin Dashboard',
             href: '/admin/dashboard',
@@ -49,37 +76,7 @@ if (user && user.is_admin) {
     );
 }
 
-mainNavItems.push(
-    {
-        title: 'Identify Plant',
-        href: '/plant-identifier',
-        icon: SearchIcon,
-    },
-    {
-        title: 'My Sightings',
-        href: '/sightings',
-        icon: Eye,
-    },
-    {
-        title: 'Plant Library',
-        href: '/plants',
-        icon: BookOpen,
-    },
-    {
-        title: 'Sightings Map',
-        href: '/sightings-map',
-        icon: Map,
-    },
-    {
-        title: 'Forum',
-        href: '/forum',
-        icon: UsersRoundIcon,
-    },
-);
-
-const footerNavItems: NavItem[] = [
-
-];
+const footerNavItems: NavItem[] = [];
 </script>
 
 <template>
@@ -102,6 +99,7 @@ const footerNavItems: NavItem[] = [
 
     <SidebarFooter>
       <NavFooter :items="footerNavItems" />
+      <NavMain v-if="adminNavItems.length > 0" :items="adminNavItems" title="Administration" />
       <NavUser />
     </SidebarFooter>
   </Sidebar>
