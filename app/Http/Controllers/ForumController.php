@@ -159,7 +159,8 @@ class ForumController extends Controller
         ])->findOrFail($id);
 
         return Inertia::render('Forum/Post', [
-            'thread' => $thread
+            'thread' => $thread,
+            'allTags' => ForumTag::all()
         ]);
     }
 

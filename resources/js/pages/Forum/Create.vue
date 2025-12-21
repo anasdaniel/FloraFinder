@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
+import { onClickOutside } from '@vueuse/core';
 import { Head, Link, useForm } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ImagePlus, X, Loader2, AlertCircle, Plus } from 'lucide-vue-next';
+import { ArrowLeft, ImagePlus, X, Loader2, AlertCircle, Plus, Search } from 'lucide-vue-next';
 import { useToast } from "@/composables/useToast";
 import type { BreadcrumbItem } from "@/types";
 
@@ -107,16 +108,33 @@ const removeImage = () => {
   }
 };
 
-// Tag management
-const addTag = (value: string) => {
-    const tagId = parseInt(value);
-    if (!form.tag_ids.includes(tagId)) {
-        form.tag_ids.push(tagId);
-    }
-};
-
 const removeTag = (tagId: number) => {
     form.tag_ids = form.tag_ids.filter(id => id !== tagId);
+};
+
+// Searchable tags logic
+const showTagDropdown = ref(false);
+const tagSearchQuery = ref("");
+const tagDropdownRef = ref(null);
+
+onClickOutside(tagDropdownRef, () => {
+    showTagDropdown.value = false;
+});
+
+const filteredTags = computed(() => {
+    if (!tagSearchQuery.value) return tags.value || [];
+    const query = tagSearchQuery.value.toLowerCase();
+    return (tags.value || []).filter(tag => 
+        tag.tag_name.toLowerCase().includes(query)
+    );
+});
+
+const selectTag = (tag: any) => {
+    if (!form.tag_ids.includes(tag.id)) {
+        form.tag_ids.push(tag.id);
+    }
+    showTagDropdown.value = false;
+    tagSearchQuery.value = "";
 };
 
 // Submit the form
@@ -333,21 +351,48 @@ const submitForm = () => {
                       </span>
                   </div>
 
-                  <Select :model-value="''" @update:model-value="addTag">
-                      <SelectTrigger class="w-full text-sm transition-all border-gray-200 shadow-inner h-12 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20">
-                          <SelectValue placeholder="Add tags..." />
-                      </SelectTrigger>
-                      <SelectContent class="border-gray-200 shadow-2xl rounded-xl">
-                          <SelectItem
-                              v-for="tag in tags.filter(t => !form.tag_ids.includes(t.id))"
-                              :key="tag.id"
-                              :value="String(tag.id)"
-                              class="my-1 rounded-lg"
-                          >
-                              {{ tag.tag_name }}
-                          </SelectItem>
-                      </SelectContent>
-                  </Select>
+                  <div class="relative" ref="tagDropdownRef">
+                      <button
+                          type="button"
+                          class="w-full text-left px-4 h-12 rounded-xl bg-gray-50 border border-gray-200 text-sm font-medium text-gray-500 hover:bg-white hover:border-emerald-500/20 transition-all flex items-center justify-between group"
+                          @click="showTagDropdown = !showTagDropdown"
+                      >
+                          <span v-if="form.tag_ids.length === 0">Add tags...</span>
+                          <span v-else class="text-emerald-600 font-bold">Add more tags...</span>
+                          <Plus class="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                      </button>
+
+                      <div
+                          v-if="showTagDropdown"
+                          class="absolute left-0 right-0 mt-2 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 rounded-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-200 origin-top"
+                      >
+                          <div class="relative mb-2">
+                              <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <input 
+                                  v-model="tagSearchQuery"
+                                  type="text" 
+                                  placeholder="Search tags..." 
+                                  class="w-full bg-gray-50 border border-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all"
+                                  autoFocus
+                              />
+                          </div>
+                          <div class="max-h-60 overflow-y-auto custom-scrollbar rounded-xl border border-gray-50">
+                              <div v-if="filteredTags.length === 0" class="p-4 text-center text-sm text-gray-400 font-medium">
+                                  No tags found
+                              </div>
+                              <button
+                                  v-for="tag in filteredTags.filter(t => !form.tag_ids.includes(t.id))"
+                                  :key="tag.id"
+                                  type="button"
+                                  @click="selectTag(tag)"
+                                  class="w-full text-left px-4 py-3 text-sm font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
+                              >
+                                  <div class="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                                  {{ tag.tag_name }}
+                              </button>
+                          </div>
+                      </div>
+                  </div>
 
                   <p v-if="form.errors.tag_ids" class="text-xs text-red-500 mt-1.5 ml-1 flex items-center gap-1 font-bold">
                       <AlertCircle class="w-3.5 h-3.5" /> {{ form.errors.tag_ids }}

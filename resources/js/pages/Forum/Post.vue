@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { onClickOutside } from '@vueuse/core';
 import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Icon from '@/components/Icon.vue';
-import { Trash2, MessageCircle, SendHorizontal, Heart, Share2 } from 'lucide-vue-next';
+import { Trash2, MessageCircle, SendHorizontal, Heart, Share2, Plus, X, Search, ArrowLeft } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
 // Props from Inertia page
 const page = usePage();
-const thread = ref(page.props.thread);
-const authUser = page.props.auth.user;
+const thread = ref(page.props.thread as any);
+const allTags = computed(() => page.props.allTags as any[]);
+const authUser = computed(() => page.props.auth.user as any);
 
 // UI state
 const openReplyBox = ref<number | null>(null);
@@ -20,12 +22,82 @@ const commentContent = ref('');
 const replyContent = ref('');
 
 // Breadcrumbs
-const breadcrumbs: BreadcrumbItem[] = [
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
     { title: 'Forum', href: '/forum' },
-    { title: thread.value.title, href: `/forum/${thread.value.id}` },
-];
+    { title: thread.value?.title || 'Loading...', href: `/forum/${thread.value?.id || ''}` },
+]);
 
-const isOwner = (item) => authUser && authUser.id === item.user_id;
+// Tag management
+interface ForumTag {
+    id: number;
+    tag_name: string;
+}
+const showTagDropdown = ref(false);
+const tagSearchQuery = ref("");
+const tagDropdownRef = ref(null);
+
+onClickOutside(tagDropdownRef, () => {
+    showTagDropdown.value = false;
+});
+
+const filteredTags = computed(() => {
+    if (!tagSearchQuery.value) return allTags.value || [];
+    const query = tagSearchQuery.value.toLowerCase();
+    return (allTags.value || []).filter(tag => 
+        tag.tag_name.toLowerCase().includes(query)
+    );
+});
+
+const isOwner = (item: any) => authUser.value && authUser.value.id === item.user_id;
+
+const addTag = async (tag: ForumTag) => {
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${thread.value.id}/tags`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ tag_id: tag.id }),
+        });
+
+        if (res.ok) {
+            if (!thread.value.tags) thread.value.tags = [];
+            if (!thread.value.tags.some((t: any) => t.id === tag.id)) {
+                thread.value.tags.push(tag);
+            }
+            showTagDropdown.value = false;
+            tagSearchQuery.value = "";
+        }
+    } catch (e) {
+        console.error("Failed to add tag", e);
+    }
+};
+
+const removeTag = async (tagId: number) => {
+    if (!confirm("Are you sure you want to remove this tag?")) return;
+
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${thread.value.id}/tags/${tagId}`, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (res.ok) {
+            thread.value.tags = thread.value.tags.filter((t: any) => t.id !== tagId);
+        }
+    } catch (e) {
+        console.error("Failed to remove tag", e);
+    }
+};
 
 // Submit comment
 function submitComment() {
@@ -178,6 +250,63 @@ const shareThread = async () => {
                         :src="`/storage/${thread.image}`"
                         class="w-full h-auto max-h-[500px] object-cover"
                     />
+                </div>
+
+                <!-- Tags -->
+                <div v-if="thread.tags?.length || isOwner(thread)" class="flex flex-wrap items-center gap-1.5 mb-6">
+                    <span
+                        v-for="tag in thread.tags"
+                        :key="tag.id"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-gray-50 text-gray-600 rounded-full border border-gray-100 hover:bg-gray-100 transition-colors"
+                    >
+                        #{{ tag.tag_name }}
+                        <button
+                            v-if="isOwner(thread)"
+                            class="text-gray-300 hover:text-red-500 ml-0.5"
+                            @click="removeTag(tag.id)"
+                        >
+                            ×
+                        </button>
+                    </span>
+
+                    <div v-if="isOwner(thread)" class="relative" ref="tagDropdownRef">
+                        <button
+                            class="px-2.5 py-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-full border border-emerald-100 transition-all flex items-center gap-1"
+                            @click="showTagDropdown = !showTagDropdown"
+                        >
+                            <Plus class="w-3 h-3" />
+                            Tag
+                        </button>
+                        <div
+                            v-if="showTagDropdown"
+                            class="absolute left-0 mt-2 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 rounded-2xl p-3 z-50 w-64 animate-in fade-in zoom-in-95 duration-200 origin-top-left"
+                        >
+                            <div class="relative mb-2">
+                                <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                                <input 
+                                    v-model="tagSearchQuery"
+                                    type="text" 
+                                    placeholder="Search tags..." 
+                                    class="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all"
+                                    autoFocus
+                                />
+                            </div>
+                            <div class="max-h-48 overflow-y-auto custom-scrollbar rounded-xl border border-gray-50">
+                                <div v-if="filteredTags.length === 0" class="p-4 text-center text-[10px] text-gray-400 font-medium">
+                                    No tags found
+                                </div>
+                                <button
+                                    v-for="tag in filteredTags.filter(t => !thread.tags?.some((tt: any) => tt.id === t.id))"
+                                    :key="tag.id"
+                                    @click="addTag(tag)"
+                                    class="w-full text-left px-3 py-2 text-[11px] font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors flex items-center gap-2"
+                                >
+                                    <div class="w-1 h-1 rounded-full bg-emerald-400"></div>
+                                    {{ tag.tag_name }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Footer Stats -->

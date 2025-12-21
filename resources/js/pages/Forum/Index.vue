@@ -1,10 +1,31 @@
 <script setup lang="ts">
-import { defineProps, ref, computed, reactive, watch } from "vue";
+import { ref, computed, reactive, watch, onMounted, onUnmounted } from "vue";
 import { Head, Link, usePage, router } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
 import Heading from "@/components/Heading.vue";
 import Icon from "@/components/Icon.vue";
-import type { BreadcrumbItem, ForumThread } from "@/types";
+import type { BreadcrumbItem } from "@/types";
+interface ForumThread {
+    id: number;
+    title: string;
+    content: string;
+    category: string;
+    image: string | null;
+    user_id: number;
+    created_at: string;
+    user?: {
+        name: string;
+        avatar: string | null;
+    };
+    tags?: {
+        id: number;
+        tag_name: string;
+    }[];
+    posts_count?: number;
+    likes_count?: number;
+    shares_count?: number;
+    is_liked_by_user?: boolean;
+}
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,44 +36,107 @@ const newComment = ref("");
 
 // Tag management per thread
 const showTagDropdown = reactive<Record<number, boolean>>({});
-const selectedTag = ref(null);
+const tagSearchQuery = ref("");
+
+const toggleTagDropdown = (threadId: number) => {
+    const currentState = showTagDropdown[threadId];
+    // Close all first to ensure only one is open
+    Object.keys(showTagDropdown).forEach(key => {
+        showTagDropdown[Number(key)] = false;
+    });
+    showTagDropdown[threadId] = !currentState;
+    if (showTagDropdown[threadId]) {
+        tagSearchQuery.value = "";
+    }
+};
+
+const filteredTags = computed(() => {
+    if (!tagSearchQuery.value) return props.allTags || [];
+    const query = tagSearchQuery.value.toLowerCase();
+    return (props.allTags || []).filter(tag => 
+        tag.tag_name.toLowerCase().includes(query)
+    );
+});
+
+const addTag = async (threadId: number, tag: { id: number; tag_name: string }) => {
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${threadId}/tags`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ tag_id: tag.id }),
+        });
+
+        if (res.ok) {
+            // Update local thread state
+            const thread = props.threads.data.find(t => t.id === threadId);
+            if (thread) {
+                if (!thread.tags) thread.tags = [];
+                if (!thread.tags.some(t => t.id === tag.id)) {
+                    thread.tags.push(tag);
+                }
+            }
+            showTagDropdown[threadId] = false;
+            tagSearchQuery.value = "";
+        }
+    } catch (e) {
+        console.error("Failed to add tag", e);
+    }
+};
+
+const removeTag = async (threadId: number, tagId: number) => {
+    if (!confirm("Are you sure you want to remove this tag?")) return;
+
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch(`/forum/${threadId}/tags/${tagId}`, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrf || '',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (res.ok) {
+            const thread = props.threads.data.find(t => t.id === threadId);
+            if (thread) {
+                thread.tags = thread.tags.filter(t => t.id !== tagId);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to remove tag", e);
+    }
+};
+
+
 
 
 const page = usePage();
-const authUser = page.props.auth.user;
+const authUser = computed(() => page.props.auth.user as any);
 
-// Add this at the top with your other refs
-const allTags = ref<{ id: number; tag_name: string }[]>([]);
+const isOwner = (thread: ForumThread) => authUser.value && authUser.value.id === thread.user_id;
 
-// Fetch or define all tags (could be from page props or API)
-allTags.value = page.props.allTags || []; // if passed from backend
-
-const isOwner = (thread) => authUser && authUser.id === thread.user_id;
-
-const addTag = (threadId) => {
-    if (!selectedTag.value) return;
-
-    router.post(`/forum/${threadId}/tags`,
-        { tag_id: selectedTag.value },
-        { preserveScroll: true }
-    );
-
-    showTagDropdown[threadId] = false;
-    selectedTag.value = null;
-};
-
-const removeTag = (threadId, tagId) => {
-    if (!confirm("Are you sure you want to remove this tag?")) {
-        return;
-    }
-
-    router.delete(`/forum/${threadId}/tags/${tagId}`, {
-        preserveScroll: true,
+// Click outside to close tag dropdowns
+onMounted(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.tag-management-container')) {
+            Object.keys(showTagDropdown).forEach(key => {
+                showTagDropdown[Number(key)] = false;
+            });
+        }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    onUnmounted(() => {
+        window.removeEventListener('mousedown', handleClickOutside);
     });
-};
-
-
-
+});
 
 // Local cache of comments per thread
 const commentsMap = ref<Record<number, any[]>>({});
@@ -523,31 +607,42 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                             </button>
                         </span>
 
-                         <div v-if="isOwner(thread)" class="relative">
+                         <div v-if="isOwner(thread)" class="relative tag-management-container">
                             <button
                                 class="px-2.5 py-1 text-[9px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-full border border-emerald-100 transition-all flex items-center gap-1"
-                                @click="showTagDropdown[thread.id] = !showTagDropdown[thread.id]"
+                                @click="toggleTagDropdown(thread.id)"
                             >
                                 <Plus class="w-2.5 h-2.5" />
                                 Tag
                             </button>
                             <div
                                 v-if="showTagDropdown[thread.id]"
-                                class="absolute left-0 mt-1.5 bg-white shadow-2xl border border-gray-100 rounded-xl p-3 z-50 w-48 animate-in fade-in zoom-in duration-200"
+                                class="absolute left-0 mt-2 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 rounded-2xl p-3 z-50 w-64 animate-in fade-in zoom-in-95 duration-200 origin-top-left"
                             >
-                                <select v-model="selectedTag" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs mb-2 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none bg-gray-50">
-                                    <option disabled value="">Select tag</option>
-                                    <option v-for="t in allTags" :key="t.id" :value="t.id">
-                                        {{ t.tag_name }}
-                                    </option>
-                                </select>
-                                <Button
-                                    size="sm"
-                                    class="w-full bg-emerald-600 hover:bg-emerald-700 rounded-lg h-8 text-xs"
-                                    @click="addTag(thread.id)"
-                                >
-                                    Add Tag
-                                </Button>
+                                <div class="relative mb-2">
+                                    <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                                    <input 
+                                        v-model="tagSearchQuery"
+                                        type="text" 
+                                        placeholder="Search tags..." 
+                                        class="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div class="max-h-48 overflow-y-auto custom-scrollbar rounded-xl border border-gray-50">
+                                    <div v-if="filteredTags.length === 0" class="p-4 text-center text-[10px] text-gray-400 font-medium">
+                                        No tags found
+                                    </div>
+                                    <button
+                                        v-for="tag in filteredTags.filter(t => !thread.tags?.some(tt => tt.id === t.id))"
+                                        :key="tag.id"
+                                        @click="addTag(thread.id, tag)"
+                                        class="w-full text-left px-3 py-2 text-[11px] font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors flex items-center gap-2"
+                                    >
+                                        <div class="w-1 h-1 rounded-full bg-emerald-400"></div>
+                                        {{ tag.tag_name }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
