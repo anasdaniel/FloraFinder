@@ -17,7 +17,8 @@ class ForumTagFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'tag_name' => $this->faker->unique()->word(),
+            'tag_category' => $this->faker->word(),
         ];
     }
 }

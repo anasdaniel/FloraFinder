@@ -17,7 +17,10 @@ class ForumThreadFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'title' => $this->faker->sentence(),
+            'content' => $this->faker->paragraph(),
+            'category' => $this->faker->randomElement(['General', 'Identification', 'Showcase']),
+            'user_id' => \App\Models\User::factory(),
         ];
     }
 }

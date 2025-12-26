@@ -15,6 +15,8 @@ class ForumTag extends Model
         'tag_category',
     ];
 
+    public $timestamps = false;
+
     public function threads()
     {
         return $this->belongsToMany(ForumThread::class, 'thread_tag');
