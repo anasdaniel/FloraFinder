@@ -192,9 +192,18 @@ const hasTrefleCare = computed(() => {
   return (
     props.plant.care_source === "trefle" &&
     (props.plant.light !== null ||
+    props.plant.atmospheric_humidity !== null ||
     props.plant.minimum_temperature_celsius !== null ||
+    props.plant.maximum_temperature_celsius !== null ||
+    props.plant.ph_minimum !== null ||
+    props.plant.ph_maximum !== null ||
     props.plant.minimum_precipitation_mm !== null ||
-    props.plant.soil_texture !== null)
+    props.plant.maximum_precipitation_mm !== null ||
+    props.plant.soil_texture !== null ||
+    props.plant.soil_nutriments !== null ||
+    props.plant.growth_months !== null ||
+    props.plant.bloom_months !== null ||
+    props.plant.fruit_months !== null)
   );
 });
 
@@ -835,48 +844,117 @@ const getConservationMessage = (category: string | null): string => {
                 </div>
               </div>
 
-              <!-- Trefle Care (Fallback) -->
-              <div v-else-if="hasTrefleCare" class="grid gap-6 sm:grid-cols-2">
-                <!-- Existing Trefle cards logic but styled better -->
-                <div class="p-6 transition-all duration-300 bg-white border border-gray-100 shadow-sm rounded-3xl hover:shadow-md hover:-translate-y-1">
-                  <div class="flex items-center gap-3 mb-6">
-                    <div class="p-2.5 text-yellow-600 bg-yellow-50 rounded-xl">
-                      <Sun class="w-6 h-6" />
+              <!-- Trefle Care (Primary for Database) -->
+              <div v-else-if="hasTrefleCare" class="grid gap-6">
+                <div class="grid gap-6 sm:grid-cols-2">
+                  <!-- Light & Atmosphere -->
+                  <div class="p-6 transition-all duration-300 bg-white border border-gray-100 shadow-sm rounded-3xl hover:shadow-md hover:-translate-y-1">
+                    <div class="flex items-center gap-3 mb-6">
+                      <div class="p-2.5 text-yellow-600 bg-yellow-50 rounded-xl">
+                        <Sun class="w-6 h-6" />
+                      </div>
+                      <h3 class="font-bold text-gray-900">Light & Atmosphere</h3>
                     </div>
-                    <h3 class="font-bold text-gray-900">Light & Atmosphere</h3>
+                    <div class="space-y-6">
+                      <div v-if="plant.light !== null">
+                        <div class="flex justify-between mb-2 text-sm">
+                          <span class="text-gray-500">Light Level</span>
+                          <span class="font-bold text-gray-900">{{ getLightLabel(plant.light) }}</span>
+                        </div>
+                        <div class="h-2.5 overflow-hidden bg-gray-100 rounded-full">
+                          <div class="h-full bg-yellow-400 rounded-full" :style="{ width: `${(plant.light || 0) * 10}%` }"></div>
+                        </div>
+                      </div>
+                      <div v-if="plant.atmospheric_humidity !== null">
+                        <div class="flex justify-between mb-2 text-sm">
+                          <span class="text-gray-500">Humidity</span>
+                          <span class="font-bold text-gray-900">{{ getHumidityLabel(plant.atmospheric_humidity) }}</span>
+                        </div>
+                        <div class="h-2.5 overflow-hidden bg-gray-100 rounded-full">
+                          <div class="h-full bg-blue-400 rounded-full" :style="{ width: `${(plant.atmospheric_humidity || 0) * 10}%` }"></div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="space-y-6">
-                    <div>
-                      <div class="flex justify-between mb-2 text-sm">
-                        <span class="text-gray-500">Light Level</span>
-                        <span class="font-bold text-gray-900">{{
-                          getLightLabel(plant.light)
-                        }}</span>
+
+                  <!-- Temperature & PH -->
+                  <div class="p-6 transition-all duration-300 bg-white border border-gray-100 shadow-sm rounded-3xl hover:shadow-md hover:-translate-y-1">
+                    <div class="flex items-center gap-3 mb-6">
+                      <div class="p-2.5 text-rose-600 bg-rose-50 rounded-xl">
+                        <Thermometer class="w-6 h-6" />
                       </div>
-                      <div class="h-2.5 overflow-hidden bg-gray-100 rounded-full">
-                        <div
-                          class="h-full bg-yellow-400 rounded-full"
-                          :style="{ width: `${(plant.light || 0) * 10}%` }"
-                        ></div>
+                      <h3 class="font-bold text-gray-900">Conditions</h3>
+                    </div>
+                    <div class="space-y-4">
+                      <div v-if="plant.minimum_temperature_celsius !== null || plant.maximum_temperature_celsius !== null" class="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                        <span class="text-sm font-medium text-gray-500">Temperature</span>
+                        <span class="text-sm font-bold text-gray-900">
+                          {{ plant.minimum_temperature_celsius }}°C - {{ plant.maximum_temperature_celsius }}°C
+                        </span>
+                      </div>
+                      <div v-if="plant.ph_minimum !== null || plant.ph_maximum !== null" class="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                        <span class="text-sm font-medium text-gray-500">Soil pH</span>
+                        <span class="text-sm font-bold text-gray-900">
+                          {{ plant.ph_minimum }} - {{ plant.ph_maximum }}
+                        </span>
+                      </div>
+                      <div v-if="plant.minimum_precipitation_mm !== null" class="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                        <span class="text-sm font-medium text-gray-500">Min Rain/yr</span>
+                        <span class="text-sm font-bold text-gray-900">{{ plant.minimum_precipitation_mm }}mm</span>
                       </div>
                     </div>
-                    <div>
-                      <div class="flex justify-between mb-2 text-sm">
-                        <span class="text-gray-500">Humidity</span>
-                        <span class="font-bold text-gray-900">{{
-                          getHumidityLabel(plant.atmospheric_humidity)
-                        }}</span>
+                  </div>
+
+                  <!-- Soil Requirements -->
+                  <div v-if="plant.soil_texture || plant.soil_nutriments !== null" class="p-6 transition-all duration-300 bg-white border border-gray-100 shadow-sm rounded-3xl hover:shadow-md hover:-translate-y-1">
+                    <div class="flex items-center gap-3 mb-6">
+                      <div class="p-2.5 text-emerald-600 bg-emerald-50 rounded-xl">
+                        <Sprout class="w-6 h-6" />
                       </div>
-                      <div class="h-2.5 overflow-hidden bg-gray-100 rounded-full">
-                        <div
-                          class="h-full bg-blue-400 rounded-full"
-                          :style="{ width: `${(plant.atmospheric_humidity || 0) * 10}%` }"
-                        ></div>
+                      <h3 class="font-bold text-gray-900">Soil Requirements</h3>
+                    </div>
+                    <div class="space-y-4">
+                      <div v-if="plant.soil_texture" class="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                        <span class="text-sm font-medium text-gray-500">Texture</span>
+                        <span class="text-sm font-bold text-gray-900">{{ getSoilTextureLabel(plant.soil_texture) }}</span>
+                      </div>
+                      <div v-if="plant.soil_nutriments !== null" class="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                        <span class="text-sm font-medium text-gray-500">Nutrients</span>
+                        <span class="text-sm font-bold text-gray-900">{{ getSoilNutrimentsLabel(plant.soil_nutriments) }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Growth & Space -->
+                  <div v-if="plant.spread_cm || plant.row_spacing_cm || plant.days_to_harvest" class="p-6 transition-all duration-300 bg-white border border-gray-100 shadow-sm rounded-3xl hover:shadow-md hover:-translate-y-1">
+                    <div class="flex items-center gap-3 mb-6">
+                      <div class="p-2.5 text-blue-600 bg-blue-50 rounded-xl">
+                        <RefreshCw class="w-6 h-6" />
+                      </div>
+                      <h3 class="font-bold text-gray-900">Growth Specs</h3>
+                    </div>
+                    <div class="space-y-4">
+                      <div v-if="plant.spread_cm" class="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                        <span class="text-sm font-medium text-gray-500">Plant Spread</span>
+                        <span class="text-sm font-bold text-gray-900">{{ plant.spread_cm }} cm</span>
+                      </div>
+                      <div v-if="plant.days_to_harvest" class="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                        <span class="text-sm font-medium text-gray-500">Maturation</span>
+                        <span class="text-sm font-bold text-gray-900">{{ plant.days_to_harvest }} days</span>
                       </div>
                     </div>
                   </div>
                 </div>
-                <!-- Add other Trefle cards similarly if needed, keeping it concise for now -->
+
+                <!-- Note about data source -->
+                <div class="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-start gap-3">
+                  <div class="p-1.5 bg-white rounded-lg shadow-sm mt-0.5">
+                    <TreeDeciduous class="w-4 h-4 text-green-600" />
+                  </div>
+                  <p class="text-xs text-gray-500 leading-relaxed">
+                    Data provided by Trefle Plant Database. This scientific data reflects optimal growing conditions found in natural habitats and established agricultural records.
+                  </p>
+                </div>
               </div>
             </div>
 

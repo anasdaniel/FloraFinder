@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\AdminForumController;
 use App\Http\Controllers\Admin\AdminPlantController;
+use App\Http\Controllers\Admin\AdminSightingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlantIdentifierController;
 use App\Http\Controllers\ForumController;
@@ -156,14 +158,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/plants/{plant}', [AdminPlantController::class, 'destroy'])->name('plants.destroy');
 
     // Forum Moderation
-    Route::get('/forum', [\App\Http\Controllers\Admin\AdminForumController::class, 'index'])->name('forum.index');
-    Route::get('/forum/threads/{thread}', [\App\Http\Controllers\Admin\AdminForumController::class, 'show'])->name('forum.threads.show');
-    Route::delete('/forum/threads/{thread}', [\App\Http\Controllers\Admin\AdminForumController::class, 'destroyThread'])->name('forum.threads.destroy');
-    Route::delete('/forum/posts/{post}', [\App\Http\Controllers\Admin\AdminForumController::class, 'destroyPost'])->name('forum.posts.destroy');
+    Route::get('/forum', [AdminForumController::class, 'index'])->name('forum.index');
+    Route::get('/forum/threads/{thread}', [AdminForumController::class, 'show'])->name('forum.threads.show');
+    Route::delete('/forum/threads/{thread}', [AdminForumController::class, 'destroyThread'])->name('forum.threads.destroy');
+    Route::delete('/forum/posts/{post}', [AdminForumController::class, 'destroyPost'])->name('forum.posts.destroy');
 
     // Sighting Management
-    Route::get('/sightings', [\App\Http\Controllers\Admin\AdminSightingController::class, 'index'])->name('sightings.index');
-    Route::delete('/sightings/{sighting}', [\App\Http\Controllers\Admin\AdminSightingController::class, 'destroy'])->name('sightings.destroy');
+    Route::get('/sightings', [AdminSightingController::class, 'index'])->name('sightings.index');
+    Route::delete('/sightings/{sighting}', [AdminSightingController::class, 'destroy'])->name('sightings.destroy');
 });
 
 require __DIR__ . '/settings.php';

@@ -783,16 +783,35 @@ PROMPT;
             }
         }
 
-        // For Trefle numeric responses, check for numeric data
+        // For Trefle numeric and categorical responses
         $numericFields = [
             'ph_minimum',
             'ph_maximum',
             'minimum_temperature_celsius',
             'maximum_temperature_celsius',
+            'light',
+            'atmospheric_humidity',
+            'soil_nutriments',
+            'soil_salinity',
+            'soil_texture',
+            'soil_humidity',
+            'minimum_precipitation_mm',
+            'maximum_precipitation_mm',
+            'days_to_harvest',
+            'row_spacing_cm',
+            'spread_cm',
         ];
 
         foreach ($numericFields as $field) {
             if (isset($data[$field]) && is_numeric($data[$field])) {
+                return true;
+            }
+        }
+
+        // Check for monthly cycle data
+        $monthFields = ['growth_months', 'bloom_months', 'fruit_months'];
+        foreach ($monthFields as $field) {
+            if (!empty($data[$field]) && is_array($data[$field])) {
                 return true;
             }
         }

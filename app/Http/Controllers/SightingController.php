@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use App\Models\Plant;
 
 class SightingController extends Controller
 {
@@ -250,13 +251,12 @@ class SightingController extends Controller
             ->values()
             ->toArray();
 
-        // Get unique IUCN categories for filter dropdown
-        $statuses = Sighting::where('user_id', Auth::id())
-            ->with('plant') // Eager load to access plant relationship
-            ->get()
-            ->pluck('plant.iucn_category')
-            ->filter() // Remove nulls
-            ->unique()
+        $statuses = Plant::whereHas('sightings', function ($q) {
+                $q->where('user_id', Auth::id());
+            })
+            ->whereNotNull('iucn_category')
+            ->distinct()
+            ->pluck('iucn_category')
             ->sort()
             ->values()
             ->toArray();
@@ -367,12 +367,10 @@ class SightingController extends Controller
             ->values()
             ->toArray();
 
-        // Get unique plant families for filter dropdown
-        $families = Sighting::with('plant')
-            ->get()
-            ->pluck('plant.family')
-            ->filter()
-            ->unique()
+        $families = Plant::whereHas('sightings')
+            ->whereNotNull('family')
+            ->distinct()
+            ->pluck('family')
             ->sort()
             ->values()
             ->toArray();
@@ -388,13 +386,12 @@ class SightingController extends Controller
             ['code' => 'CR', 'label' => 'Critically Endangered'],
         ];
 
-        // Calculate statistics
-        $allSightings = Sighting::with('plant')->get();
+        // Calculate statistics using database-level aggregations
         $stats = [
-            'total_sightings' => $allSightings->count(),
-            'unique_species' => $allSightings->pluck('scientific_name')->unique()->count(),
-            'unique_families' => $allSightings->pluck('plant.family')->filter()->unique()->count(),
-            'unique_regions' => $allSightings->pluck('region')->filter()->unique()->count(),
+            'total_sightings' => Sighting::count(),
+            'unique_species' => Sighting::distinct('scientific_name')->count('scientific_name'),
+            'unique_families' => Plant::whereHas('sightings')->whereNotNull('family')->distinct('family')->count('family'),
+            'unique_regions' => Sighting::whereNotNull('region')->distinct('region')->count('region'),
         ];
 
         return Inertia::render('Sightings/PublicMap', [

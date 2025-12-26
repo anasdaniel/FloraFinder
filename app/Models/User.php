@@ -58,6 +58,6 @@ class User extends Authenticatable
     }
     public function sightings()
     {
-        return $this->hasMany(Plant::class);
+        return $this->hasMany(Sighting::class);
     }
 }

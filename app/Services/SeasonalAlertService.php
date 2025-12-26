@@ -35,15 +35,12 @@ class SeasonalAlertService
         $livePlantIds = $liveAlerts->pluck('plant_id')->toArray();
 
         $staticAlerts = Plant::whereNotIn('id', $livePlantIds)
-            ->get()
-            ->filter(function ($plant) use ($currentMonth) {
-                $bloomMonths = is_array($plant->bloom_months) ? $plant->bloom_months : json_decode($plant->bloom_months ?? '[]', true);
-                $fruitMonths = is_array($plant->fruit_months) ? $plant->fruit_months : json_decode($plant->fruit_months ?? '[]', true);
-
-                return in_array((string)$currentMonth, $bloomMonths ?: []) ||
-                    in_array((string)$currentMonth, $fruitMonths ?: []);
+            ->where(function ($q) use ($currentMonth) {
+                $q->whereJsonContains('bloom_months', (string)$currentMonth)
+                    ->orWhereJsonContains('fruit_months', (string)$currentMonth);
             })
             ->take(3)
+            ->get()
             ->map(function ($plant) use ($currentMonth) {
                 $bloomMonths = is_array($plant->bloom_months) ? $plant->bloom_months : json_decode($plant->bloom_months ?? '[]', true);
                 $isBlooming = in_array((string)$currentMonth, $bloomMonths ?: []);

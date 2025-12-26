@@ -49,6 +49,10 @@ class ForumThread extends Model
 
     public function getIsLikedByUserAttribute()
     {
+        if (array_key_exists('is_liked_by_user', $this->attributes)) {
+            return (bool) $this->attributes['is_liked_by_user'];
+        }
+
         if (!auth()->check()) {
             return false;
         }

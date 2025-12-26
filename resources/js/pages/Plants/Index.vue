@@ -355,6 +355,7 @@ const goToPage = (url: string | null) => {
                                     v-if="plant.latest_image"
                                     :src="plant.latest_image"
                                     :alt="plant.common_name || plant.scientific_name"
+                                    loading="lazy"
                                     class="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
                                 />
                                 <div v-else class="flex items-center justify-center w-full h-full bg-gradient-to-br from-green-50 to-emerald-100">
@@ -486,6 +487,7 @@ const goToPage = (url: string | null) => {
                                         v-if="plant.latest_image"
                                         :src="plant.latest_image"
                                         :alt="plant.common_name || plant.scientific_name"
+                                        loading="lazy"
                                         class="object-cover w-full h-full"
                                     />
                                     <Leaf v-else class="w-6 h-6 text-gray-600" />

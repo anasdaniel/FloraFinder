@@ -104,16 +104,21 @@ class DashboardController extends Controller
             ->groupBy('scientific_name')
             ->get();
 
-        // Get activity data for the chart
+        // Get activity data for the chart - optimized to avoid queries in loop
+        $monthStartBoundary = Carbon::now()->subMonths($range - 1)->startOfMonth();
+        $sightingsInRange = Sighting::where('user_id', $userId)
+            ->where('created_at', '>=', $monthStartBoundary)
+            ->get(['created_at']);
+
         $activityData = [];
         for ($i = $range - 1; $i >= 0; $i--) {
             $month = Carbon::now()->subMonths($i);
             $monthStart = $month->copy()->startOfMonth();
             $monthEnd = $month->copy()->endOfMonth();
 
-            $sightingsCount = Sighting::where('user_id', $userId)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->count();
+            $sightingsCount = $sightingsInRange->filter(function ($sighting) use ($monthStart, $monthEnd) {
+                return $sighting->created_at->between($monthStart, $monthEnd);
+            })->count();
 
             // Count species whose FIRST detection was in this month
             $newSpeciesCount = $firstDetections->filter(function ($detection) use ($monthStart, $monthEnd) {

@@ -101,8 +101,8 @@ class Plant extends Model
             'fruit_months' => $this->fruit_months,
             'minimum_precipitation' => $this->minimum_precipitation_mm,
             'maximum_precipitation' => $this->maximum_precipitation_mm,
-            'minimum_temperature_celcius' => $this->minimum_temperature_celsius,
-            'maximum_temperature_celcius' => $this->maximum_temperature_celsius,
+            'minimum_temperature_celsius' => $this->minimum_temperature_celsius,
+            'maximum_temperature_celsius' => $this->maximum_temperature_celsius,
             'soil_nutriments' => $this->soil_nutriments,
             'soil_salinity' => $this->soil_salinity,
             'soil_texture' => $this->soil_texture,
@@ -157,5 +157,13 @@ class Plant extends Model
     public function plantingRecommendations()
     {
         return $this->belongsTo(PlantingRecommendation::class, 'planting_recommendation_id');
+    }
+
+    /**
+     * Get the latest sighting for this plant that has an image.
+     */
+    public function latestSighting()
+    {
+        return $this->hasOne(Sighting::class)->whereNotNull('image_url')->latestOfMany('sighted_at');
     }
 }

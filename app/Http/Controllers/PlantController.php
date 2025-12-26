@@ -41,16 +41,11 @@ class PlantController extends Controller
             $query->whereIn('iucn_category', ['EX', 'EW', 'CR', 'EN', 'VU', 'NT']);
         }
 
-        $plants = $query->orderBy('scientific_name')->paginate(20);
+        $plants = $query->with(['latestSighting'])->orderBy('scientific_name')->paginate(20);
 
         // Load the latest sighting image for each plant, or use the API image as fallback
         $plants->getCollection()->transform(function ($plant) {
-            $latestSighting = $plant->sightings()
-                ->whereNotNull('image_url')
-                ->latest('sighted_at')
-                ->first();
-
-            $plant->latest_image = $latestSighting?->image_url ?? $plant->image_url;
+            $plant->latest_image = $plant->latestSighting?->image_url ?? $plant->image_url;
             return $plant;
         });
 

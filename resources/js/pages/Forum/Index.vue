@@ -582,6 +582,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Forum", href: "/forum" }];
                      <div v-if="thread.image" class="mb-4 relative rounded-xl overflow-hidden border border-gray-100 group/image">
                         <img
                             :src="`/storage/${thread.image}`"
+                            loading="lazy"
                             class="w-full h-auto max-h-[400px] object-cover transition-transform duration-500 group-hover/image:scale-[1.02]"
                         />
                         <div class="absolute bottom-2.5 right-2.5 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-lg text-[9px] font-semibold flex items-center gap-1">

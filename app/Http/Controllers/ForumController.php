@@ -22,15 +22,11 @@ class ForumController extends Controller
         $query = ForumThread::with([
             'user',
             'tags',
-            'posts' => function ($query) {
-                $query->whereNull('parent_post_id')->orderBy('created_at', 'asc');
-            },
             'posts.user',
-            'posts.replies' => function ($q) {
-                $q->orderBy('created_at', 'asc');
-            },
             'posts.replies.user',
-        ])->withCount('allPosts as posts_count')->latest();
+        ])->withExists(['likes as is_liked_by_user' => function ($q) {
+            $q->where('user_id', auth()->id());
+        }])->withCount('allPosts as posts_count')->latest();
 
         if ($request->filled('category') && $request->category !== 'all') {
             $query->where('category', $request->category);
@@ -148,15 +144,11 @@ class ForumController extends Controller
         $thread = ForumThread::with([
             'user',
             'tags',
-            'posts' => function ($q) {
-                $q->whereNull('parent_post_id')->orderBy('created_at', 'asc'); // top-level comments only
-            },
             'posts.user',
-            'posts.replies' => function ($q) {
-                $q->orderBy('created_at', 'asc'); // replies of each post
-            },
             'posts.replies.user'
-        ])->findOrFail($id);
+        ])->withExists(['likes as is_liked_by_user' => function ($q) {
+            $q->where('user_id', auth()->id());
+        }])->findOrFail($id);
 
         return Inertia::render('Forum/Post', [
             'thread' => $thread,
